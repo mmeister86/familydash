@@ -403,10 +403,10 @@ function renderCalendars(d) {
 // for testing on the laptop. Each scene lists the widgets of the focus zone
 // (between clock and school row); the board's rows resize via CSS classes.
 const SCENES = {
-  morning:   { label: "Morgen",     focus: (sc) => (sc.schoolDay ? ["hints", "checklist"] : ["hints", "photos"]) },
-  day:       { label: "Tag",        focus: () => ["photos"] },
-  afternoon: { label: "Nachmittag", focus: () => ["photos"] },
-  evening:   { label: "Abend",      focus: () => ["tomorrow", "photos"] },
+  morning:   { label: "Morgen",     focus: (sc) => (sc.schoolDay ? ["hints", "checklist", "todos"] : ["hints", "todos", "photos"]) },
+  day:       { label: "Tag",        focus: () => ["todos", "photos"] },
+  afternoon: { label: "Nachmittag", focus: () => ["todos", "photos"] },
+  evening:   { label: "Abend",      focus: () => ["tomorrow", "todos", "photos"] },
   night:     { label: "Nacht",      focus: () => [] },
 };
 
@@ -432,12 +432,15 @@ const FOCUS_WIDGETS = {
   hints: (d) => hintsCard("Heute", weatherHints(d.weather, ymd(new Date()), 7, 16)),
   checklist: () => "", // TODO: morning checklist per child (CHECKLIST_n_*), + "Sportbeutel" from the timetable
   tomorrow: (d) => tomorrowCard(d),
+  todos: (d) => todosCard(d.todos),
 };
 
 function renderFocus(d, sc) {
   const wanted = SCENES[sc.name].focus(sc);
-  const cards = wanted.filter((w) => FOCUS_WIDGETS[w]).map((w) => FOCUS_WIDGETS[w](d)).join("");
-  const photos = wanted.includes("photos") && slideshow.has();
+  const shown = wanted.filter((w) => FOCUS_WIDGETS[w]).map((w) => FOCUS_WIDGETS[w](d)).filter(Boolean);
+  const cards = shown.join("");
+  // two cards need the full width – the photo only joins a single card
+  const photos = wanted.includes("photos") && slideshow.has() && shown.length < 2;
   $("focus-cards").innerHTML = cards;
   $("focus").classList.toggle("no-photo", !photos);
   $("board").classList.toggle("no-focus", !cards && !photos);
@@ -508,6 +511,48 @@ function tomorrowCard(d) {
     <div class="head"><span class="dot" style="--c:var(--accent)"></span><span class="name">Morgen</span>
       <span class="meta">${esc(fmt.wdShort.format(tomorrow) + " " + fmt.dayMonthShort.format(tomorrow))}</span></div>
     ${rows.length ? rows.join("") : `<div class="empty">Nichts Besonderes – ruhiger Tag 🙂</div>`}
+  </div>`;
+}
+
+// ------------------------------------------------------------------ to-dos (Things 3)
+
+// Today's to-dos of one Things area (THINGS_AREA). Open ones in Things' order
+// ("This Evening" last, with a moon), then what was ticked off today, struck
+// through. The card disappears when there's nothing open and nothing done.
+const MAX_TODOS = 8;
+const TODO_DONE_SHOWN = 3; // ticked-off tasks listed below the open ones
+
+const CHECK_SVG = `<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.2"/><path class="tick" d="M6.2 10.4l2.5 2.5 5.1-5.6"/></svg>`;
+
+function todoRow(t) {
+  const diff = t.deadline ? dayDiff(t.deadline) : null;
+  const due = diff === null ? "" : diff < 0 ? `<span class="tag danger">überfällig</span>`
+    : diff === 0 ? `<span class="tag danger">heute fällig</span>`
+    : diff === 1 ? `<span class="tag warn">morgen fällig</span>` : "";
+  const meta = [
+    t.project ? esc(t.project) : "",
+    t.checklist ? `${t.checklist.done}/${t.checklist.total} erledigt` : "",
+  ].filter(Boolean).join(" · ");
+  return `<div class="todo${t.done ? " done" : ""}">
+    <span class="box">${CHECK_SVG}</span>
+    <span class="what"><span class="t">${esc(t.title)}</span>${t.done ? "" : due}${t.evening && !t.done ? `<span class="eve" title="Heute Abend">🌙</span>` : ""}${meta ? `<span class="sub">${meta}</span>` : ""}</span>
+  </div>`;
+}
+
+function todosCard(list) {
+  if (!list) return "";
+  const tasks = list.tasks || [];
+  const open = tasks.filter((t) => !t.done), done = tasks.filter((t) => t.done);
+  if (!open.length && !done.length) return list.error ? `<div class="panel focus-card todos"><div class="head"><span class="dot" style="--c:var(--good)"></span><span class="name">To-dos</span></div><p class="hint">${esc(list.error)}</p></div>` : "";
+  const shownOpen = open.slice(0, MAX_TODOS);
+  const shownDone = done.slice(0, Math.max(0, Math.min(TODO_DONE_SHOWN, MAX_TODOS - shownOpen.length)));
+  const hidden = open.length - shownOpen.length;
+  return `<div class="panel focus-card todos fade">
+    <div class="head"><span class="dot" style="--c:var(--good)"></span><span class="name">To-dos</span>
+      <span class="meta">${open.length ? `${open.length} offen` : "alles erledigt 🎉"}</span></div>
+    ${shownOpen.map(todoRow).join("")}
+    ${hidden > 0 ? `<div class="more">+ ${hidden} weitere</div>` : ""}
+    ${shownDone.map(todoRow).join("")}
   </div>`;
 }
 
@@ -583,6 +628,7 @@ function renderStatus() {
     if (d.school?.error && d.school.students?.length) parts.push(`<span class="err">Schule: ${esc(d.school.error)}</span>`);
     if (d.shopping?.error && d.shopping.items?.length) parts.push(`<span class="err">Bring!: ${esc(d.shopping.error)}</span>`);
     for (const c of d.meals?.children || []) if (c.error && c.days?.length) parts.push(`<span class="err">Essen ${esc(c.name)}: ${esc(c.error)}</span>`);
+    if (d.todos?.error && d.todos.tasks?.length) parts.push(`<span class="err">Things: ${esc(d.todos.error)}</span>`);
   }
   if (d) {
     const sc = currentScene(d);

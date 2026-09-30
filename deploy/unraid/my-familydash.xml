@@ -10,7 +10,7 @@
   <Network>bridge</Network>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
-  <Overview>Leichtgewichtiges Familiendashboard fürs Wanddisplay: Google Kalender (iCal), Wetter (Open-Meteo), Stundenplan/Vertretungen/Hausaufgaben (beste.schule), Einkaufsliste (Bring!), Schulessen (VielfaltMenü). Ein statisches Go-Binary, ~8 MB Image.</Overview>
+  <Overview>Leichtgewichtiges Familiendashboard fürs Wanddisplay: Google Kalender (iCal), Wetter (Open-Meteo), Stundenplan/Vertretungen/Hausaufgaben (beste.schule), Einkaufsliste (Bring!), Schulessen (VielfaltMenü), To-dos (Things 3). Statische Binaries, ~20 MB Image.</Overview>
   <Category>Productivity: HomeAutomation:</Category>
   <WebUI>http://[IP]:[PORT:8080]/</WebUI>
   <ExtraParams>--restart unless-stopped</ExtraParams>
@@ -74,6 +74,11 @@
 
   <Config Name="Fotos" Target="/data/pictures" Default="/mnt/user/appdata/familydash/pictures" Mode="ro" Description="Ordner mit JPG/PNG/WebP für die Diashow (kein HEIC)" Type="Path" Display="always" Required="false">/mnt/user/appdata/familydash/pictures</Config>
   <Config Name="Fotos – Anzeigedauer" Target="PHOTOS_INTERVAL" Default="45s" Type="Variable" Display="advanced" Required="false">45s</Config>
+
+  <Config Name="Things – E-Mail" Target="THINGS_EMAIL" Default="" Description="Things-Cloud-Login (inoffiziell, nur lesend). Leer = keine To-do-Karte" Type="Variable" Display="always" Required="false"></Config>
+  <Config Name="Things – Passwort" Target="THINGS_PASSWORD" Default="" Type="Variable" Display="always" Required="false" Mask="true"></Config>
+  <Config Name="Things – Bereich" Target="THINGS_AREA" Default="Familie" Description="Things-Bereich, dessen Heute-Aufgaben angezeigt werden" Type="Variable" Display="always" Required="false">Familie</Config>
+  <Config Name="Things – Cache" Target="/data/things" Default="/mnt/user/appdata/familydash/things" Mode="rw" Description="Sync-Cache der things3-CLI (muss nobody:users gehören)" Type="Path" Display="advanced" Required="false">/mnt/user/appdata/familydash/things</Config>
 
   <Config Name="Szene Morgen" Target="SCENE_MORNING" Default="06:00" Description="Schultage Mo–Fr; off = Szene auslassen" Type="Variable" Display="advanced" Required="false">06:00</Config>
   <Config Name="Szene Tag" Target="SCENE_DAY" Default="08:00" Type="Variable" Display="advanced" Required="false">08:00</Config>

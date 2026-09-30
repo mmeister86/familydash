@@ -20,6 +20,7 @@ import (
 	"familydash/internal/config"
 	"familydash/internal/photos"
 	"familydash/internal/server"
+	"familydash/internal/things"
 	"familydash/internal/timetable"
 	"familydash/internal/vielfalt"
 	"familydash/internal/waste"
@@ -36,6 +37,7 @@ func main() {
 	schoolDump := flag.Bool("besteschule-dump", false, "print the raw beste.schule API responses as JSON and exit")
 	schoolPreview := flag.Bool("besteschule-preview", false, "print what the dashboard would show from beste.schule and exit")
 	mealsPreview := flag.Bool("vielfalt-preview", false, "log in to VielfaltMenü, print the ordered meals and exit")
+	todosPreview := flag.Bool("things-preview", false, "sync with Things Cloud, print today's to-dos of THINGS_AREA and exit")
 	flag.Parse()
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
@@ -53,6 +55,9 @@ func main() {
 	}
 	if *mealsPreview {
 		os.Exit(meals(cfg))
+	}
+	if *todosPreview {
+		os.Exit(todos(cfg))
 	}
 	if version == "dev" {
 		version = fmt.Sprintf("dev-%d", time.Now().Unix())
@@ -113,7 +118,13 @@ func main() {
 		go ph.Run(ctx, cfg.PhotosRefresh)
 	}
 
-	src := server.Sources{Weather: wx, Bring: br, School: sc, Plan: plan, Meals: ml, Waste: ws, Photos: ph}
+	var td *things.Service
+	if cfg.ThingsEnabled() {
+		td = newTodos(cfg)
+		go td.Run(ctx, cfg.ThingsRefresh)
+	}
+
+	src := server.Sources{Weather: wx, Bring: br, School: sc, Plan: plan, Meals: ml, Waste: ws, Photos: ph, Todos: td}
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
 		Handler:           server.New(cfg, version, cal, src, web.Static()).Handler(),
@@ -129,7 +140,7 @@ func main() {
 	slog.Info("familydash started", "version", version, "addr", cfg.ListenAddr,
 		"calendars", len(cfg.Calendars), "weather", cfg.WeatherEnabled(), "tz", cfg.Location.String(),
 		"bring", cfg.BringEnabled(), "besteschule", cfg.SchoolEnabled(), "timetable", plan != nil, "vielfalt", len(cfg.Meals), "waste", len(cfg.Waste),
-		"photos", cfg.PhotosDir, "scene", cfg.Scenes.At(time.Now(), cfg.Location).Name)
+		"photos", cfg.PhotosDir, "things", cfg.ThingsEnabled(), "scene", cfg.Scenes.At(time.Now(), cfg.Location).Name)
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("server", "err", err)
 		os.Exit(1)
@@ -199,6 +210,34 @@ func meals(cfg *config.Config) int {
 		if c.Error != "" {
 			return 1
 		}
+	}
+	return 0
+}
+
+func newTodos(cfg *config.Config) *things.Service {
+	return things.NewService(cfg.ThingsBin, cfg.ThingsEmail, cfg.ThingsPassword, cfg.ThingsArea, cfg.ThingsStateDir)
+}
+
+// todos checks the Things login and area: `docker exec familydash /familydash -things-preview`
+func todos(cfg *config.Config) int {
+	if !cfg.ThingsEnabled() {
+		fmt.Fprintln(os.Stderr, "THINGS_EMAIL / THINGS_PASSWORD are not set")
+		return 1
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	s := newTodos(cfg)
+	s.Refresh(ctx)
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	enc.SetEscapeHTML(false)
+	snap := s.Snapshot()
+	if err := enc.Encode(snap); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if snap == nil || snap.Error != "" {
+		return 1
 	}
 	return 0
 }

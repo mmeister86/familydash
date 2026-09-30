@@ -1,11 +1,12 @@
 # familydash
 
-A lightweight family wall dashboard: **Google Calendar**, **weather**, the **school timetable** from beste.schule and the **Bring! shopping list** and the **school lunch** ordered at VielfaltMenü on one screen.
-Runs as a single static Go binary in an ~8 MB container on Unraid; a Raspberry Pi only runs a browser in kiosk mode.
+A lightweight family wall dashboard: **Google Calendar**, **weather**, the **school timetable** from beste.schule and the **Bring! shopping list**, the **school lunch** ordered at VielfaltMenü and today's **Things 3 to-dos** on one screen.
+Runs as a static Go binary in a ~20 MB container on Unraid; a Raspberry Pi only runs a browser in kiosk mode.
 
 <img src="docs/screenshot.png" alt="Wall display (portrait)" width="420">
 
 - Go standard library only — no dependencies, no database, no Node build step
+- The image also ships the [things3](https://github.com/evanpurkhiser/things3-cloud) CLI (Rust, MIT) for the Things card
 - Frontend is plain HTML/CSS/JS, embedded in the binary
 - Reloads itself on the wall display when you deploy a new image
 - Keeps the last good data per source, so a flaky feed never blanks the screen
@@ -15,7 +16,8 @@ Runs as a single static Go binary in an ~8 MB container on Unraid; a Raspberry P
  Open-Meteo      ──(15 min)──────────────────┤
  beste.schule    ──(API token, 15 min)───────┼──▶ familydash (Unraid, :8080) ◀── Chromium kiosk (Raspberry Pi)
  Bring!          ──(login, 2 min)────────────┤
- VielfaltMenü    ──(login per child, 30 min)─┘
+ VielfaltMenü    ──(login per child, 30 min)─┤
+ Things Cloud    ──(things3 CLI, 5 min)──────┘
 ```
 
 ## Quick start (Unraid)
@@ -67,6 +69,10 @@ All settings are environment variables.
 | `PHOTOS_REFRESH` | `5m` | How often the folder is rescanned |
 | `VIELFALT_n_COLOR` | palette | Dot color of the card |
 | `VIELFALT_REFRESH` | `30m` | |
+| `THINGS_EMAIL` / `THINGS_PASSWORD` | – | Things Cloud account; the to-do card is off until set |
+| `THINGS_AREA` | `Familie` | Things area whose **Today** to-dos are shown (title, case-insensitive substring) |
+| `THINGS_REFRESH` | `5m` | |
+| `THINGS_STATE_DIR` | `/data/things` | Sync cache of the CLI; falls back to `/tmp` when not writable (then it syncs from scratch after a restart) |
 | `LISTEN_ADDR` | `:8080` | |
 
 Values may be wrapped in quotes (`KEY="value"`) – they are stripped, since `docker --env-file` would otherwise keep them.
@@ -166,17 +172,37 @@ button has `data-quantity-ordered` ≥ 1. It may break when the portal changes; 
 docker exec familydash /familydash -vielfalt-preview
 ```
 
+### Things 3 (to-dos)
+
+Put the family's to-dos into one Things area (default `Familie`) and set `THINGS_EMAIL` / `THINGS_PASSWORD`
+(your Things Cloud login). The card shows what that area has in **Today** – in Things' order, „This Evening" last with a 🌙 –
+plus what was ticked off today, struck through. Deadlines today or overdue get a red tag, checklists show their progress.
+It disappears when there's nothing to show.
+
+Things has **no public API**. The image ships [things3](https://github.com/evanpurkhiser/things3-cloud), a CLI that syncs with
+Things Cloud like the apps do (reverse-engineered, pinned to a release in the `Dockerfile`). It may break when Cultured Code changes
+something; only the to-do card is affected then. familydash only runs fixed, **read-only** commands (`find --json`) and never starts
+the CLI's built-in webserver, which would accept any command – including edits – from the network. The CLI keeps a sync cache
+(task titles, no password) in `THINGS_STATE_DIR`; with `-v /mnt/user/appdata/familydash:/data` that folder must be writable for
+`nobody:users` (`chown 99:100`), otherwise it lives in `/tmp` until the next restart. Check the login and area with:
+
+```sh
+docker exec familydash /familydash -things-preview
+```
+
 ### Time-of-day scenes
 
 The board changes its layout with the time of day. A **focus zone** between the clock row and the school row shows what matters right now:
 
 | Scene | Default (school day) | Focus zone |
 |---|---|---|
-| `morning` | 06:00 | Weather hints for the way to school („Regenjacke mitnehmen"), checklist (planned). Weekends: hints + photos |
-| `day` | 08:00 | Photo slideshow |
-| `afternoon` | 15:00 | Photo slideshow |
-| `evening` | 18:00 | „Morgen": bins to put out, tomorrow's appointments, weather hints for tomorrow + photos |
+| `morning` | 06:00 | Weather hints for the way to school („Regenjacke mitnehmen"), checklist (planned), to-dos. Weekends: hints + to-dos + photos |
+| `day` | 08:00 | To-dos + photo slideshow |
+| `afternoon` | 15:00 | To-dos + photo slideshow |
+| `evening` | 18:00 | „Morgen": bins to put out, tomorrow's appointments, weather hints for tomorrow + to-dos + photos |
 | `night` | 21:30 | Everything hidden – only a dimmed clock on black |
+
+Cards with nothing to say disappear. The photo only shares the zone with a single card – with two cards they get the full width.
 
 Try a scene on your laptop with `http://<unraid-ip>:8095/?scene=evening`. Scenes and their widgets are defined in `SCENES` / `FOCUS_WIDGETS` in `web/static/app.js`, row heights in `.board.scene-*` in `style.css`.
 

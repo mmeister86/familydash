@@ -11,6 +11,7 @@
   --danger: #F76C5E;
   --sun: #F7C548;
   --rain: #5AA9F7;
+  --good: #46C28E;
   --radius: 18px;
   --gap: clamp(10px, 1.1vmax, 24px);
   /* the wall display hangs in portrait: size text from the short edge */
@@ -250,6 +251,7 @@ h2 {
   padding: 0.05rem 0.35rem;
   margin-left: 0.4rem;
   vertical-align: 0.1em;
+  white-space: nowrap;
 }
 .tag { background: color-mix(in srgb, var(--muted) 18%, transparent); color: var(--muted); }
 .tag.danger { background: color-mix(in srgb, var(--danger) 22%, transparent); color: var(--danger); }
@@ -384,6 +386,20 @@ h2 {
 .tm-row .dot { display: inline-block; width: 0.8rem; height: 0.8rem; margin-right: 0.45rem; border-radius: 50%; background: var(--c); vertical-align: -0.05em; }
 .bin-row { color: var(--text); }
 .focus-card .ev .cdot { display: inline-block; width: 0.5rem; height: 0.5rem; margin-right: 0.4rem; border-radius: 50%; background: var(--c); vertical-align: 0.1em; }
+
+/* ---------- to-dos (Things 3) */
+.todo { display: grid; grid-template-columns: 1.5rem 1fr; gap: 0.55rem; align-items: start; padding: 0.24rem 0; }
+.todo .box svg { width: 1.3rem; height: 1.3rem; display: block; margin-top: 0.05rem; }
+.todo .box circle { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+.todo .box .tick { fill: none; stroke: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.todo .what { min-width: 0; font-size: 1.05rem; line-height: 1.3; }
+.todo .t { overflow-wrap: anywhere; }
+.todo .eve { margin-left: 0.35rem; font-size: 0.85rem; }
+.todo .sub { display: block; color: var(--muted); font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.todo.done { opacity: 0.45; }
+.todo.done .t { text-decoration: line-through; }
+.todo.done .box circle { fill: var(--good); stroke: var(--good); }
+.todo.done .box .tick { stroke: var(--bg); }
 
 /* slideshow: two stacked images crossfading. Opacity only – cheap on the Pi. */
 .photo-frame {

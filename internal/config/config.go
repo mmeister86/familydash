@@ -68,6 +68,14 @@ type Config struct {
 	PhotosInterval time.Duration
 	PhotosShuffle  bool
 	PhotosRefresh  time.Duration
+
+	// Things 3 to-dos of one area (THINGS_*), read via the things3 CLI
+	ThingsEmail    string
+	ThingsPassword string
+	ThingsArea     string
+	ThingsBin      string
+	ThingsStateDir string // sync cache of the CLI
+	ThingsRefresh  time.Duration
 }
 
 type MealAccount struct {
@@ -106,6 +114,13 @@ func Load() (*Config, error) {
 		PhotosInterval: envDuration("PHOTOS_INTERVAL", 45*time.Second),
 		PhotosShuffle:  !strings.EqualFold(env("PHOTOS_SHUFFLE", "on"), "off"),
 		PhotosRefresh:  envDuration("PHOTOS_REFRESH", 5*time.Minute),
+
+		ThingsEmail:    env("THINGS_EMAIL", ""),
+		ThingsPassword: env("THINGS_PASSWORD", ""),
+		ThingsArea:     env("THINGS_AREA", "Familie"),
+		ThingsBin:      env("THINGS_BIN", "/things3"),
+		ThingsStateDir: env("THINGS_STATE_DIR", "/data/things"),
+		ThingsRefresh:  envDuration("THINGS_REFRESH", 5*time.Minute),
 	}
 	if strings.EqualFold(c.PhotosDir, "off") {
 		c.PhotosDir = ""
@@ -253,6 +268,7 @@ func (c *Config) WeatherEnabled() bool { return c.WeatherLat != 0 || c.WeatherLo
 func (c *Config) BringEnabled() bool   { return c.BringEmail != "" && c.BringPassword != "" }
 func (c *Config) SchoolEnabled() bool  { return c.SchoolToken != "" }
 func (c *Config) MealsEnabled() bool   { return len(c.Meals) > 0 }
+func (c *Config) ThingsEnabled() bool  { return c.ThingsEmail != "" && c.ThingsPassword != "" }
 
 // env reads a variable, trims whitespace and one pair of surrounding quotes.
 // docker --env-file passes quotes through literally, so KEY="value" would

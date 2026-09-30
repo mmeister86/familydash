@@ -14,6 +14,7 @@ import (
 	"familydash/internal/config"
 	"familydash/internal/photos"
 	"familydash/internal/scene"
+	"familydash/internal/things"
 	"familydash/internal/timetable"
 	"familydash/internal/vielfalt"
 	"familydash/internal/waste"
@@ -31,6 +32,7 @@ type Server struct {
 	meals    *vielfalt.Service    // nil if not configured
 	waste    *waste.Service       // nil if not configured
 	photos   *photos.Service      // nil if not configured
+	todos    *things.Service      // nil if not configured
 	static   fs.FS
 }
 
@@ -43,11 +45,12 @@ type Sources struct {
 	Meals   *vielfalt.Service
 	Waste   *waste.Service
 	Photos  *photos.Service
+	Todos   *things.Service
 }
 
 func New(cfg *config.Config, version string, cal *calendar.Service, src Sources, static fs.FS) *Server {
 	return &Server{cfg: cfg, version: version, calendar: cal, weather: src.Weather, bring: src.Bring, school: src.School,
-		plan: src.Plan, meals: src.Meals, waste: src.Waste, photos: src.Photos, static: static}
+		plan: src.Plan, meals: src.Meals, waste: src.Waste, photos: src.Photos, todos: src.Todos, static: static}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -85,6 +88,8 @@ type dashboard struct {
 	Scene scene.Current `json:"scene"`
 	// Slideshow (PHOTOS_DIR); files at /photos/<path>?v=<v>
 	Photos *photos.Snapshot `json:"photos,omitempty"`
+	// Today's to-dos of one Things area (THINGS_*)
+	Todos *things.List `json:"todos,omitempty"`
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, _ *http.Request) {
@@ -119,6 +124,9 @@ func (s *Server) handleDashboard(w http.ResponseWriter, _ *http.Request) {
 	}
 	if s.photos != nil {
 		d.Photos = s.photos.Snapshot()
+	}
+	if s.todos != nil {
+		d.Todos = s.todos.Snapshot()
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, d)
