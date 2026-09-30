@@ -12,6 +12,8 @@ import (
 	"familydash/internal/bring"
 	"familydash/internal/calendar"
 	"familydash/internal/config"
+	"familydash/internal/photos"
+	"familydash/internal/scene"
 	"familydash/internal/timetable"
 	"familydash/internal/vielfalt"
 	"familydash/internal/waste"
@@ -28,16 +30,32 @@ type Server struct {
 	plan     *timetable.File      // nil if not configured
 	meals    *vielfalt.Service    // nil if not configured
 	waste    *waste.Service       // nil if not configured
+	photos   *photos.Service      // nil if not configured
 	static   fs.FS
 }
 
-func New(cfg *config.Config, version string, cal *calendar.Service, wx *weather.Service, br *bring.Service, sc *besteschule.Service, plan *timetable.File, meals *vielfalt.Service, ws *waste.Service, static fs.FS) *Server {
-	return &Server{cfg: cfg, version: version, calendar: cal, weather: wx, bring: br, school: sc, plan: plan, meals: meals, waste: ws, static: static}
+// Sources bundles the optional data sources (nil = not configured).
+type Sources struct {
+	Weather *weather.Service
+	Bring   *bring.Service
+	School  *besteschule.Service
+	Plan    *timetable.File
+	Meals   *vielfalt.Service
+	Waste   *waste.Service
+	Photos  *photos.Service
+}
+
+func New(cfg *config.Config, version string, cal *calendar.Service, src Sources, static fs.FS) *Server {
+	return &Server{cfg: cfg, version: version, calendar: cal, weather: src.Weather, bring: src.Bring, school: src.School,
+		plan: src.Plan, meals: src.Meals, waste: src.Waste, photos: src.Photos, static: static}
 }
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/dashboard", s.handleDashboard)
+	if s.photos != nil {
+		mux.Handle("GET /photos/{path...}", s.photos)
+	}
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	files := http.FileServerFS(s.static)
 	mux.Handle("GET /", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -63,6 +81,10 @@ type dashboard struct {
 	Meals *vielfalt.Meals `json:"meals,omitempty"`
 	// Next bin collections (WASTE_n_*)
 	Waste []waste.Pickup `json:"waste,omitempty"`
+	// Time-of-day layout (SCENE_*)
+	Scene scene.Current `json:"scene"`
+	// Slideshow (PHOTOS_DIR); files at /photos/<path>?v=<v>
+	Photos *photos.Snapshot `json:"photos,omitempty"`
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, _ *http.Request) {
@@ -73,6 +95,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, _ *http.Request) {
 		Days:     s.cfg.CalendarDays,
 		Calendar: s.calendar.Snapshot(),
 	}
+	d.Scene = s.cfg.Scenes.At(d.Now, s.cfg.Location)
 	if d.Calendar.Events == nil {
 		d.Calendar.Events = []calendar.Event{}
 	}
@@ -93,6 +116,9 @@ func (s *Server) handleDashboard(w http.ResponseWriter, _ *http.Request) {
 	}
 	if s.waste != nil {
 		d.Waste = s.waste.Snapshot(d.Now, s.cfg.Location)
+	}
+	if s.photos != nil {
+		d.Photos = s.photos.Snapshot()
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, d)

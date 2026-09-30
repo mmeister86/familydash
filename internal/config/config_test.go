@@ -1,6 +1,10 @@
 package config
 
-import "testing"
+import (
+	"testing"
+
+	"familydash/internal/scene"
+)
 
 func TestEnvStripsQuotes(t *testing.T) {
 	t.Setenv("A", `"https://example.com/a.ics"`)
@@ -37,5 +41,54 @@ func TestCalendarColumn(t *testing.T) {
 		if cal.Into != want[cal.Num] {
 			t.Errorf("CALENDAR_%d: Into = %d, want %d", cal.Num, cal.Into, want[cal.Num])
 		}
+	}
+}
+
+func TestScenes(t *testing.T) {
+	t.Setenv("SCENE_EVENING", "18:30")
+	t.Setenv("SCENE_DAY_WEEKEND", "off")
+	t.Setenv("SCENE_FORCE", "Night")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	find := func(list []scene.Start, name string) int {
+		for _, s := range list {
+			if s.Name == name {
+				return s.Minute
+			}
+		}
+		return -1
+	}
+	if m := find(c.Scenes.SchoolDay, scene.Evening); m != 18*60+30 {
+		t.Errorf("school-day evening = %d", m)
+	}
+	if m := find(c.Scenes.Weekend, scene.Evening); m != 18*60+30 {
+		t.Errorf("weekend evening should fall back to SCENE_EVENING, got %d", m)
+	}
+	if m := find(c.Scenes.Weekend, scene.Day); m != -1 {
+		t.Errorf("weekend day should be off, got %d", m)
+	}
+	if m := find(c.Scenes.Weekend, scene.Morning); m != 7*60+30 {
+		t.Errorf("weekend morning default = %d", m)
+	}
+	if c.Scenes.Force != scene.Night {
+		t.Errorf("force = %q", c.Scenes.Force)
+	}
+
+	t.Setenv("SCENE_FORCE", "brunch")
+	if _, err := Load(); err == nil {
+		t.Error("SCENE_FORCE=brunch: want error")
+	}
+}
+
+func TestPhotosDir(t *testing.T) {
+	c, _ := Load()
+	if c.PhotosDir != "/data/pictures" {
+		t.Errorf("default PHOTOS_DIR = %q", c.PhotosDir)
+	}
+	t.Setenv("PHOTOS_DIR", "off")
+	if c, _ := Load(); c.PhotosDir != "" {
+		t.Errorf("PHOTOS_DIR=off → %q", c.PhotosDir)
 	}
 }

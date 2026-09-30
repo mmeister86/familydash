@@ -29,60 +29,89 @@ html, body {
   cursor: none; /* kiosk */
 }
 
-body { transition: filter 2s ease; }
-body.night { filter: brightness(0.35); }
-
-/* ---------- grid (portrait first, see sketch) */
+/* ---------- grid (portrait first, see sketch)
+   Row heights live in --t-* so scenes and missing sections can change them
+   independently. Rows are separated by margin-top instead of row-gap, so a
+   hidden row (0px) doesn't leave a double gap behind. */
 .board {
+  --t-top: minmax(min-content, 0.9fr); /* clock + weather never get squeezed */
+  --t-focus: 0px;
+  --t-school: minmax(0, 1.15fr);
+  --t-meals: minmax(0, 0.5fr);
+  --t-cals: minmax(0, 1.6fr);
   height: calc(100% - 1.8rem);
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: minmax(0, 0.9fr) minmax(0, 1.15fr) minmax(0, 0.5fr) minmax(0, 1.6fr);
+  grid-template-rows: var(--t-top) var(--t-focus) var(--t-school) var(--t-meals) var(--t-cals);
   grid-template-areas:
     "clock shop"
+    "focus focus"
     "school school"
     "meals meals"
     "cals cals";
-  gap: var(--gap);
+  column-gap: var(--gap);
+  row-gap: 0;
   padding: var(--gap) var(--gap) 0;
 }
-.board.no-meals {
-  grid-template-rows: minmax(0, 0.9fr) minmax(0, 1.4fr) minmax(0, 1.6fr);
-  grid-template-areas: "clock shop" "school school" "cals cals";
-}
-.board.no-school {
-  grid-template-rows: minmax(0, 0.9fr) minmax(0, 0.5fr) minmax(0, 2.2fr);
-  grid-template-areas: "clock shop" "meals meals" "cals cals";
-}
-.board.no-school.no-meals {
-  grid-template-rows: minmax(0, 0.9fr) minmax(0, 2.4fr);
-  grid-template-areas: "clock shop" "cals cals";
-}
-.board.no-school .school-row, .board.no-meals .meals-row { display: none; }
+.focus, .school-row, .meals-row, .calendars { margin-top: var(--gap); }
+
+/* scenes: how much room the focus zone gets, and who gives it up */
+.board.scene-morning   { --t-focus: minmax(0, 0.6fr);  --t-school: minmax(0, 1.3fr);  --t-cals: minmax(0, 1.2fr); }
+.board.scene-day       { --t-focus: minmax(0, 1.05fr); --t-school: minmax(0, 1fr);    --t-cals: minmax(0, 1.35fr); }
+.board.scene-afternoon { --t-focus: minmax(0, 0.8fr);  --t-cals: minmax(0, 1.4fr); }
+.board.scene-evening   { --t-focus: minmax(0, 1fr);    --t-school: minmax(0, 0.9fr);  --t-cals: minmax(0, 1.3fr); }
+
+/* sections without content collapse (after the scenes, so they win) */
+.board.no-focus  { --t-focus: 0px; }
+.board.no-school { --t-school: 0px; }
+.board.no-meals  { --t-meals: 0px; }
+.board.no-focus .focus, .board.no-school .school-row, .board.no-meals .meals-row { display: none; }
 
 .clock-card { grid-area: clock; }
 .shopping   { grid-area: shop; }
+.focus      { grid-area: focus; }
 .school-row { grid-area: school; }
 .meals-row  { grid-area: meals; }
 .calendars  { grid-area: cals; }
 
-/* landscape fallback: top row of four cards, meals, calendars below */
+/* landscape fallback: top row of four cards, focus, meals, calendars below */
 @media (orientation: landscape) {
   .board {
+    --t-top: minmax(min-content, 1fr);
+    --t-meals: minmax(0, 0.4fr);
+    --t-cals: minmax(0, 1.1fr);
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    grid-template-rows: minmax(0, 1fr) minmax(0, 0.4fr) minmax(0, 1.1fr);
-    grid-template-areas: "clock shop school school" "meals meals meals meals" "cals cals cals cals";
+    grid-template-rows: var(--t-top) var(--t-focus) var(--t-meals) var(--t-cals);
+    grid-template-areas:
+      "clock shop school school"
+      "focus focus focus focus"
+      "meals meals meals meals"
+      "cals cals cals cals";
   }
-  .board.no-meals {
-    grid-template-rows: minmax(0, 1fr) minmax(0, 1.25fr);
-    grid-template-areas: "clock shop school school" "cals cals cals cals";
-  }
-  .board.no-school { grid-template-areas: "clock shop shop shop" "meals meals meals meals" "cals cals cals cals"; }
-  .board.no-school.no-meals {
-    grid-template-rows: minmax(0, 1fr) minmax(0, 1.25fr);
-    grid-template-areas: "clock shop shop shop" "cals cals cals cals";
+  .school-row { margin-top: 0; }
+  .board.no-school {
+    grid-template-areas:
+      "clock shop shop shop"
+      "focus focus focus focus"
+      "meals meals meals meals"
+      "cals cals cals cals";
   }
 }
+
+/* ---------- night scene: only a dimmed clock on black */
+.night-clock { display: none; }
+body.scene-night { background: #000; }
+body.scene-night .board, body.scene-night .status { display: none; }
+body.scene-night .night-clock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #3A3F47;
+}
+.n-time { font-size: 22vmin; font-weight: 200; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.n-date { font-size: 3vmin; margin-top: 1.5vmin; color: #2A2E35; }
 
 .panel {
   background: var(--panel);
@@ -326,6 +355,54 @@ h2 {
 .ev.other .what::before { content: ""; display: inline-block; width: 0.5rem; height: 0.5rem; margin-right: 0.35rem; border-radius: 50%; background: var(--c); vertical-align: 0.1em; }
 .calcol .head .also { display: inline-flex; flex: none; align-items: center; gap: 0.3rem; white-space: nowrap; font-size: 0.78rem; color: var(--muted); }
 .calcol .head .also .dot { width: 0.5rem; height: 0.5rem; }
+
+/* ---------- focus zone (scene widgets + photo frame) */
+.focus { display: flex; gap: var(--gap); min-height: 0; }
+.focus-cards {
+  flex: 1.2 1 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--gap);
+  min-width: 0;
+  min-height: 0;
+}
+.focus-cards:empty { display: none; }
+.focus-card { display: flex; flex-direction: column; }
+
+.hint-row { display: grid; grid-template-columns: 2rem 1fr auto; gap: 0.6rem; align-items: baseline; padding: 0.2rem 0; }
+.hint-row .ic { font-size: 1.35rem; line-height: 1; }
+.hint-row .what { font-size: 1.15rem; font-weight: 600; }
+.hint-row .why { color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
+
+.tm-row { padding: 0.25rem 0; font-size: 1.05rem; line-height: 1.3; }
+.tm-row .dot { display: inline-block; width: 0.8rem; height: 0.8rem; margin-right: 0.45rem; border-radius: 50%; background: var(--c); vertical-align: -0.05em; }
+.bin-row { color: var(--text); }
+.focus-card .ev .cdot { display: inline-block; width: 0.5rem; height: 0.5rem; margin-right: 0.4rem; border-radius: 50%; background: var(--c); vertical-align: 0.1em; }
+
+/* slideshow: two stacked images crossfading. Opacity only – cheap on the Pi. */
+.photo-frame {
+  flex: 1 1 0;
+  position: relative;
+  min-width: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.focus.no-photo .photo-frame { display: none; }
+.focus-cards:empty + .photo-frame { flex-basis: 100%; }
+.photo-frame .ph {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 35%; /* faces tend to sit in the upper third */
+  opacity: 0;
+  transition: opacity 1.5s ease;
+}
+.photo-frame .ph.show { opacity: 1; }
 
 /* ---------- status */
 .status {

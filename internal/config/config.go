@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"familydash/internal/scene"
 	"familydash/internal/waste"
 )
 
@@ -58,6 +59,15 @@ type Config struct {
 	// Bin collection rules (WASTE_n_NAME/_DAY/_WEEKS/_COLOR)
 	Waste      []waste.Bin
 	WasteShift bool // WASTE_HOLIDAY_SHIFT, default on
+
+	// Time-of-day layouts (SCENE_<NAME>[_WEEKEND]=HH:MM, SCENE_FORCE)
+	Scenes scene.Schedule
+
+	// Photo slideshow (PHOTOS_DIR, PHOTOS_INTERVAL, PHOTOS_SHUFFLE)
+	PhotosDir      string // "" = off
+	PhotosInterval time.Duration
+	PhotosShuffle  bool
+	PhotosRefresh  time.Duration
 }
 
 type MealAccount struct {
@@ -91,6 +101,17 @@ func Load() (*Config, error) {
 		TimetableFile: env("TIMETABLE_FILE", ""),
 		MealsRefresh:  envDuration("VIELFALT_REFRESH", 30*time.Minute),
 		TimetableOff:  strings.EqualFold(env("TIMETABLE_FILE", ""), "off"),
+
+		PhotosDir:      env("PHOTOS_DIR", "/data/pictures"),
+		PhotosInterval: envDuration("PHOTOS_INTERVAL", 45*time.Second),
+		PhotosShuffle:  !strings.EqualFold(env("PHOTOS_SHUFFLE", "on"), "off"),
+		PhotosRefresh:  envDuration("PHOTOS_REFRESH", 5*time.Minute),
+	}
+	if strings.EqualFold(c.PhotosDir, "off") {
+		c.PhotosDir = ""
+	}
+	if err := c.loadScenes(); err != nil {
+		return nil, err
 	}
 	if c.TimetableOff {
 		c.TimetableFile = ""
@@ -199,6 +220,33 @@ func (c *Config) resolveColumns(intoNum map[int]int) {
 		}
 		c.Calendars[i].Into = t
 	}
+}
+
+// loadScenes reads SCENE_MORNING … SCENE_NIGHT (school days, Mon–Fri) and
+// SCENE_<NAME>_WEEKEND (Sat/Sun; falls back to the school-day value).
+// A value of "off" skips that scene on those days.
+func (c *Config) loadScenes() error {
+	key := func(name string) string { return "SCENE_" + strings.ToUpper(name) }
+	school, err := scene.Build(func(n string) string { return env(key(n), scene.DefaultSchoolDay[n]) })
+	if err != nil {
+		return fmt.Errorf("SCENE_*: %w", err)
+	}
+	weekend, err := scene.Build(func(n string) string {
+		def := scene.DefaultWeekend[n]
+		if def == "" {
+			def = env(key(n), scene.DefaultSchoolDay[n])
+		}
+		return env(key(n)+"_WEEKEND", def)
+	})
+	if err != nil {
+		return fmt.Errorf("SCENE_*_WEEKEND: %w", err)
+	}
+	force := strings.ToLower(env("SCENE_FORCE", ""))
+	if force != "" && !scene.Valid(force) {
+		return fmt.Errorf("SCENE_FORCE %q: want one of %s", force, strings.Join(scene.Names, ", "))
+	}
+	c.Scenes = scene.Schedule{SchoolDay: school, Weekend: weekend, Force: force}
+	return nil
 }
 
 func (c *Config) WeatherEnabled() bool { return c.WeatherLat != 0 || c.WeatherLon != 0 }

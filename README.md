@@ -58,6 +58,13 @@ All settings are environment variables.
 | `BRING_REFRESH` | `2m` | |
 | `VIELFALT_n_USER` / `VIELFALT_n_PASSWORD` | – | VielfaltMenü login (Kundennummer + password) of child `n` = 1…6; lunch cards are off until set |
 | `VIELFALT_n_NAME` | name from the portal | Card title, e.g. `Lukas` |
+| `SCENE_MORNING` … `SCENE_NIGHT` | `06:00`, `08:00` (DAY), `15:00` (AFTERNOON), `18:00` (EVENING), `21:30` (NIGHT) | Start of each time-of-day layout on school days (Mon–Fri); `off` skips a scene |
+| `SCENE_<NAME>_WEEKEND` | MORNING `07:30`, DAY `10:00`, rest = school-day value | Same for Saturday/Sunday |
+| `SCENE_FORCE` | – | Always show this scene (`morning`, `day`, `afternoon`, `evening`, `night`) – for testing |
+| `PHOTOS_DIR` | `/data/pictures` | Folder with photos for the slideshow (subfolders ok); `off` disables it. May not exist yet – it's picked up once it does |
+| `PHOTOS_INTERVAL` | `45s` | Time per photo |
+| `PHOTOS_SHUFFLE` | `on` | Random order; `off` = alphabetical |
+| `PHOTOS_REFRESH` | `5m` | How often the folder is rescanned |
 | `VIELFALT_n_COLOR` | palette | Dot color of the card |
 | `VIELFALT_REFRESH` | `30m` | |
 | `LISTEN_ADDR` | `:8080` | |
@@ -159,6 +166,29 @@ button has `data-quantity-ordered` ≥ 1. It may break when the portal changes; 
 docker exec familydash /familydash -vielfalt-preview
 ```
 
+### Time-of-day scenes
+
+The board changes its layout with the time of day. A **focus zone** between the clock row and the school row shows what matters right now:
+
+| Scene | Default (school day) | Focus zone |
+|---|---|---|
+| `morning` | 06:00 | Weather hints for the way to school („Regenjacke mitnehmen"), checklist (planned). Weekends: hints + photos |
+| `day` | 08:00 | Photo slideshow |
+| `afternoon` | 15:00 | Photo slideshow |
+| `evening` | 18:00 | „Morgen": bins to put out, tomorrow's appointments, weather hints for tomorrow + photos |
+| `night` | 21:30 | Everything hidden – only a dimmed clock on black |
+
+Try a scene on your laptop with `http://<unraid-ip>:8095/?scene=evening`. Scenes and their widgets are defined in `SCENES` / `FOCUS_WIDGETS` in `web/static/app.js`, row heights in `.board.scene-*` in `style.css`.
+
+### Photos
+
+Put JPEG/PNG/WebP files into the photo folder – subfolders are fine, new files show up within `PHOTOS_REFRESH`.
+With the default `PHOTOS_DIR=/data/pictures` and the container started with `-v /mnt/user/appdata/familydash:/data`, that's `/mnt/user/appdata/familydash/pictures` on Unraid.
+
+- **HEIC (iPhone default) can't be shown by the browser** – export as JPEG or set the iPhone camera to *Most Compatible*.
+- Keep files reasonably small (≈ 2–4 MP is plenty for the wall); the Pi downloads each one once and caches it.
+- Hidden files (macOS `._*` from SMB copies, `@eaDir`) are ignored.
+
 ### Weather
 
 [Open-Meteo](https://open-meteo.com) — free, no API key, uses DWD's ICON model for Germany.
@@ -173,13 +203,14 @@ chromium --kiosk --noerrdialogs --disable-infobars --incognito --check-for-updat
 
 Disable screen blanking via `sudo raspi-config` → *Display Options* → *Screen Blanking*.
 Set the Pi's time zone to `Europe/Berlin` – the frontend groups days by the browser's local time.
-The page dims itself 22:00–06:00 (`NIGHT` in `web/static/app.js`). Portrait and landscape both work.
+At night (`SCENE_NIGHT`) the page shows only a dimmed clock. Portrait and landscape both work.
 
 ## API
 
 | | |
 |---|---|
 | `GET /api/dashboard` | Everything the frontend needs (JSON) |
+| `GET /photos/<path>` | Slideshow files (only those listed in `/api/dashboard`) |
 | `GET /healthz` | Liveness |
 
 ## Development

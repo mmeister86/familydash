@@ -71,4 +71,15 @@
   <Config Name="Essen Kind 2 – Kundennummer" Target="VIELFALT_2_USER" Default="" Type="Variable" Display="always" Required="false"></Config>
   <Config Name="Essen Kind 2 – Passwort" Target="VIELFALT_2_PASSWORD" Default="" Type="Variable" Display="always" Required="false" Mask="true"></Config>
   <Config Name="Essen Kind 2 – Farbe" Target="VIELFALT_2_COLOR" Default="#F2B53A" Type="Variable" Display="advanced" Required="false">#F2B53A</Config>
+
+  <Config Name="Fotos" Target="/data/pictures" Default="/mnt/user/appdata/familydash/pictures" Mode="ro" Description="Ordner mit JPG/PNG/WebP für die Diashow (kein HEIC)" Type="Path" Display="always" Required="false">/mnt/user/appdata/familydash/pictures</Config>
+  <Config Name="Fotos – Anzeigedauer" Target="PHOTOS_INTERVAL" Default="45s" Type="Variable" Display="advanced" Required="false">45s</Config>
+
+  <Config Name="Szene Morgen" Target="SCENE_MORNING" Default="06:00" Description="Schultage Mo–Fr; off = Szene auslassen" Type="Variable" Display="advanced" Required="false">06:00</Config>
+  <Config Name="Szene Tag" Target="SCENE_DAY" Default="08:00" Type="Variable" Display="advanced" Required="false">08:00</Config>
+  <Config Name="Szene Nachmittag" Target="SCENE_AFTERNOON" Default="15:00" Type="Variable" Display="advanced" Required="false">15:00</Config>
+  <Config Name="Szene Abend" Target="SCENE_EVENING" Default="18:00" Type="Variable" Display="advanced" Required="false">18:00</Config>
+  <Config Name="Szene Nacht" Target="SCENE_NIGHT" Default="21:30" Type="Variable" Display="advanced" Required="false">21:30</Config>
+  <Config Name="Szene Morgen (Wochenende)" Target="SCENE_MORNING_WEEKEND" Default="07:30" Type="Variable" Display="advanced" Required="false">07:30</Config>
+  <Config Name="Szene Tag (Wochenende)" Target="SCENE_DAY_WEEKEND" Default="10:00" Type="Variable" Display="advanced" Required="false">10:00</Config>
 </Container>
