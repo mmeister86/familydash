@@ -21,6 +21,7 @@ import (
 	"familydash/internal/server"
 	"familydash/internal/timetable"
 	"familydash/internal/vielfalt"
+	"familydash/internal/waste"
 	"familydash/internal/weather"
 	"familydash/web"
 )
@@ -100,9 +101,14 @@ func main() {
 		go ml.Run(ctx, cfg.MealsRefresh)
 	}
 
+	var ws *waste.Service
+	if len(cfg.Waste) > 0 {
+		ws = &waste.Service{Bins: cfg.Waste, Shift: cfg.WasteShift}
+	}
+
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           server.New(cfg, version, cal, wx, br, sc, plan, ml, web.Static()).Handler(),
+		Handler:           server.New(cfg, version, cal, wx, br, sc, plan, ml, ws, web.Static()).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	go func() {
@@ -114,7 +120,7 @@ func main() {
 
 	slog.Info("familydash started", "version", version, "addr", cfg.ListenAddr,
 		"calendars", len(cfg.Calendars), "weather", cfg.WeatherEnabled(), "tz", cfg.Location.String(),
-		"bring", cfg.BringEnabled(), "besteschule", cfg.SchoolEnabled(), "timetable", plan != nil, "vielfalt", len(cfg.Meals))
+		"bring", cfg.BringEnabled(), "besteschule", cfg.SchoolEnabled(), "timetable", plan != nil, "vielfalt", len(cfg.Meals), "waste", len(cfg.Waste))
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("server", "err", err)
 		os.Exit(1)

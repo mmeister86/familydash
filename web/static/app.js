@@ -127,6 +127,26 @@ function eventsOn(events, day) {
   return { allDay, timed };
 }
 
+// ------------------------------------------------------------------ waste collection
+
+const WASTE_DONE_HOUR = 14; // today's collection counts as done after this hour
+
+function renderWaste(list) {
+  const el = $("waste");
+  if (!list?.length) { el.innerHTML = ""; return; }
+  const now = new Date(), today = ymd(now);
+  const next = list.map((b) => {
+    const date = (b.dates || []).find((d) => d > today || (d === today && now.getHours() < WASTE_DONE_HOUR));
+    return date && { ...b, date, moved: (b.shifted || []).includes(date) };
+  }).filter(Boolean).sort((a, b) => a.date.localeCompare(b.date));
+  el.innerHTML = next.map((b) => {
+    const diff = dayDiff(b.date);
+    const cls = diff === 0 ? " today" : diff === 1 ? " soon" : "";
+    return `<span class="bin${cls}" style="--c:${esc(b.color)}"><span class="dot"></span>${esc(b.name)}
+      <span class="when">${esc(shortDay(b.date))}${b.moved ? " (verlegt)" : ""}</span></span>`;
+  }).join("");
+}
+
 // ------------------------------------------------------------------ shopping (Bring!)
 
 const MAX_SHOPPING = 40;
@@ -406,6 +426,7 @@ function render() {
   const d = state.data;
   if (d) {
     renderWeather(d.weather);
+    renderWaste(d.waste);
     renderShopping(d.shopping);
     renderMeals(renderSchoolRow(d));
     renderCalendars(d);

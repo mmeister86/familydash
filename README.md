@@ -46,6 +46,11 @@ All settings are environment variables.
 | `BESTESCHULE_STUDENTS` | all | Comma-separated first names or ids to show |
 | `BESTESCHULE_REFRESH` | `15m` | |
 | `BESTESCHULE_URL` | `https://beste.schule/api` | |
+| `WASTE_n_NAME` | – | Bin name, `n` = 1…10, e.g. `Gelbe Tonne`; waste chips are off until set |
+| `WASTE_n_DAY` | – | Collection weekday: `Mo` … `So` (also `mittwochs`, `Wed`) |
+| `WASTE_n_WEEKS` | every week | `gerade` / `ungerade` ISO calendar week, or `jede` |
+| `WASTE_n_COLOR` | grey, yellow, blue … | Dot color |
+| `WASTE_HOLIDAY_SHIFT` | `on` | Move a collection one day later per weekday public holiday (Saxony) earlier in the same week; `off` to disable |
 | `TIMETABLE_FILE` | built-in | Path to a JSON timetable (see *Fixed timetable*); `off` disables it |
 | `BRING_EMAIL` / `BRING_PASSWORD` | – | Bring! account; shopping panel is off until set |
 | `BRING_LIST` | account default | Name of the list to show, e.g. `Zuhause` |
@@ -80,6 +85,13 @@ For a child without beste.schule, keep their school dates in a Google calendar a
 **One card per child:** a `CALENDAR_n_PANEL=school` calendar and a `VIELFALT_n_*` lunch account whose name matches a child's card
 (beste.schule or fixed timetable) move into that card, ordered *school → Termine → Essen*. Names match case-insensitively, and a
 single first name also matches a full name (`Lukas` ↔ `Meister Lukas`). Anything without a matching child keeps a card of its own.
+
+### Waste collection
+
+For districts that only publish a printable plan ("mittwochs gerade Kalenderwoche"): one `WASTE_n_*` set per bin.
+The clock card shows the next collection of each bin; tomorrow's is highlighted (put it out tonight), today's counts as done after 14:00.
+Holiday shifts follow the common rule (Saxon public holidays, +1 day per holiday on or before the collection day in that week) –
+check it against your district's announcements around holidays.
 
 ### Fixed timetable (school without beste.schule)
 

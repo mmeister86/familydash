@@ -45,6 +45,20 @@
   <Config Name="beste.schule – Token" Target="BESTESCHULE_TOKEN" Default="" Description="beste.schule → Benutzerkonto → API → Personal Access Token" Type="Variable" Display="always" Required="false" Mask="true"></Config>
   <Config Name="beste.schule – Kinder" Target="BESTESCHULE_STUDENTS" Default="" Description="Optional: nur diese Vornamen/IDs anzeigen, kommagetrennt" Type="Variable" Display="advanced" Required="false"></Config>
 
+  <Config Name="Müll 1 – Name" Target="WASTE_1_NAME" Default="Restabfall" Type="Variable" Display="always" Required="false">Restabfall</Config>
+  <Config Name="Müll 1 – Wochentag" Target="WASTE_1_DAY" Default="Mi" Description="Mo … So" Type="Variable" Display="always" Required="false">Mi</Config>
+  <Config Name="Müll 1 – Kalenderwoche" Target="WASTE_1_WEEKS" Default="gerade" Description="gerade / ungerade / jede" Type="Variable" Display="always" Required="false">gerade</Config>
+  <Config Name="Müll 1 – Farbe" Target="WASTE_1_COLOR" Default="#8A8F98" Type="Variable" Display="advanced" Required="false">#8A8F98</Config>
+  <Config Name="Müll 2 – Name" Target="WASTE_2_NAME" Default="Gelbe Tonne" Type="Variable" Display="always" Required="false">Gelbe Tonne</Config>
+  <Config Name="Müll 2 – Wochentag" Target="WASTE_2_DAY" Default="Do" Description="Mo … So" Type="Variable" Display="always" Required="false">Do</Config>
+  <Config Name="Müll 2 – Kalenderwoche" Target="WASTE_2_WEEKS" Default="gerade" Description="gerade / ungerade / jede" Type="Variable" Display="always" Required="false">gerade</Config>
+  <Config Name="Müll 2 – Farbe" Target="WASTE_2_COLOR" Default="#F2C94C" Type="Variable" Display="advanced" Required="false">#F2C94C</Config>
+  <Config Name="Müll 3 – Name" Target="WASTE_3_NAME" Default="Blaue Tonne" Type="Variable" Display="always" Required="false">Blaue Tonne</Config>
+  <Config Name="Müll 3 – Wochentag" Target="WASTE_3_DAY" Default="Do" Description="Mo … So" Type="Variable" Display="always" Required="false">Do</Config>
+  <Config Name="Müll 3 – Kalenderwoche" Target="WASTE_3_WEEKS" Default="ungerade" Description="gerade / ungerade / jede" Type="Variable" Display="always" Required="false">ungerade</Config>
+  <Config Name="Müll 3 – Farbe" Target="WASTE_3_COLOR" Default="#4F8EF7" Type="Variable" Display="advanced" Required="false">#4F8EF7</Config>
+  <Config Name="Müll – Feiertagsverschiebung" Target="WASTE_HOLIDAY_SHIFT" Default="on" Description="on = Abholung rutscht nach Feiertagen einen Tag nach hinten, off = nie" Type="Variable" Display="advanced" Required="false">on</Config>
+
   <Config Name="Bring! – E-Mail" Target="BRING_EMAIL" Default="" Type="Variable" Display="always" Required="false"></Config>
   <Config Name="Bring! – Passwort" Target="BRING_PASSWORD" Default="" Type="Variable" Display="always" Required="false" Mask="true"></Config>
   <Config Name="Bring! – Liste" Target="BRING_LIST" Default="" Description="Optional: Listenname, sonst Standardliste" Type="Variable" Display="always" Required="false"></Config>
