@@ -129,15 +129,31 @@ function eventsOn(events, day) {
 
 // ------------------------------------------------------------------ waste collection
 
-// only bins collected tomorrow – the reminder to put them out tonight
+// Bin icons next to the clock: outline = collected tomorrow (put it out
+// tonight), filled + pulsing = collected today (until WASTE_TODAY_UNTIL).
+const WASTE_TODAY_UNTIL = 12; // hour; afterwards today's bins are gone
+const BIN_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true">
+  <path class="bin-body" d="M5.5 8h13l-1.1 12a1.8 1.8 0 0 1-1.8 1.6H8.4a1.8 1.8 0 0 1-1.8-1.6z"/>
+  <rect class="bin-lid" x="3.5" y="5" width="17" height="2" rx="1"/>
+  <path class="bin-handle" d="M9.5 5V3.5h5V5"/></svg>`;
+
 function renderWaste(list) {
-  const tomorrow = ymd(addDays(new Date(), 1));
-  const due = (list || []).filter((b) => (b.dates || []).includes(tomorrow));
-  $("waste").innerHTML = due.map((b) => {
-    const moved = (b.shifted || []).includes(tomorrow);
-    return `<span class="bin" style="--c:${esc(b.color)}"><span class="dot"></span>${esc(b.name)}
-      <span class="when">morgen${moved ? " (verlegt)" : ""}</span></span>`;
+  const now = new Date();
+  const today = ymd(now), tomorrow = ymd(addDays(now, 1));
+  const bins = [];
+  for (const b of list || []) {
+    const dates = b.dates || [];
+    if (dates.includes(today) && now.getHours() < WASTE_TODAY_UNTIL) bins.push({ b, day: today, state: "today" });
+    else if (dates.includes(tomorrow)) bins.push({ b, day: tomorrow, state: "tomorrow" });
+  }
+  const html = bins.map(({ b, day, state }) => {
+    const moved = (b.shifted || []).includes(day) ? " (verlegt)" : "";
+    const label = `${b.name} ${state === "today" ? "heute" : "morgen"}${moved}`;
+    return `<span class="bin bin--${state}" style="--c:${esc(b.color)}" title="${esc(label)}">${BIN_SVG}</span>`;
   }).join("");
+  // render() runs every minute – only touch the DOM on change, so the pulse doesn't restart
+  const el = $("waste");
+  if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
 }
 
 // ------------------------------------------------------------------ shopping (Bring!)
