@@ -1,7 +1,7 @@
 # For Unraid's "Docker Compose Manager" plugin or plain `docker compose up -d`.
 services:
   familydash:
-    image: ghcr.io/OWNER/familydash:latest
+    image: ghcr.io/mmeister86/familydash:latest
     # build: .            # alternatively build locally on Unraid
     container_name: familydash
     restart: unless-stopped

@@ -5,8 +5,8 @@
 -->
 <Container version="2">
   <Name>familydash</Name>
-  <Repository>ghcr.io/OWNER/familydash:latest</Repository>
-  <Registry>https://github.com/OWNER/familydash/pkgs/container/familydash</Registry>
+  <Repository>ghcr.io/mmeister86/familydash:latest</Repository>
+  <Registry>https://github.com/mmeister86/familydash/pkgs/container/familydash</Registry>
   <Network>bridge</Network>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
