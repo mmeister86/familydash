@@ -10,7 +10,7 @@
   <Network>bridge</Network>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
-  <Overview>Leichtgewichtiges Familiendashboard fürs Wanddisplay: Google Kalender (iCal), Wetter (Open-Meteo), Stundenplan/Vertretungen/Hausaufgaben (beste.schule), Einkaufsliste (Bring!). Ein statisches Go-Binary, ~8 MB Image.</Overview>
+  <Overview>Leichtgewichtiges Familiendashboard fürs Wanddisplay: Google Kalender (iCal), Wetter (Open-Meteo), Stundenplan/Vertretungen/Hausaufgaben (beste.schule), Einkaufsliste (Bring!), Schulessen (VielfaltMenü). Ein statisches Go-Binary, ~8 MB Image.</Overview>
   <Category>Productivity: HomeAutomation:</Category>
   <WebUI>http://[IP]:[PORT:8080]/</WebUI>
   <ExtraParams>--restart unless-stopped</ExtraParams>
@@ -48,4 +48,13 @@
   <Config Name="Bring! – E-Mail" Target="BRING_EMAIL" Default="" Type="Variable" Display="always" Required="false"></Config>
   <Config Name="Bring! – Passwort" Target="BRING_PASSWORD" Default="" Type="Variable" Display="always" Required="false" Mask="true"></Config>
   <Config Name="Bring! – Liste" Target="BRING_LIST" Default="" Description="Optional: Listenname, sonst Standardliste" Type="Variable" Display="always" Required="false"></Config>
+
+  <Config Name="Essen Kind 1 – Name" Target="VIELFALT_1_NAME" Default="" Description="Titel der Karte, z. B. Lukas" Type="Variable" Display="always" Required="false"></Config>
+  <Config Name="Essen Kind 1 – Kundennummer" Target="VIELFALT_1_USER" Default="" Description="Login von bestellung.vielfaltmenue.com" Type="Variable" Display="always" Required="false"></Config>
+  <Config Name="Essen Kind 1 – Passwort" Target="VIELFALT_1_PASSWORD" Default="" Type="Variable" Display="always" Required="false" Mask="true"></Config>
+  <Config Name="Essen Kind 1 – Farbe" Target="VIELFALT_1_COLOR" Default="#4F8EF7" Type="Variable" Display="advanced" Required="false">#4F8EF7</Config>
+  <Config Name="Essen Kind 2 – Name" Target="VIELFALT_2_NAME" Default="" Type="Variable" Display="always" Required="false"></Config>
+  <Config Name="Essen Kind 2 – Kundennummer" Target="VIELFALT_2_USER" Default="" Type="Variable" Display="always" Required="false"></Config>
+  <Config Name="Essen Kind 2 – Passwort" Target="VIELFALT_2_PASSWORD" Default="" Type="Variable" Display="always" Required="false" Mask="true"></Config>
+  <Config Name="Essen Kind 2 – Farbe" Target="VIELFALT_2_COLOR" Default="#F2B53A" Type="Variable" Display="advanced" Required="false">#F2B53A</Config>
 </Container>

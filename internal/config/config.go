@@ -48,6 +48,17 @@ type Config struct {
 
 	TimetableFile string // optional JSON override for the built-in fixed timetable
 	TimetableOff  bool
+
+	// VielfaltMenü school lunch, one login per child (VIELFALT_n_*)
+	Meals        []MealAccount
+	MealsRefresh time.Duration
+}
+
+type MealAccount struct {
+	Name     string // VIELFALT_n_NAME, empty = name from the portal
+	User     string // VIELFALT_n_USER = Kundennummer
+	Password string // VIELFALT_n_PASSWORD
+	Color    string // VIELFALT_n_COLOR
 }
 
 // Default colors used when a calendar has no explicit color.
@@ -72,6 +83,7 @@ func Load() (*Config, error) {
 		SchoolRefresh: envDuration("BESTESCHULE_REFRESH", 15*time.Minute),
 
 		TimetableFile: env("TIMETABLE_FILE", ""),
+		MealsRefresh:  envDuration("VIELFALT_REFRESH", 30*time.Minute),
 		TimetableOff:  strings.EqualFold(env("TIMETABLE_FILE", ""), "off"),
 	}
 	if c.TimetableOff {
@@ -121,6 +133,21 @@ func Load() (*Config, error) {
 		}
 	}
 	c.resolveColumns(intoNum)
+
+	// VIELFALT_1_USER, VIELFALT_1_PASSWORD, VIELFALT_1_NAME, VIELFALT_1_COLOR, VIELFALT_2_… (up to 6)
+	for i := 1; i <= 6; i++ {
+		user := env(fmt.Sprintf("VIELFALT_%d_USER", i), "")
+		pass := env(fmt.Sprintf("VIELFALT_%d_PASSWORD", i), "")
+		if user == "" || pass == "" {
+			continue
+		}
+		c.Meals = append(c.Meals, MealAccount{
+			User:     user,
+			Password: pass,
+			Name:     env(fmt.Sprintf("VIELFALT_%d_NAME", i), ""),
+			Color:    env(fmt.Sprintf("VIELFALT_%d_COLOR", i), palette[(i+1)%len(palette)]),
+		})
+	}
 	return c, nil
 }
 
@@ -147,6 +174,7 @@ func (c *Config) resolveColumns(intoNum map[int]int) {
 func (c *Config) WeatherEnabled() bool { return c.WeatherLat != 0 || c.WeatherLon != 0 }
 func (c *Config) BringEnabled() bool   { return c.BringEmail != "" && c.BringPassword != "" }
 func (c *Config) SchoolEnabled() bool  { return c.SchoolToken != "" }
+func (c *Config) MealsEnabled() bool   { return len(c.Meals) > 0 }
 
 // env reads a variable, trims whitespace and one pair of surrounding quotes.
 // docker --env-file passes quotes through literally, so KEY="value" would

@@ -1,6 +1,6 @@
 # familydash
 
-A lightweight family wall dashboard: **Google Calendar**, **weather**, the **school timetable** from beste.schule and the **Bring! shopping list** on one screen.
+A lightweight family wall dashboard: **Google Calendar**, **weather**, the **school timetable** from beste.schule and the **Bring! shopping list** and the **school lunch** ordered at VielfaltMenü on one screen.
 Runs as a single static Go binary in an ~8 MB container on Unraid; a Raspberry Pi only runs a browser in kiosk mode.
 
 <img src="docs/screenshot.png" alt="Wall display (portrait)" width="420">
@@ -14,7 +14,8 @@ Runs as a single static Go binary in an ~8 MB container on Unraid; a Raspberry P
  Google Calendar ──(iCal secret URL, 5 min)──┐
  Open-Meteo      ──(15 min)──────────────────┤
  beste.schule    ──(API token, 15 min)───────┼──▶ familydash (Unraid, :8080) ◀── Chromium kiosk (Raspberry Pi)
- Bring!          ──(login, 2 min)────────────┘
+ Bring!          ──(login, 2 min)────────────┤
+ VielfaltMenü    ──(login per child, 30 min)─┘
 ```
 
 ## Quick start (Unraid)
@@ -50,6 +51,10 @@ All settings are environment variables.
 | `BRING_LIST` | account default | Name of the list to show, e.g. `Zuhause` |
 | `BRING_LOCALE` | `de-DE` | Language for catalog item names |
 | `BRING_REFRESH` | `2m` | |
+| `VIELFALT_n_USER` / `VIELFALT_n_PASSWORD` | – | VielfaltMenü login (Kundennummer + password) of child `n` = 1…6; lunch cards are off until set |
+| `VIELFALT_n_NAME` | name from the portal | Card title, e.g. `Lukas` |
+| `VIELFALT_n_COLOR` | palette | Dot color of the card |
+| `VIELFALT_REFRESH` | `30m` | |
 | `LISTEN_ADDR` | `:8080` | |
 
 Values may be wrapped in quotes (`KEY="value"`) – they are stripped, since `docker --env-file` would otherwise keep them.
@@ -63,6 +68,8 @@ Built for a **portrait** wall display (landscape works too):
 │ clock+weather│ Bring! list  │
 ├──────────────┼──────────────┤
 │ beste.schule │ school cal.  │   one card per child / per CALENDAR_n_PANEL=school
+├──────────────┼──────────────┤
+│ lunch child 1│ lunch child 2│   one card per VIELFALT_n_*
 ├────────┬─────┴──┬───────────┤
 │ cal 1  │ cal 2  │ cal 3 …   │   one column per CALENDAR_n_PANEL=column
 └────────┴────────┴───────────┘
@@ -121,6 +128,20 @@ if you sign in to Bring! with Apple/Google only, the login will fail.
 Bring! has **no public API** – this uses the endpoints of the Bring! apps as documented by the community
 library [bring-api](https://github.com/miaucl/bring-api) (also used by Home Assistant). It may break when Bring! changes something;
 only the shopping panel is affected then.
+
+### VielfaltMenü (school lunch)
+
+Set `VIELFALT_1_USER` (Kundennummer), `VIELFALT_1_PASSWORD` and `VIELFALT_1_NAME`, then the same with `_2_` for the next child.
+Each child has its own portal account. Per child the card shows the next two delivery days (today until 14:00, then from tomorrow on):
+the ordered dish (sides after `|` in small print) or **"Noch nichts bestellt!"** in orange when a day with menus has no order yet.
+
+There is **no public API** – this logs in like the parent portal (`POST bestellung.vielfaltmenue.com/frontend/login` → token)
+and reads the week plan HTML (`GET ibs.vielfaltmenue.com/…/Mealplan/Weekplan?year=…&week=…`); a menu counts as ordered when its
+button has `data-quantity-ordered` ≥ 1. It may break when the portal changes; only the lunch cards are affected then. Check the logins with:
+
+```sh
+docker exec familydash /familydash -vielfalt-preview
+```
 
 ### Weather
 

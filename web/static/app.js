@@ -241,6 +241,46 @@ function renderSchoolRow(d) {
   $("board").classList.toggle("no-school", !html);
 }
 
+// ------------------------------------------------------------------ school lunch (VielfaltMenü)
+
+const MEAL_DAYS = 2;     // delivery days shown per child
+const LUNCH_OVER = 14;   // from this hour on, today's lunch is done → start with the next day
+
+function mealRow(day) {
+  const isToday = day.date === ymd(new Date());
+  const ordered = day.ordered || [];
+  let what;
+  if (ordered.length) {
+    what = ordered.map((m) => `<span class="dish">${esc(m.name)}</span>${m.side ? `<span class="side">${esc(m.side)}</span>` : ""}`).join("");
+  } else if (isToday) {
+    what = `<span class="dish none">nichts bestellt</span>`;
+  } else {
+    what = `<span class="dish">Noch nichts bestellt!</span>`;
+  }
+  const cls = ["meal", isToday ? "today" : "", !ordered.length && !isToday ? "missing" : ""].join(" ");
+  return `<div class="${cls}"><span class="when">${esc(relDay(day.date))}</span><span class="what">${what}</span></div>`;
+}
+
+function mealCard(ch) {
+  const now = new Date(), today = ymd(now);
+  const days = (ch.days || [])
+    .filter((d) => d.date > today || (d.date === today && now.getHours() < LUNCH_OVER))
+    .slice(0, MEAL_DAYS);
+  const body = days.length
+    ? days.map(mealRow).join("")
+    : ch.error ? `<p class="hint">${esc(ch.error)}</p>` : `<div class="empty">Kein Essen in Sicht</div>`;
+  return `<div class="panel" style="--c:${esc(ch.color || "var(--accent)")}">
+    <div class="head"><span class="dot"></span><span class="name">${esc(ch.name)}</span><span class="meta">Mittagessen</span></div>
+    ${body}
+  </div>`;
+}
+
+function renderMeals(meals) {
+  const kids = meals?.children || [];
+  $("meals").innerHTML = kids.map(mealCard).join("");
+  $("board").classList.toggle("no-meals", !kids.length);
+}
+
 // ------------------------------------------------------------------ calendar columns
 
 // a column shows one calendar plus any calendars merged into it via
@@ -300,6 +340,7 @@ function renderStatus() {
     if (d.weather?.error) parts.push(`<span class="err">Wetter: ${esc(d.weather.error)}</span>`);
     if (d.school?.error && d.school.students?.length) parts.push(`<span class="err">Schule: ${esc(d.school.error)}</span>`);
     if (d.shopping?.error && d.shopping.items?.length) parts.push(`<span class="err">Bring!: ${esc(d.shopping.error)}</span>`);
+    for (const c of d.meals?.children || []) if (c.error && c.days?.length) parts.push(`<span class="err">Essen ${esc(c.name)}: ${esc(c.error)}</span>`);
   }
   if (state.lastOk) parts.push(`<span>aktualisiert ${fmt.time.format(new Date(state.lastOk))}</span>`);
   $("status").innerHTML = parts.join("");
@@ -329,6 +370,7 @@ function render() {
     renderWeather(d.weather);
     renderShopping(d.shopping);
     renderSchoolRow(d);
+    renderMeals(d.meals);
     renderCalendars(d);
   }
   renderStatus();

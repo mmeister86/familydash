@@ -37,33 +37,51 @@ body.night { filter: brightness(0.35); }
   height: calc(100% - 1.8rem);
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: minmax(0, 0.9fr) minmax(0, 1.15fr) minmax(0, 1.75fr);
+  grid-template-rows: minmax(0, 0.9fr) minmax(0, 1.15fr) minmax(0, 0.5fr) minmax(0, 1.6fr);
   grid-template-areas:
     "clock shop"
     "school school"
+    "meals meals"
     "cals cals";
   gap: var(--gap);
   padding: var(--gap) var(--gap) 0;
 }
+.board.no-meals {
+  grid-template-rows: minmax(0, 0.9fr) minmax(0, 1.15fr) minmax(0, 1.75fr);
+  grid-template-areas: "clock shop" "school school" "cals cals";
+}
 .board.no-school {
+  grid-template-rows: minmax(0, 0.9fr) minmax(0, 0.5fr) minmax(0, 2.2fr);
+  grid-template-areas: "clock shop" "meals meals" "cals cals";
+}
+.board.no-school.no-meals {
   grid-template-rows: minmax(0, 0.9fr) minmax(0, 2.4fr);
   grid-template-areas: "clock shop" "cals cals";
 }
-.board.no-school .school-row { display: none; }
+.board.no-school .school-row, .board.no-meals .meals-row { display: none; }
 
 .clock-card { grid-area: clock; }
 .shopping   { grid-area: shop; }
 .school-row { grid-area: school; }
+.meals-row  { grid-area: meals; }
 .calendars  { grid-area: cals; }
 
-/* landscape fallback: top row of four cards, calendars below */
+/* landscape fallback: top row of four cards, meals, calendars below */
 @media (orientation: landscape) {
   .board {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr) minmax(0, 0.4fr) minmax(0, 1.1fr);
+    grid-template-areas: "clock shop school school" "meals meals meals meals" "cals cals cals cals";
+  }
+  .board.no-meals {
     grid-template-rows: minmax(0, 1fr) minmax(0, 1.25fr);
     grid-template-areas: "clock shop school school" "cals cals cals cals";
   }
-  .board.no-school { grid-template-areas: "clock shop shop shop" "cals cals cals cals"; }
+  .board.no-school { grid-template-areas: "clock shop shop shop" "meals meals meals meals" "cals cals cals cals"; }
+  .board.no-school.no-meals {
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1.25fr);
+    grid-template-areas: "clock shop shop shop" "cals cals cals cals";
+  }
 }
 
 .panel {
@@ -211,6 +229,33 @@ h2 {
 .entry.exam .when, .entry.soon .when { color: var(--danger); }
 .entry.today .when { color: var(--accent); }
 .entry .loc { color: var(--muted); font-size: 0.8rem; }
+
+/* ---------- school lunch (VielfaltMenü) */
+.meals-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--gap);
+  min-height: 0;
+}
+.meals-row .head { margin-bottom: 0.45rem; }
+.meal {
+  display: grid;
+  grid-template-columns: 5.2rem 1fr;
+  gap: 0.6rem;
+  align-items: baseline;
+  padding: 0.2rem 0;
+}
+.meal .when { color: var(--muted); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
+.meal.today .when { color: var(--accent); }
+.meal .what { min-width: 0; }
+.meal .dish {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  font-size: 1.02rem; line-height: 1.25;
+}
+.meal .side { display: block; color: var(--muted); font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meal .dish.none { color: var(--faint); font-size: 0.9rem; }
+.meal.missing .when, .meal.missing .dish { color: var(--warn); font-weight: 600; }
 
 /* ---------- calendar columns */
 .calendars {

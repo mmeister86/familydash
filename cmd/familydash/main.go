@@ -20,6 +20,7 @@ import (
 	"familydash/internal/config"
 	"familydash/internal/server"
 	"familydash/internal/timetable"
+	"familydash/internal/vielfalt"
 	"familydash/internal/weather"
 	"familydash/web"
 )
@@ -32,6 +33,7 @@ func main() {
 	healthcheck := flag.Bool("healthcheck", false, "probe /healthz and exit (for Docker HEALTHCHECK)")
 	schoolDump := flag.Bool("besteschule-dump", false, "print the raw beste.schule API responses as JSON and exit")
 	schoolPreview := flag.Bool("besteschule-preview", false, "print what the dashboard would show from beste.schule and exit")
+	mealsPreview := flag.Bool("vielfalt-preview", false, "log in to VielfaltMenü, print the ordered meals and exit")
 	flag.Parse()
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
@@ -46,6 +48,9 @@ func main() {
 	}
 	if *schoolDump || *schoolPreview {
 		os.Exit(school(cfg, *schoolDump))
+	}
+	if *mealsPreview {
+		os.Exit(meals(cfg))
 	}
 	if version == "dev" {
 		version = fmt.Sprintf("dev-%d", time.Now().Unix())
@@ -89,9 +94,15 @@ func main() {
 		}
 	}
 
+	var ml *vielfalt.Service
+	if cfg.MealsEnabled() {
+		ml = newMeals(cfg)
+		go ml.Run(ctx, cfg.MealsRefresh)
+	}
+
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           server.New(cfg, version, cal, wx, br, sc, plan, web.Static()).Handler(),
+		Handler:           server.New(cfg, version, cal, wx, br, sc, plan, ml, web.Static()).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	go func() {
@@ -103,7 +114,7 @@ func main() {
 
 	slog.Info("familydash started", "version", version, "addr", cfg.ListenAddr,
 		"calendars", len(cfg.Calendars), "weather", cfg.WeatherEnabled(), "tz", cfg.Location.String(),
-		"bring", cfg.BringEnabled(), "besteschule", cfg.SchoolEnabled(), "timetable", plan != nil)
+		"bring", cfg.BringEnabled(), "besteschule", cfg.SchoolEnabled(), "timetable", plan != nil, "vielfalt", len(cfg.Meals))
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("server", "err", err)
 		os.Exit(1)
@@ -135,6 +146,44 @@ func school(cfg *config.Config, rawDump bool) int {
 	if err := enc.Encode(out); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
+	}
+	return 0
+}
+
+func newMeals(cfg *config.Config) *vielfalt.Service {
+	accs := make([]vielfalt.Account, len(cfg.Meals))
+	for i, m := range cfg.Meals {
+		accs[i] = vielfalt.Account{Name: m.Name, User: m.User, Password: m.Password, Color: m.Color}
+	}
+	s := vielfalt.NewService(accs, cfg.Location)
+	if u := os.Getenv("VIELFALT_API_URL"); u != "" { // for local testing
+		s.LoginURL, s.IBSURL = u, u
+	}
+	return s
+}
+
+// meals checks the VielfaltMenü logins: `docker exec familydash /familydash -vielfalt-preview`
+func meals(cfg *config.Config) int {
+	if !cfg.MealsEnabled() {
+		fmt.Fprintln(os.Stderr, "VIELFALT_1_USER / VIELFALT_1_PASSWORD are not set")
+		return 1
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	s := newMeals(cfg)
+	s.Refresh(ctx)
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	enc.SetEscapeHTML(false)
+	snap := s.Snapshot()
+	if err := enc.Encode(snap); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	for _, c := range snap.Children {
+		if c.Error != "" {
+			return 1
+		}
 	}
 	return 0
 }
