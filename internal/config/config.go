@@ -69,6 +69,10 @@ type Config struct {
 	PhotosShuffle  bool
 	PhotosRefresh  time.Duration
 
+	// Background picture of the night scene (NIGHT_BG): a file path, "" = look
+	// for bg.jpeg/bg.jpg/bg.png/bg.webp in /data, "off" = plain black
+	NightBG string
+
 	// Things 3 to-dos of one area (THINGS_*), read via the things3 CLI
 	ThingsEmail    string
 	ThingsPassword string
@@ -114,6 +118,7 @@ func Load() (*Config, error) {
 		PhotosInterval: envDuration("PHOTOS_INTERVAL", 45*time.Second),
 		PhotosShuffle:  !strings.EqualFold(env("PHOTOS_SHUFFLE", "on"), "off"),
 		PhotosRefresh:  envDuration("PHOTOS_REFRESH", 5*time.Minute),
+		NightBG:        env("NIGHT_BG", ""),
 
 		ThingsEmail:    env("THINGS_EMAIL", ""),
 		ThingsPassword: env("THINGS_PASSWORD", ""),
@@ -262,6 +267,18 @@ func (c *Config) loadScenes() error {
 	}
 	c.Scenes = scene.Schedule{SchoolDay: school, Weekend: weekend, Force: force}
 	return nil
+}
+
+// NightBGCandidates lists the files tried for the night background, in order.
+// The first one that exists wins; none = plain black night clock.
+func (c *Config) NightBGCandidates() []string {
+	switch {
+	case strings.EqualFold(c.NightBG, "off"):
+		return nil
+	case c.NightBG != "":
+		return []string{c.NightBG}
+	}
+	return []string{"/data/bg.jpeg", "/data/bg.jpg", "/data/bg.png", "/data/bg.webp"}
 }
 
 func (c *Config) WeatherEnabled() bool { return c.WeatherLat != 0 || c.WeatherLon != 0 }

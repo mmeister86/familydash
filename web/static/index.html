@@ -33,10 +33,14 @@
     <section class="calendars" id="calendars"></section>
   </main>
 
-  <!-- night scene: only a dimmed clock -->
+  <!-- night scene: dimmed clock + current weather, optionally on a picture (NIGHT_BG) -->
   <div class="night-clock" id="night-clock">
-    <div class="n-time" id="night-time">--:--</div>
-    <div class="n-date" id="night-date"></div>
+    <div class="n-bg" id="night-bg"></div>
+    <div class="n-content">
+      <div class="n-time" id="night-time">--:--</div>
+      <div class="n-date" id="night-date"></div>
+      <div class="n-weather" id="night-weather"></div>
+    </div>
   </div>
 
   <footer class="status" id="status"></footer>

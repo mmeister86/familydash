@@ -67,6 +67,7 @@ All settings are environment variables.
 | `PHOTOS_INTERVAL` | `45s` | Time per photo |
 | `PHOTOS_SHUFFLE` | `on` | Random order; `off` = alphabetical |
 | `PHOTOS_REFRESH` | `5m` | How often the folder is rescanned |
+| `NIGHT_BG` | `/data/bg.jpeg` (also `bg.jpg`, `.png`, `.webp`) | Full-screen picture behind the night clock; `off` = plain black. Replaced files show up with the next poll |
 | `VIELFALT_n_COLOR` | palette | Dot color of the card |
 | `VIELFALT_REFRESH` | `30m` | |
 | `THINGS_EMAIL` / `THINGS_PASSWORD` | – | Things Cloud account; the to-do card is off until set |
@@ -204,7 +205,7 @@ The board changes its layout with the time of day. A **focus zone** between the 
 | `day` | 08:00 | To-dos + photo slideshow |
 | `afternoon` | 15:00 | To-dos + photo slideshow |
 | `evening` | 18:00 | „Morgen": bins to put out, tomorrow's appointments, weather hints for tomorrow + to-dos + photos |
-| `night` | 21:30 | Everything hidden – only a dimmed clock on black |
+| `night` | 21:30 | Everything hidden – only a dimmed clock, date and current weather (icon + temperature), on black or on the `NIGHT_BG` picture |
 
 Cards with nothing to say disappear. The photo only shares the zone with a single card – with two cards they get the full width.
 
@@ -218,6 +219,10 @@ With the default `PHOTOS_DIR=/data/pictures` and the container started with `-v 
 - **HEIC (iPhone default) can't be shown by the browser** – export as JPEG or set the iPhone camera to *Most Compatible*.
 - Keep files reasonably small (≈ 2–4 MP is plenty for the wall); the Pi downloads each one once and caches it.
 - Hidden files (macOS `._*` from SMB copies, `@eaDir`) are ignored.
+
+### Night background
+
+Drop a picture as `bg.jpeg` into the data folder – with `-v /mnt/user/appdata/familydash:/data` that's `/mnt/user/appdata/familydash/bg.jpeg` on Unraid. The night scene then shows it full-screen (anchored at the bottom, so a horizon stays in view) with the clock in the upper third. Pick something dark – it's on all night. Without the file the clock stays on black. Don't put it into the photo folder, or it joins the slideshow.
 
 ### Weather
 

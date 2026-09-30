@@ -93,6 +93,25 @@ function renderWeather(w) {
     </div>`;
 }
 
+// ------------------------------------------------------------------ night scene
+
+// Background picture (NIGHT_BG) + current weather next to the dimmed clock.
+// The picture is preloaded as soon as the server reports it, so the switch
+// to the night scene doesn't show a black frame first.
+function renderNight(d) {
+  const url = d.nightBg ? `night-bg?v=${d.nightBg.v}` : "";
+  const bg = $("night-bg");
+  if (bg.dataset.url !== url) {
+    bg.dataset.url = url;
+    bg.style.backgroundImage = url ? `url("${url}")` : "";
+    if (url) new Image().src = url;
+  }
+  document.body.classList.toggle("night-has-bg", !!url);
+
+  const c = d.weather?.current;
+  $("night-weather").innerHTML = c ? `${icon(c.icon)}<span class="n-temp">${round(c.temp)}°</span>` : "";
+}
+
 // ------------------------------------------------------------------ date helpers
 
 const dayDiff = (dateStr) => Math.round((new Date(dateStr + "T00:00") - startOfDay(new Date())) / 86_400_000);
@@ -701,6 +720,7 @@ function render() {
     renderMeals(renderSchoolRow(d)); // first: decides which to-dos move into child cards
     renderFocus(d, sc);
     renderWeather(d.weather);
+    renderNight(d);
     renderWaste(d.waste);
     renderShopping(d.shopping);
     renderCalendars(d);

@@ -59,6 +59,7 @@ func (s *Server) Handler() http.Handler {
 	if s.photos != nil {
 		mux.Handle("GET /photos/{path...}", s.photos)
 	}
+	mux.HandleFunc("GET /night-bg", s.handleNightBG)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	files := http.FileServerFS(s.static)
 	mux.Handle("GET /", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -90,6 +91,8 @@ type dashboard struct {
 	Photos *photos.Snapshot `json:"photos,omitempty"`
 	// Today's to-dos of one Things area (THINGS_*)
 	Todos *things.List `json:"todos,omitempty"`
+	// Background of the night scene (NIGHT_BG); file at /night-bg?v=<v>
+	NightBG *nightBG `json:"nightBg,omitempty"`
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, _ *http.Request) {
@@ -127,6 +130,9 @@ func (s *Server) handleDashboard(w http.ResponseWriter, _ *http.Request) {
 	}
 	if s.todos != nil {
 		d.Todos = s.todos.Snapshot()
+	}
+	if _, info := findNightBG(s.cfg.NightBGCandidates()); info != nil {
+		d.NightBG = &nightBG{V: info.ModTime().Unix()}
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, d)

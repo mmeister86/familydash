@@ -74,6 +74,7 @@
 
   <Config Name="Fotos" Target="/data/pictures" Default="/mnt/user/appdata/familydash/pictures" Mode="ro" Description="Ordner mit JPG/PNG/WebP für die Diashow (kein HEIC)" Type="Path" Display="always" Required="false">/mnt/user/appdata/familydash/pictures</Config>
   <Config Name="Fotos – Anzeigedauer" Target="PHOTOS_INTERVAL" Default="45s" Type="Variable" Display="advanced" Required="false">45s</Config>
+  <Config Name="Nacht-Hintergrund" Target="/data/bg.jpeg" Default="/mnt/user/appdata/familydash/bg.jpeg" Mode="ro" Description="Bild hinter der Nachtuhr (Datei muss existieren, sonst legt Docker einen Ordner an – dann Eintrag leeren)" Type="Path" Display="advanced" Required="false"></Config>
 
   <Config Name="Things – E-Mail" Target="THINGS_EMAIL" Default="" Description="Things-Cloud-Login (inoffiziell, nur lesend). Leer = keine To-do-Karte" Type="Variable" Display="always" Required="false"></Config>
   <Config Name="Things – Passwort" Target="THINGS_PASSWORD" Default="" Type="Variable" Display="always" Required="false" Mask="true"></Config>

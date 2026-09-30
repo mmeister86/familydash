@@ -99,7 +99,7 @@ html, body {
   }
 }
 
-/* ---------- night scene: only a dimmed clock on black */
+/* ---------- night scene: dimmed clock + weather, on black or on a picture (NIGHT_BG) */
 .night-clock { display: none; }
 body.scene-night { background: #000; }
 body.scene-night .board, body.scene-night .status { display: none; }
@@ -108,11 +108,33 @@ body.scene-night .night-clock {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  position: fixed;
+  inset: 0;
   color: #3A3F47;
+  --panel: #000; /* cloud fill of the weather icon */
 }
+.n-bg { display: none; position: absolute; inset: 0; background: #000 center bottom / cover no-repeat; }
+/* keep it a night light: darken the edges, leave the sky around the clock open */
+.n-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.1) 35%, rgba(0,0,0,0.1) 60%, rgba(0,0,0,0.35) 100%);
+}
+.n-content { position: relative; text-align: center; }
 .n-time { font-size: 22vmin; font-weight: 200; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 .n-date { font-size: 3vmin; margin-top: 1.5vmin; color: #2A2E35; }
+.n-weather { display: flex; align-items: center; justify-content: center; gap: 1.6vmin; margin-top: 3.5vmin; font-size: 6vmin; font-weight: 250; font-variant-numeric: tabular-nums; }
+.n-weather:empty { display: none; }
+.n-weather .icon { width: 8vmin; height: 8vmin; color: inherit; }
+.n-weather .icon .sun, .n-weather .icon .drop { color: inherit; } /* calm, one-tone at night */
+
+/* with a picture: clock sits in the sky above the horizon, a bit brighter so it reads */
+body.night-has-bg .n-bg { display: block; }
+body.scene-night.night-has-bg .night-clock { justify-content: flex-start; padding-top: 20vh; color: rgba(232, 236, 241, 0.62); --panel: #0D151D; }
+body.night-has-bg .n-time, body.night-has-bg .n-weather { text-shadow: 0 0 4vmin rgba(0, 0, 0, 0.7); }
+body.night-has-bg .n-weather .icon { filter: drop-shadow(0 0 1.5vmin rgba(0, 0, 0, 0.7)); }
+body.night-has-bg .n-date { color: rgba(232, 236, 241, 0.42); }
 
 .panel {
   background: var(--panel);
