@@ -171,16 +171,20 @@ function lessonRow(l, isToday) {
   </div>`;
 }
 
-// beste.schule or fixed timetable: one card per child.
-// opts.color tints the dot, opts.cal/opts.events add the child's school calendar below.
+// beste.schule or fixed timetable: one card per child, top to bottom
+// school (lessons, exams, homework) → Termine → Essen.
+// opts.color tints the dot, opts.cal/opts.events add the child's school calendar,
+// opts.meal the child's lunch (VielfaltMenü). The school part absorbs any
+// overflow so Termine and Essen always stay visible at the bottom.
 function studentCard(st, opts = {}) {
   const day = st.day || {};
   const isToday = day.date === ymd(new Date());
   const exams = (st.exams || []).slice(0, MAX_EXAMS);
   const hw = (st.homework || []).slice(0, MAX_HOMEWORK);
-  return `<div class="panel fade">
+  return `<div class="panel kid">
     <div class="head"><span class="dot" style="--c:${opts.color ? esc(opts.color) : "var(--accent)"}"></span><span class="name">${esc(st.name || "Schule")}</span>
       <span class="meta">${day.noSchool ? "" : esc(relDay(day.date))}</span></div>
+    <div class="kid-main">
     ${(day.notices || []).map((n) => `<div class="notice">${esc(n)}</div>`).join("")}
     ${day.noSchool ? `<div class="empty">Keine Schule in Sicht 🎉</div>` : (day.lessons || []).map((l) => lessonRow(l, isToday)).join("")}
     ${exams.length ? `<div class="sub-h">Arbeiten</div>${exams.map((e) => `
@@ -189,8 +193,20 @@ function studentCard(st, opts = {}) {
     ${hw.length ? `<div class="sub-h">Hausaufgaben</div>${hw.map((e) => `
       <div class="entry"><span class="when">${esc(shortDay(e.date))}</span>
         <span class="what"><b>${esc(e.subject || "")}</b>${e.text ? ` <span class="muted">${esc(e.text)}</span>` : ""}</span></div>`).join("")}` : ""}
-    ${opts.cal ? `<div class="sub-h">Termine</div>${calendarRows(opts.events || [], MAX_CARD_EVENTS) || `<div class="empty">Nichts eingetragen</div>`}` : ""}
+    </div>
+    ${opts.cal ? `<div class="kid-sec"><div class="sub-h">Termine</div>${calendarRows(opts.events || [], MAX_CARD_EVENTS) || `<div class="empty">Nichts eingetragen</div>`}</div>` : ""}
+    ${opts.meal ? `<div class="kid-sec"><div class="sub-h">Essen</div>${mealRows(opts.meal)}</div>` : ""}
   </div>`;
+}
+
+// "Lukas" matches "Lukas", "lukas" and "Meister Lukas"; two multi-word names must be equal
+function sameKid(a, b) {
+  const wa = String(a || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const wb = String(b || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!wa.length || !wb.length) return false;
+  if (wa.join(" ") === wb.join(" ")) return true;
+  const [short, long] = wa.length <= wb.length ? [wa, wb] : [wb, wa];
+  return short.length === 1 && long.includes(short[0]);
 }
 
 // upcoming entries of a school calendar as rows
@@ -218,27 +234,46 @@ function schoolCalendarCard(cal, events) {
   </div>`;
 }
 
+// One card per child. A school calendar (CALENDAR_n_PANEL=school) and a lunch
+// account (VIELFALT_n_*) with the child's name move into that child's card;
+// a timetable's "calendar" field picks the calendar explicitly.
+// Returns the lunch accounts that found no card.
 function renderSchoolRow(d) {
   const cals = d.calendar?.calendars || [];
   const events = d.calendar?.events || [];
+  const meals = d.meals?.children || [];
+  const usedCals = new Set(), usedMeals = new Set();
+
+  const extras = (name, calName) => {
+    const opts = {};
+    const cal = cals.find((c) => c.panel === "school" && !usedCals.has(c.id) &&
+      (calName ? c.name.toLowerCase() === calName.toLowerCase() : sameKid(c.name, name)));
+    if (cal) {
+      usedCals.add(cal.id);
+      Object.assign(opts, { color: cal.color, cal, events: events.filter((e) => e.cal === cal.id) });
+    }
+    const mi = meals.findIndex((m, i) => !usedMeals.has(i) && sameKid(m.name, name));
+    if (mi >= 0) {
+      usedMeals.add(mi);
+      opts.meal = meals[mi];
+      opts.color ||= meals[mi].color;
+    }
+    return opts;
+  };
+
   let html = "";
   if (d.school) {
     html += d.school.students?.length
-      ? d.school.students.map(studentCard).join("")
+      ? d.school.students.map((st) => studentCard(st, extras(st.name))).join("")
       : `<div class="panel"><h2>Schule</h2><p class="hint">${esc(d.school.error || "Noch keine Daten von beste.schule.")}</p></div>`;
   }
-  // fixed timetables; a school calendar with the same name moves into the card
-  const used = new Set();
-  for (const t of d.timetables || []) {
-    const cal = t.calendar && cals.find((c) => c.panel === "school" && c.name.toLowerCase() === t.calendar.toLowerCase());
-    if (cal) used.add(cal.id);
-    html += studentCard(t, cal ? { color: cal.color, cal, events: events.filter((e) => e.cal === cal.id) } : {});
-  }
-  for (const cal of cals.filter((c) => c.panel === "school" && !used.has(c.id))) {
+  for (const t of d.timetables || []) html += studentCard(t, extras(t.name, t.calendar));
+  for (const cal of cals.filter((c) => c.panel === "school" && !usedCals.has(c.id))) {
     html += schoolCalendarCard(cal, events.filter((e) => e.cal === cal.id));
   }
   $("school").innerHTML = html;
   $("board").classList.toggle("no-school", !html);
+  return meals.filter((_, i) => !usedMeals.has(i));
 }
 
 // ------------------------------------------------------------------ school lunch (VielfaltMenü)
@@ -261,22 +296,25 @@ function mealRow(day) {
   return `<div class="${cls}"><span class="when">${esc(relDay(day.date))}</span><span class="what">${what}</span></div>`;
 }
 
-function mealCard(ch) {
+function mealRows(ch) {
   const now = new Date(), today = ymd(now);
   const days = (ch.days || [])
     .filter((d) => d.date > today || (d.date === today && now.getHours() < LUNCH_OVER))
     .slice(0, MEAL_DAYS);
-  const body = days.length
+  return days.length
     ? days.map(mealRow).join("")
     : ch.error ? `<p class="hint">${esc(ch.error)}</p>` : `<div class="empty">Kein Essen in Sicht</div>`;
+}
+
+// lunch of a child without a school card: a card of its own
+function mealCard(ch) {
   return `<div class="panel" style="--c:${esc(ch.color || "var(--accent)")}">
     <div class="head"><span class="dot"></span><span class="name">${esc(ch.name)}</span><span class="meta">Mittagessen</span></div>
-    ${body}
+    ${mealRows(ch)}
   </div>`;
 }
 
-function renderMeals(meals) {
-  const kids = meals?.children || [];
+function renderMeals(kids) {
   $("meals").innerHTML = kids.map(mealCard).join("");
   $("board").classList.toggle("no-meals", !kids.length);
 }
@@ -369,8 +407,7 @@ function render() {
   if (d) {
     renderWeather(d.weather);
     renderShopping(d.shopping);
-    renderSchoolRow(d);
-    renderMeals(d.meals);
+    renderMeals(renderSchoolRow(d));
     renderCalendars(d);
   }
   renderStatus();

@@ -77,6 +77,10 @@ Built for a **portrait** wall display (landscape works too):
 
 For a child without beste.schule, keep their school dates in a Google calendar and set `CALENDAR_n_PANEL=school`.
 
+**One card per child:** a `CALENDAR_n_PANEL=school` calendar and a `VIELFALT_n_*` lunch account whose name matches a child's card
+(beste.schule or fixed timetable) move into that card, ordered *school → Termine → Essen*. Names match case-insensitively, and a
+single first name also matches a full name (`Lukas` ↔ `Meister Lukas`). Anything without a matching child keeps a card of its own.
+
 ### Fixed timetable (school without beste.schule)
 
 `internal/timetable/stundenplan.json` holds a weekly plan that is compiled into the image and shows up as the same card as a beste.schule child:

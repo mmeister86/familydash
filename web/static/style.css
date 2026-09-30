@@ -47,7 +47,7 @@ body.night { filter: brightness(0.35); }
   padding: var(--gap) var(--gap) 0;
 }
 .board.no-meals {
-  grid-template-rows: minmax(0, 0.9fr) minmax(0, 1.15fr) minmax(0, 1.75fr);
+  grid-template-rows: minmax(0, 0.9fr) minmax(0, 1.4fr) minmax(0, 1.6fr);
   grid-template-areas: "clock shop" "school school" "cals cals";
 }
 .board.no-school {
@@ -229,6 +229,19 @@ h2 {
 .entry.exam .when, .entry.soon .when { color: var(--danger); }
 .entry.today .when { color: var(--accent); }
 .entry .loc { color: var(--muted); font-size: 0.8rem; }
+
+/* one card per child: school part on top takes what's left and fades out,
+   Termine and Essen always stay visible below it */
+.panel.kid { display: flex; flex-direction: column; }
+.kid-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent);
+          mask-image: linear-gradient(to bottom, black 85%, transparent);
+}
+.kid-sec { flex: none; }
+.kid-sec .meal .dish { font-size: 0.95rem; }
 
 /* ---------- school lunch (VielfaltMenü) */
 .meals-row {
