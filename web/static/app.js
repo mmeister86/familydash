@@ -1,7 +1,6 @@
 "use strict";
 
 const POLL_MS = 60_000;
-const NIGHT = { from: 22, to: 6 }; // dim the display between these hours
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -59,10 +58,11 @@ const icon = (key) => ICONS[key] || ICONS.cloud;
 
 function tickClock() {
   const now = new Date();
-  $("time").textContent = fmt.time.format(now);
-  $("date").textContent = fmt.longDate.format(now);
-  const h = now.getHours();
-  document.body.classList.toggle("night", NIGHT.from > NIGHT.to ? h >= NIGHT.from || h < NIGHT.to : h >= NIGHT.from && h < NIGHT.to);
+  const t = fmt.time.format(now), d = fmt.longDate.format(now);
+  $("time").textContent = t;
+  $("date").textContent = d;
+  $("night-time").textContent = t;
+  $("night-date").textContent = d;
 }
 
 // ------------------------------------------------------------------ weather
@@ -380,6 +380,181 @@ function renderCalendars(d) {
     : `<div class="calcol"><h2>Kalender</h2><p class="hint">Setze <code>CALENDAR_1_URL</code> auf die „Privatadresse im iCal-Format“ aus Google Kalender.</p></div>`;
 }
 
+// ------------------------------------------------------------------ scenes (time of day)
+
+// The server decides the scene from SCENE_* (school days vs. weekend) and
+// sends it with every poll. ?scene=evening in the URL overrides it – handy
+// for testing on the laptop. Each scene lists the widgets of the focus zone
+// (between clock and school row); the board's rows resize via CSS classes.
+const SCENES = {
+  morning:   { label: "Morgen",     focus: (sc) => (sc.schoolDay ? ["hints", "checklist"] : ["hints", "photos"]) },
+  day:       { label: "Tag",        focus: () => ["photos"] },
+  afternoon: { label: "Nachmittag", focus: () => ["photos"] },
+  evening:   { label: "Abend",      focus: () => ["tomorrow", "photos"] },
+  night:     { label: "Nacht",      focus: () => [] },
+};
+
+const urlScene = new URLSearchParams(location.search).get("scene");
+
+function currentScene(d) {
+  const sc = { name: "day", schoolDay: true, ...(d?.scene || {}) };
+  if (urlScene && SCENES[urlScene]) Object.assign(sc, { name: urlScene, forced: true });
+  if (!SCENES[sc.name]) sc.name = "day";
+  return sc;
+}
+
+function applyScene(sc) {
+  const board = $("board");
+  for (const n of Object.keys(SCENES)) {
+    board.classList.toggle("scene-" + n, n === sc.name);
+    document.body.classList.toggle("scene-" + n, n === sc.name);
+  }
+}
+
+// focus widgets: each returns HTML, or "" when it has nothing to say
+const FOCUS_WIDGETS = {
+  hints: (d) => hintsCard("Heute", weatherHints(d.weather, ymd(new Date()), 7, 16)),
+  checklist: () => "", // TODO: morning checklist per child (CHECKLIST_n_*), + "Sportbeutel" from the timetable
+  tomorrow: (d) => tomorrowCard(d),
+};
+
+function renderFocus(d, sc) {
+  const wanted = SCENES[sc.name].focus(sc);
+  const cards = wanted.filter((w) => FOCUS_WIDGETS[w]).map((w) => FOCUS_WIDGETS[w](d)).join("");
+  const photos = wanted.includes("photos") && slideshow.has();
+  $("focus-cards").innerHTML = cards;
+  $("focus").classList.toggle("no-photo", !photos);
+  $("board").classList.toggle("no-focus", !cards && !photos);
+  photos ? slideshow.start() : slideshow.stop();
+}
+
+// ------------------------------------------------------------------ weather hints
+
+// plain-language hints for the time kids are out (hourly forecast when it
+// covers the window, otherwise the daily forecast)
+function weatherHints(w, dateStr, fromH, toH) {
+  if (!w?.daily) return [];
+  const hours = (w.hourly || []).filter((h) => {
+    const t = new Date(h.time);
+    return ymd(t) === dateStr && t.getHours() >= fromH && t.getHours() < toH;
+  });
+  const day = w.daily.find((x) => x.date === dateStr);
+  if (!hours.length && !day) return [];
+  const rain = hours.length ? Math.max(...hours.map((h) => h.precipProb)) : day.precipProb;
+  const tmin = hours.length ? Math.min(...hours.map((h) => h.temp)) : day.min;
+  const tmax = hours.length ? Math.max(...hours.map((h) => h.temp)) : day.max;
+  const icons = hours.length ? hours.map((h) => h.icon) : [day.icon];
+
+  const out = [];
+  if (icons.some((i) => i === "snow" || i === "sleet")) out.push(["⛄", "Winterstiefel an", "Schnee möglich"]);
+  if (rain >= 50) out.push(["☔", "Regenjacke mitnehmen", `bis ${rain} % Regen`]);
+  else if (rain >= 30) out.push(["🌂", "Schirm einpacken", `${rain} % Regen`]);
+  if (tmin <= 2) out.push(["🧤", "Mütze & Handschuhe", `nur ${round(tmin)}°`]);
+  else if (tmin <= 10) out.push(["🧥", "Warme Jacke", `${round(tmin)}°`]);
+  if (tmax >= 26) out.push(["🧴", "Sonnencreme & Trinkflasche", `bis ${round(tmax)}°`]);
+  if (!out.length) out.push(["👍", "Wetter passt", `${round(tmin)}–${round(tmax)}°`]);
+  return out;
+}
+
+const hintRows = (hints) => hints.map(([ic, what, why]) =>
+  `<div class="hint-row"><span class="ic">${ic}</span><span class="what">${esc(what)}</span><span class="why">${esc(why)}</span></div>`).join("");
+
+function hintsCard(title, hints) {
+  if (!hints.length) return "";
+  return `<div class="panel focus-card">
+    <div class="head"><span class="dot" style="--c:var(--sun)"></span><span class="name">${esc(title)}</span><span class="meta">Wetter</span></div>
+    ${hintRows(hints)}
+  </div>`;
+}
+
+// ------------------------------------------------------------------ evening: "Morgen" card
+
+const MAX_TOMORROW = 5;
+
+function tomorrowCard(d) {
+  const tomorrow = addDays(new Date(), 1), key = ymd(tomorrow);
+  const bins = (d.waste || []).filter((b) => (b.dates || []).includes(key));
+  const { allDay, timed } = eventsOn(d.calendar?.events || [], tomorrow);
+  timed.sort((a, b) => a.s - b.s);
+  const hints = weatherHints(d.weather, key, 7, 16).filter(([ic]) => ic !== "👍");
+
+  const rows = [
+    ...bins.map((b) => `<div class="tm-row bin-row" style="--c:${esc(b.color)}"><span class="dot"></span><b>${esc(b.name)}</b> rausstellen</div>`),
+    ...(allDay.length ? [`<div class="allday">${allDay.map((e) => `<span class="chip" style="--c:${esc(e.color)}">${esc(e.title)}</span>`).join("")}</div>`] : []),
+    ...timed.slice(0, MAX_TOMORROW).map((e) => `<div class="ev" style="--c:${esc(e.color)}">
+        <span class="when">${e.s >= tomorrow ? fmt.time.format(e.s) : "…"}</span>
+        <span class="what"><span class="cdot"></span>${esc(e.title)}</span></div>`),
+    ...(timed.length > MAX_TOMORROW ? [`<div class="more">+ ${timed.length - MAX_TOMORROW} weitere</div>`] : []),
+    hintRows(hints),
+  ].filter(Boolean);
+
+  return `<div class="panel focus-card fade">
+    <div class="head"><span class="dot" style="--c:var(--accent)"></span><span class="name">Morgen</span>
+      <span class="meta">${esc(fmt.wdShort.format(tomorrow) + " " + fmt.dayMonthShort.format(tomorrow))}</span></div>
+    ${rows.length ? rows.join("") : `<div class="empty">Nichts Besonderes – ruhiger Tag 🙂</div>`}
+  </div>`;
+}
+
+// ------------------------------------------------------------------ photo slideshow
+
+// Two stacked <img>s: the next photo loads into the hidden one and fades in
+// once it's decoded, so there's never a half-loaded frame on the wall.
+const slideshow = {
+  list: [], order: [], pos: 0, key: "", interval: 45, shuffle: true, timer: null, front: 0,
+
+  set(snap) {
+    const items = snap?.items || [];
+    const key = items.map((i) => i.path + "@" + i.v).join("|");
+    const interval = Math.max(5, snap?.interval || 45);
+    if (key === this.key && interval === this.interval) return;
+    const restart = this.timer && (interval !== this.interval || !items.length);
+    Object.assign(this, { list: items, key, interval, shuffle: snap?.shuffle !== false, order: [], pos: 0 });
+    if (restart) { this.stop(); if (items.length) this.start(); }
+  },
+  has() { return this.list.length > 0; },
+
+  start() {
+    if (this.timer || !this.list.length) return;
+    this.next();
+    this.timer = setInterval(() => this.next(), this.interval * 1000);
+  },
+  stop() {
+    clearInterval(this.timer);
+    this.timer = null;
+  },
+
+  pick() {
+    if (this.pos >= this.order.length) {
+      const last = this.order[this.order.length - 1];
+      this.order = this.list.map((_, i) => i);
+      if (this.shuffle) {
+        for (let i = this.order.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [this.order[i], this.order[j]] = [this.order[j], this.order[i]];
+        }
+        if (this.order.length > 1 && this.order[0] === last) this.order.push(this.order.shift()); // no repeat across rounds
+      }
+      this.pos = 0;
+    }
+    return this.list[this.order[this.pos++]];
+  },
+
+  next() {
+    const p = this.pick();
+    if (!p) return;
+    const imgs = $("photo-frame").querySelectorAll("img");
+    const back = imgs[1 - this.front];
+    const url = "photos/" + p.path.split("/").map(encodeURIComponent).join("/") + "?v=" + p.v;
+    back.onload = () => {
+      back.classList.add("show");
+      imgs[this.front].classList.remove("show");
+      this.front = 1 - this.front;
+    };
+    back.onerror = () => console.warn("photo failed", p.path);
+    back.src = url;
+  },
+};
+
 // ------------------------------------------------------------------ status
 
 function renderStatus() {
@@ -392,6 +567,10 @@ function renderStatus() {
     if (d.school?.error && d.school.students?.length) parts.push(`<span class="err">Schule: ${esc(d.school.error)}</span>`);
     if (d.shopping?.error && d.shopping.items?.length) parts.push(`<span class="err">Bring!: ${esc(d.shopping.error)}</span>`);
     for (const c of d.meals?.children || []) if (c.error && c.days?.length) parts.push(`<span class="err">Essen ${esc(c.name)}: ${esc(c.error)}</span>`);
+  }
+  if (d) {
+    const sc = currentScene(d);
+    if (sc.forced) parts.push(`<span class="err">Szene fest: ${esc(SCENES[sc.name].label)}</span>`);
   }
   if (state.lastOk) parts.push(`<span>aktualisiert ${fmt.time.format(new Date(state.lastOk))}</span>`);
   $("status").innerHTML = parts.join("");
@@ -418,6 +597,10 @@ async function refresh() {
 function render() {
   const d = state.data;
   if (d) {
+    const sc = currentScene(d);
+    applyScene(sc);
+    slideshow.set(d.photos);
+    renderFocus(d, sc);
     renderWeather(d.weather);
     renderWaste(d.waste);
     renderShopping(d.shopping);

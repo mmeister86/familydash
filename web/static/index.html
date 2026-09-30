@@ -18,12 +18,24 @@
 
     <section class="panel shopping" id="shopping"></section>
 
+    <!-- focus zone: content changes with the time of day (see SCENES in app.js) -->
+    <section class="focus" id="focus">
+      <div class="focus-cards" id="focus-cards"></div>
+      <div class="photo-frame" id="photo-frame"><img class="ph" alt=""><img class="ph" alt=""></div>
+    </section>
+
     <section class="school-row" id="school"></section>
 
     <section class="meals-row" id="meals"></section>
 
     <section class="calendars" id="calendars"></section>
   </main>
+
+  <!-- night scene: only a dimmed clock -->
+  <div class="night-clock" id="night-clock">
+    <div class="n-time" id="night-time">--:--</div>
+    <div class="n-date" id="night-date"></div>
+  </div>
 
   <footer class="status" id="status"></footer>
   <script src="app.js"></script>

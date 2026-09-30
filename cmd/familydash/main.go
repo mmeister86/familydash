@@ -18,6 +18,7 @@ import (
 	"familydash/internal/bring"
 	"familydash/internal/calendar"
 	"familydash/internal/config"
+	"familydash/internal/photos"
 	"familydash/internal/server"
 	"familydash/internal/timetable"
 	"familydash/internal/vielfalt"
@@ -106,9 +107,16 @@ func main() {
 		ws = &waste.Service{Bins: cfg.Waste, Shift: cfg.WasteShift}
 	}
 
+	var ph *photos.Service
+	if cfg.PhotosDir != "" {
+		ph = photos.NewService(cfg.PhotosDir, cfg.PhotosInterval, cfg.PhotosShuffle)
+		go ph.Run(ctx, cfg.PhotosRefresh)
+	}
+
+	src := server.Sources{Weather: wx, Bring: br, School: sc, Plan: plan, Meals: ml, Waste: ws, Photos: ph}
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           server.New(cfg, version, cal, wx, br, sc, plan, ml, ws, web.Static()).Handler(),
+		Handler:           server.New(cfg, version, cal, src, web.Static()).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	go func() {
@@ -120,7 +128,8 @@ func main() {
 
 	slog.Info("familydash started", "version", version, "addr", cfg.ListenAddr,
 		"calendars", len(cfg.Calendars), "weather", cfg.WeatherEnabled(), "tz", cfg.Location.String(),
-		"bring", cfg.BringEnabled(), "besteschule", cfg.SchoolEnabled(), "timetable", plan != nil, "vielfalt", len(cfg.Meals), "waste", len(cfg.Waste))
+		"bring", cfg.BringEnabled(), "besteschule", cfg.SchoolEnabled(), "timetable", plan != nil, "vielfalt", len(cfg.Meals), "waste", len(cfg.Waste),
+		"photos", cfg.PhotosDir, "scene", cfg.Scenes.At(time.Now(), cfg.Location).Name)
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("server", "err", err)
 		os.Exit(1)

@@ -6,7 +6,12 @@
 - [ ] Tap-to-check Bring! items on a touch display (Bring! batch update endpoint)
 - [ ] Tasks & points from the SwiftUI family app (Convex) as a fourth panel
 - [ ] Calendar legend / per-person filter
-- [ ] Configurable night dimming (`NIGHT_FROM`/`NIGHT_TO` passed via `/api/dashboard`)
+- [x] Time-of-day scenes (`SCENE_*`) with focus zone, night = dimmed clock only
+- [x] Photo slideshow (`PHOTOS_DIR`)
+- [ ] Morning checklist per child (focus widget `checklist`), "Sportbeutel" from the timetable
+- [ ] Countdown to the next appointment, pushed into every scene
+- [ ] Scenes: treat public holidays / school vacations as weekend
+- [ ] Hardware dimming at night via `ddcutil` on the Pi
 
 ## Voice control (later)
 
