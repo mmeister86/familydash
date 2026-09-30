@@ -34,6 +34,10 @@ RUN case "$TARGETARCH" in \
     esac \
     && cargo zigbuild --release --locked --target "$T" \
     && mkdir -p /out && cp "target/$T/release/things3" /out/things3
+# smoke test: the binary must start without any libraries (the build host is
+# glibc, so a dynamically linked musl binary would fail here). amd64 only –
+# arm64 can't run on the build host.
+RUN if [ "$TARGETARCH" = amd64 ]; then /out/things3 --version; fi
 
 # ~20 MB final image: the static binaries, CA certs and time zones (the
 # things3 CLI needs them to know what "today" is).
