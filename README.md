@@ -3,7 +3,7 @@
 A lightweight family wall dashboard: **Google Calendar**, **weather**, the **school timetable** from beste.schule and the **Bring! shopping list** on one screen.
 Runs as a single static Go binary in an ~8 MB container on Unraid; a Raspberry Pi only runs a browser in kiosk mode.
 
-![Wall display](docs/screenshot.png)
+<img src="docs/screenshot.png" alt="Wall display (portrait)" width="420">
 
 - Go standard library only — no dependencies, no database, no Node build step
 - Frontend is plain HTML/CSS/JS, embedded in the binary
@@ -34,6 +34,7 @@ All settings are environment variables.
 | `CALENDAR_n_URL` | – | iCal URL, `n` = 1…20. `webcal://` is accepted |
 | `CALENDAR_n_NAME` | `Kalender n` | |
 | `CALENDAR_n_COLOR` | palette | Hex color for bars/chips |
+| `CALENDAR_n_PANEL` | `column` | `column` = own column in the calendar row, `school` = card next to beste.schule (next 3 weeks) |
 | `CALENDAR_DAYS` | `7` | Days shown (today + n-1) |
 | `CALENDAR_REFRESH` | `5m` | Go duration |
 | `WEATHER_LAT` / `WEATHER_LON` | – | Weather is off until set |
@@ -50,6 +51,22 @@ All settings are environment variables.
 | `LISTEN_ADDR` | `:8080` | |
 
 Values may be wrapped in quotes (`KEY="value"`) – they are stripped, since `docker --env-file` would otherwise keep them.
+
+### Layout
+
+Built for a **portrait** wall display (landscape works too):
+
+```
+┌──────────────┬──────────────┐
+│ clock+weather│ Bring! list  │
+├──────────────┼──────────────┤
+│ beste.schule │ school cal.  │   one card per child / per CALENDAR_n_PANEL=school
+├────────┬─────┴──┬───────────┤
+│ cal 1  │ cal 2  │ cal 3 …   │   one column per CALENDAR_n_PANEL=column
+└────────┴────────┴───────────┘
+```
+
+For a child without beste.schule, keep their school dates in a Google calendar and set `CALENDAR_n_PANEL=school`.
 
 ### Google Calendar
 

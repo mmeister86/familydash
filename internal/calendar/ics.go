@@ -15,6 +15,7 @@ import (
 
 // Event is one concrete occurrence, ready for the frontend.
 type Event struct {
+	Cal       int       `json:"cal"` // index into Snapshot.Calendars
 	Calendar  string    `json:"calendar"`
 	Color     string    `json:"color"`
 	Title     string    `json:"title"`

@@ -59,14 +59,20 @@ func (s *Service) Run(ctx context.Context, every time.Duration) {
 func (s *Service) Refresh(ctx context.Context) {
 	now := time.Now().In(s.loc)
 	from := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, s.loc)
-	to := from.AddDate(0, 0, s.days)
 
 	var wg sync.WaitGroup
-	for _, c := range s.cals {
+	for i, c := range s.cals {
 		wg.Add(1)
-		go func(c config.Calendar) {
+		go func(i int, c config.Calendar) {
 			defer wg.Done()
-			evs, err := s.fetch(ctx, c, from, to)
+			days := s.days
+			if c.Panel == "school" && days < schoolDays {
+				days = schoolDays // tests and trips are announced weeks ahead
+			}
+			evs, err := s.fetch(ctx, c, from, from.AddDate(0, 0, days))
+			for j := range evs {
+				evs[j].Cal = i
+			}
 			s.mu.Lock()
 			defer s.mu.Unlock()
 			if err != nil {
@@ -76,7 +82,7 @@ func (s *Service) Refresh(ctx context.Context) {
 			}
 			delete(s.errs, c.Name)
 			s.byCal[c.URL] = evs
-		}(c)
+		}(i, c)
 	}
 	wg.Wait()
 	s.mu.Lock()
@@ -109,7 +115,19 @@ func (s *Service) fetch(ctx context.Context, c config.Calendar, from, to time.Ti
 	return Expand(body, c.Name, c.Color, from, to, s.loc)
 }
 
+// schoolDays is the look-ahead for calendars shown as a school card.
+const schoolDays = 21
+
+// CalendarInfo describes a configured calendar, in configuration order.
+type CalendarInfo struct {
+	ID    int    `json:"id"`
+	Name  string `json:"name"`
+	Color string `json:"color"`
+	Panel string `json:"panel"`
+}
+
 type Snapshot struct {
+	Calendars []CalendarInfo    `json:"calendars"`
 	Events    []Event           `json:"events"`
 	Errors    map[string]string `json:"errors,omitempty"`
 	UpdatedAt time.Time         `json:"updatedAt"`
@@ -132,5 +150,9 @@ func (s *Service) Snapshot() Snapshot {
 	for k, v := range s.errs {
 		errs[k] = v
 	}
-	return Snapshot{Events: all, Errors: errs, UpdatedAt: s.update}
+	infos := make([]CalendarInfo, len(s.cals))
+	for i, c := range s.cals {
+		infos[i] = CalendarInfo{ID: i, Name: c.Name, Color: c.Color, Panel: c.Panel}
+	}
+	return Snapshot{Calendars: infos, Events: all, Errors: errs, UpdatedAt: s.update}
 }

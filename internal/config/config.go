@@ -14,6 +14,7 @@ type Calendar struct {
 	Name  string
 	Color string
 	URL   string
+	Panel string // "column" (own column in the calendar row) or "school" (card next to beste.schule)
 }
 
 type Config struct {
@@ -88,10 +89,15 @@ func Load() (*Config, error) {
 		if url == "" {
 			continue
 		}
+		panel := strings.ToLower(env(fmt.Sprintf("CALENDAR_%d_PANEL", i), "column"))
+		if panel != "school" {
+			panel = "column"
+		}
 		c.Calendars = append(c.Calendars, Calendar{
 			URL:   url,
 			Name:  env(fmt.Sprintf("CALENDAR_%d_NAME", i), fmt.Sprintf("Kalender %d", i)),
 			Color: env(fmt.Sprintf("CALENDAR_%d_COLOR", i), palette[(i-1)%len(palette)]),
+			Panel: panel,
 		})
 	}
 	return c, nil
