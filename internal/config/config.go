@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"familydash/internal/scene"
+	"familydash/internal/uptime"
 	"familydash/internal/waste"
 )
 
@@ -80,6 +81,13 @@ type Config struct {
 	ThingsBin      string
 	ThingsStateDir string // sync cache of the CLI
 	ThingsRefresh  time.Duration
+
+	// Uptime Kuma status page in the footer (UPTIME_*)
+	UptimeBase     string // http://host:3001, "" = off
+	UptimeSlug     string // from UPTIME_URL …/status/<slug>
+	UptimeAPIKey   string // optional: /metrics for certificate expiry
+	UptimeCertWarn int    // warn at or below this many days
+	UptimeRefresh  time.Duration
 }
 
 type MealAccount struct {
@@ -126,6 +134,17 @@ func Load() (*Config, error) {
 		ThingsBin:      env("THINGS_BIN", "/things3"),
 		ThingsStateDir: env("THINGS_STATE_DIR", "/data/things"),
 		ThingsRefresh:  envDuration("THINGS_REFRESH", 5*time.Minute),
+
+		UptimeAPIKey:   env("UPTIME_API_KEY", ""),
+		UptimeCertWarn: envInt("UPTIME_CERT_WARN_DAYS", 14),
+		UptimeRefresh:  envDuration("UPTIME_REFRESH", time.Minute),
+	}
+	if raw := env("UPTIME_URL", ""); raw != "" {
+		base, slug, err := uptime.ParsePageURL(raw)
+		if err != nil {
+			return nil, fmt.Errorf("UPTIME_URL: %w", err)
+		}
+		c.UptimeBase, c.UptimeSlug = base, slug
 	}
 	if strings.EqualFold(c.PhotosDir, "off") {
 		c.PhotosDir = ""
@@ -286,6 +305,7 @@ func (c *Config) BringEnabled() bool   { return c.BringEmail != "" && c.BringPas
 func (c *Config) SchoolEnabled() bool  { return c.SchoolToken != "" }
 func (c *Config) MealsEnabled() bool   { return len(c.Meals) > 0 }
 func (c *Config) ThingsEnabled() bool  { return c.ThingsEmail != "" && c.ThingsPassword != "" }
+func (c *Config) UptimeEnabled() bool  { return c.UptimeBase != "" }
 
 // env reads a variable, trims whitespace and one pair of surrounding quotes.
 // docker --env-file passes quotes through literally, so KEY="value" would

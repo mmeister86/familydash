@@ -16,6 +16,7 @@ import (
 	"familydash/internal/scene"
 	"familydash/internal/things"
 	"familydash/internal/timetable"
+	"familydash/internal/uptime"
 	"familydash/internal/vielfalt"
 	"familydash/internal/waste"
 	"familydash/internal/weather"
@@ -33,6 +34,7 @@ type Server struct {
 	waste    *waste.Service       // nil if not configured
 	photos   *photos.Service      // nil if not configured
 	todos    *things.Service      // nil if not configured
+	uptime   *uptime.Service      // nil if not configured
 	static   fs.FS
 }
 
@@ -46,11 +48,12 @@ type Sources struct {
 	Waste   *waste.Service
 	Photos  *photos.Service
 	Todos   *things.Service
+	Uptime  *uptime.Service
 }
 
 func New(cfg *config.Config, version string, cal *calendar.Service, src Sources, static fs.FS) *Server {
 	return &Server{cfg: cfg, version: version, calendar: cal, weather: src.Weather, bring: src.Bring, school: src.School,
-		plan: src.Plan, meals: src.Meals, waste: src.Waste, photos: src.Photos, todos: src.Todos, static: static}
+		plan: src.Plan, meals: src.Meals, waste: src.Waste, photos: src.Photos, todos: src.Todos, uptime: src.Uptime, static: static}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -93,6 +96,8 @@ type dashboard struct {
 	Todos *things.List `json:"todos,omitempty"`
 	// Background of the night scene (NIGHT_BG); file at /night-bg?v=<v>
 	NightBG *nightBG `json:"nightBg,omitempty"`
+	// Monitors of one Uptime Kuma status page, shown in the footer (UPTIME_*)
+	Uptime *uptime.Status `json:"uptime,omitempty"`
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, _ *http.Request) {
@@ -130,6 +135,9 @@ func (s *Server) handleDashboard(w http.ResponseWriter, _ *http.Request) {
 	}
 	if s.todos != nil {
 		d.Todos = s.todos.Snapshot()
+	}
+	if s.uptime != nil {
+		d.Uptime = s.uptime.Snapshot()
 	}
 	if _, info := findNightBG(s.cfg.NightBGCandidates()); info != nil {
 		d.NightBG = &nightBG{V: info.ModTime().Unix()}

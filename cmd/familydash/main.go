@@ -22,6 +22,7 @@ import (
 	"familydash/internal/server"
 	"familydash/internal/things"
 	"familydash/internal/timetable"
+	"familydash/internal/uptime"
 	"familydash/internal/vielfalt"
 	"familydash/internal/waste"
 	"familydash/internal/weather"
@@ -124,7 +125,13 @@ func main() {
 		go td.Run(ctx, cfg.ThingsRefresh)
 	}
 
-	src := server.Sources{Weather: wx, Bring: br, School: sc, Plan: plan, Meals: ml, Waste: ws, Photos: ph, Todos: td}
+	var up *uptime.Service
+	if cfg.UptimeEnabled() {
+		up = uptime.NewService(cfg.UptimeBase, cfg.UptimeSlug, cfg.UptimeAPIKey, cfg.UptimeCertWarn)
+		go up.Run(ctx, cfg.UptimeRefresh)
+	}
+
+	src := server.Sources{Weather: wx, Bring: br, School: sc, Plan: plan, Meals: ml, Waste: ws, Photos: ph, Todos: td, Uptime: up}
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
 		Handler:           server.New(cfg, version, cal, src, web.Static()).Handler(),
@@ -140,7 +147,7 @@ func main() {
 	slog.Info("familydash started", "version", version, "addr", cfg.ListenAddr,
 		"calendars", len(cfg.Calendars), "weather", cfg.WeatherEnabled(), "tz", cfg.Location.String(),
 		"bring", cfg.BringEnabled(), "besteschule", cfg.SchoolEnabled(), "timetable", plan != nil, "vielfalt", len(cfg.Meals), "waste", len(cfg.Waste),
-		"photos", cfg.PhotosDir, "things", cfg.ThingsEnabled(), "scene", cfg.Scenes.At(time.Now(), cfg.Location).Name)
+		"photos", cfg.PhotosDir, "things", cfg.ThingsEnabled(), "uptime", cfg.UptimeEnabled(), "scene", cfg.Scenes.At(time.Now(), cfg.Location).Name)
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("server", "err", err)
 		os.Exit(1)

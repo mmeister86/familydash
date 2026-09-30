@@ -40,7 +40,7 @@ html, body {
   --t-school: minmax(0, 1.15fr);
   --t-meals: minmax(0, 0.5fr);
   --t-cals: minmax(0, 1.6fr);
-  height: calc(100% - 1.8rem);
+  height: calc(100% - var(--status-h));
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   grid-template-rows: var(--t-top) var(--t-focus) var(--t-school) var(--t-meals) var(--t-cals);
@@ -448,8 +448,11 @@ h2 {
 .photo-frame .ph.show { opacity: 1; }
 
 /* ---------- status */
+body { --status-h: 1.8rem; }
+body.status-alert { --status-h: 2.8rem; }
+
 .status {
-  height: 1.8rem;
+  height: var(--status-h);
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -462,3 +465,17 @@ h2 {
 }
 .status .err { color: var(--warn); }
 .status .off { color: var(--danger); }
+
+/* Uptime Kuma: left side of the footer, the rest stays right-aligned */
+.status .kuma { margin-right: auto; display: flex; gap: 1.2rem; overflow: hidden; }
+.status .k-ok { color: var(--good); opacity: 0.8; }
+.status .k-pending { color: var(--warn); }
+.status .k-maint { color: var(--accent); }
+.status .k-down { color: var(--danger); font-weight: 600; }
+body.status-alert .status {
+  font-size: 1.05rem;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--danger) 16%, var(--bg));
+  border-top: 2px solid var(--danger);
+}
+body.status-alert .status .k-down { color: #FF8C80; }

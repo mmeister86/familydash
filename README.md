@@ -74,6 +74,10 @@ All settings are environment variables.
 | `THINGS_AREA` | `Familie` | Things area whose **Today** to-dos are shown (title, case-insensitive substring) |
 | `THINGS_REFRESH` | `5m` | |
 | `THINGS_STATE_DIR` | `/data/things` | Sync cache of the CLI; falls back to `/tmp` when not writable (then it syncs from scratch after a restart) |
+| `UPTIME_URL` | – | Uptime Kuma **status page** URL, e.g. `http://192.168.188.127:3001/status/dashboard`; footer status is off until set |
+| `UPTIME_API_KEY` | – | Optional Kuma API key (Settings → API Keys): reads `/metrics` for TLS certificate expiry |
+| `UPTIME_CERT_WARN_DAYS` | `14` | Footer warns when a certificate has this many days left or fewer |
+| `UPTIME_REFRESH` | `1m` | |
 | `LISTEN_ADDR` | `:8080` | |
 
 Values may be wrapped in quotes (`KEY="value"`) – they are stripped, since `docker --env-file` would otherwise keep them.
@@ -224,6 +228,22 @@ With the default `PHOTOS_DIR=/data/pictures` and the container started with `-v 
 
 Drop a picture as `bg.jpeg` into the data folder – with `-v /mnt/user/appdata/familydash:/data` that's `/mnt/user/appdata/familydash/bg.jpeg` on Unraid. The night scene then shows it full-screen (anchored at the bottom, so a horizon stays in view) with the clock in the upper third. Pick something dark – it's on all night. Without the file the clock stays on black. Don't put it into the photo folder, or it joins the slideshow.
 
+### Uptime Kuma (footer)
+
+Create a status page in Uptime Kuma and put the monitors the wall should know about on it (e.g. *Internet* = ping `1.1.1.1`, *Jellyfin*, mail).
+Set `UPTIME_URL` to that page. familydash reads Kuma's public status page JSON – no login needed:
+
+```sh
+curl http://192.168.188.127:3001/api/status-page/dashboard            # monitors
+curl http://192.168.188.127:3001/api/status-page/heartbeat/dashboard  # heartbeats + 24 h uptime
+```
+
+The footer stays quiet while everything is up (a green „Alle 4 Dienste laufen"). A monitor that is **down** turns the footer red
+and taller: „Jellyfin ausgefallen seit 14 min". Pending (retrying) monitors, maintenance and a pinned incident show up in yellow/blue.
+With `UPTIME_API_KEY` set, certificates of the monitors on the page that expire within `UPTIME_CERT_WARN_DAYS` show a 🔒 warning.
+
+Tip: add a *Push* monitor in Kuma and let the Pi call its URL every minute (cron + `curl`) – then Kuma tells you when the wall display itself hangs.
+
 ### Weather
 
 [Open-Meteo](https://open-meteo.com) — free, no API key, uses DWD's ICON model for Germany.
@@ -244,7 +264,7 @@ At night (`SCENE_NIGHT`) the page shows only a dimmed clock. Portrait and landsc
 
 | | |
 |---|---|
-| `GET /api/dashboard` | Everything the frontend needs (JSON) |
+| `GET /api/dashboard` | Everything the frontend needs (JSON), incl. `uptime` |
 | `GET /photos/<path>` | Slideshow files (only those listed in `/api/dashboard`) |
 | `GET /healthz` | Liveness |
 

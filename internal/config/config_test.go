@@ -92,3 +92,25 @@ func TestPhotosDir(t *testing.T) {
 		t.Errorf("PHOTOS_DIR=off → %q", c.PhotosDir)
 	}
 }
+
+func TestUptime(t *testing.T) {
+	c, err := Load()
+	if err != nil || c.UptimeEnabled() {
+		t.Fatalf("uptime should be off without UPTIME_URL: %v", err)
+	}
+
+	t.Setenv("UPTIME_URL", "http://192.168.188.127:3001/status/dashboard")
+	t.Setenv("UPTIME_API_KEY", `"uk1_secret"`)
+	if c, err = Load(); err != nil {
+		t.Fatal(err)
+	}
+	if !c.UptimeEnabled() || c.UptimeBase != "http://192.168.188.127:3001" || c.UptimeSlug != "dashboard" ||
+		c.UptimeAPIKey != "uk1_secret" || c.UptimeCertWarn != 14 || c.UptimeRefresh.Minutes() != 1 {
+		t.Errorf("uptime config: %+v", c)
+	}
+
+	t.Setenv("UPTIME_URL", "http://192.168.188.127:3001")
+	if _, err := Load(); err == nil {
+		t.Error("URL without /status/<slug> should fail")
+	}
+}

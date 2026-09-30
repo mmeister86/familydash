@@ -673,9 +673,49 @@ const slideshow = {
 
 // ------------------------------------------------------------------ status
 
+// Uptime Kuma (UPTIME_URL): calm while everything runs, loud when not.
+// Returns { html, alert } – alert makes the whole footer red and bigger.
+function uptimeFooter(u, now = new Date()) {
+  if (!u) return { html: "", alert: false };
+  const mons = u.monitors || [];
+  if (!mons.length) return { html: u.error ? `<span class="err">● Uptime Kuma: ${esc(u.error)}</span>` : "", alert: false };
+
+  const since = (iso) => {
+    if (!iso) return "";
+    const t = new Date(iso);
+    const min = Math.max(1, Math.round((now - t) / 60_000));
+    if (min < 60) return ` seit ${min} min`;
+    if (startOfDay(t).getTime() === startOfDay(now).getTime()) return ` seit ${fmt.time.format(t)} Uhr`;
+    return ` seit ${fmt.wdShort.format(t)} ${fmt.time.format(t)}`;
+  };
+  const parts = [];
+  for (const m of mons) {
+    if (m.state === "down") parts.push(`<span class="k-down">● ${esc(m.name)} ausgefallen${since(m.since)}</span>`);
+    else if (m.state === "pending") parts.push(`<span class="k-pending">● ${esc(m.name)} hakt${since(m.since)}</span>`);
+    else if (m.state === "maintenance") parts.push(`<span class="k-maint">● ${esc(m.name)} Wartung</span>`);
+  }
+  const alert = mons.some((m) => m.state === "down");
+  for (const m of mons) {
+    if (m.certDays == null || m.certDays > (u.certWarn ?? 14)) continue;
+    const txt = m.certDays < 0 ? "abgelaufen" : m.certDays === 0 ? "läuft heute ab" : m.certDays === 1 ? "noch 1 Tag" : `noch ${m.certDays} Tage`;
+    parts.push(`<span class="k-pending">🔒 Zertifikat ${esc(m.name)}: ${txt}</span>`);
+  }
+  if (u.incident) parts.push(`<span class="k-pending">📢 ${esc(u.incident)}</span>`);
+  if (!parts.length) {
+    const up = mons.filter((m) => m.state === "up").length;
+    const label = mons.length === 1 ? `${esc(mons[0].name)} läuft` : up === mons.length ? `Alle ${up} Dienste laufen` : `${up} von ${mons.length} Diensten laufen`;
+    parts.push(`<span class="k-ok">● ${label}</span>`);
+  }
+  if (u.error) parts.push(`<span class="err">Uptime Kuma: Stand ${fmt.time.format(new Date(u.updatedAt))}</span>`);
+  return { html: `<span class="kuma">${parts.join("")}</span>`, alert };
+}
+
 function renderStatus() {
   const d = state.data;
   const parts = [];
+  const kuma = uptimeFooter(d?.uptime);
+  if (kuma.html) parts.push(kuma.html);
+  document.body.classList.toggle("status-alert", kuma.alert);
   if (state.error) parts.push(`<span class="off">● Server nicht erreichbar</span>`);
   if (d) {
     for (const [name, err] of Object.entries(d.calendar?.errors || {})) parts.push(`<span class="err">${esc(name)}: ${esc(err)}</span>`);
