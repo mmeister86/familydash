@@ -45,6 +45,7 @@ All settings are environment variables.
 | `BESTESCHULE_STUDENTS` | all | Comma-separated first names or ids to show |
 | `BESTESCHULE_REFRESH` | `15m` | |
 | `BESTESCHULE_URL` | `https://beste.schule/api` | |
+| `TIMETABLE_FILE` | built-in | Path to a JSON timetable (see *Fixed timetable*); `off` disables it |
 | `BRING_EMAIL` / `BRING_PASSWORD` | – | Bring! account; shopping panel is off until set |
 | `BRING_LIST` | account default | Name of the list to show, e.g. `Zuhause` |
 | `BRING_LOCALE` | `de-DE` | Language for catalog item names |
@@ -68,6 +69,14 @@ Built for a **portrait** wall display (landscape works too):
 ```
 
 For a child without beste.schule, keep their school dates in a Google calendar and set `CALENDAR_n_PANEL=school`.
+
+### Fixed timetable (school without beste.schule)
+
+`internal/timetable/stundenplan.json` holds a weekly plan that is compiled into the image and shows up as the same card as a beste.schule child:
+lesson times, subjects per weekday (`""` = free period), extras such as afternoon clubs (`"tag": "GTA"`) and holidays (`noSchool`).
+It switches to the next school day after the last lesson, like beste.schule. With `"calendar": "<name>"` the upcoming entries of the
+`CALENDAR_n_PANEL=school` calendar with that name appear at the bottom of the card instead of in a card of their own.
+Edit the file and push, or mount your own and point `TIMETABLE_FILE` at it.
 
 To show two calendars in one column, point the second one at the first: `CALENDAR_5_COLUMN=1` puts calendar 5 into calendar 1's column.
 Good for a holiday feed next to the family calendar, e.g. `https://www.feiertage-deutschland.de/kalender-download/ics/feiertage-deutschland.ics`.

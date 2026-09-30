@@ -12,6 +12,7 @@ import (
 	"familydash/internal/bring"
 	"familydash/internal/calendar"
 	"familydash/internal/config"
+	"familydash/internal/timetable"
 	"familydash/internal/weather"
 )
 
@@ -22,11 +23,12 @@ type Server struct {
 	weather  *weather.Service     // nil if not configured
 	bring    *bring.Service       // nil if not configured
 	school   *besteschule.Service // nil if not configured
+	plan     *timetable.File      // nil if not configured
 	static   fs.FS
 }
 
-func New(cfg *config.Config, version string, cal *calendar.Service, wx *weather.Service, br *bring.Service, sc *besteschule.Service, static fs.FS) *Server {
-	return &Server{cfg: cfg, version: version, calendar: cal, weather: wx, bring: br, school: sc, static: static}
+func New(cfg *config.Config, version string, cal *calendar.Service, wx *weather.Service, br *bring.Service, sc *besteschule.Service, plan *timetable.File, static fs.FS) *Server {
+	return &Server{cfg: cfg, version: version, calendar: cal, weather: wx, bring: br, school: sc, plan: plan, static: static}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -51,6 +53,8 @@ type dashboard struct {
 	Weather  *weather.Weather    `json:"weather,omitempty"`
 	Shopping *bring.List         `json:"shopping,omitempty"`
 	School   *besteschule.School `json:"school,omitempty"`
+	// Fixed timetables (TIMETABLE_FILE / built-in) for children without beste.schule
+	Timetables []timetable.Card `json:"timetables,omitempty"`
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, _ *http.Request) {
@@ -72,6 +76,9 @@ func (s *Server) handleDashboard(w http.ResponseWriter, _ *http.Request) {
 	}
 	if s.school != nil {
 		d.School = s.school.Snapshot()
+	}
+	if s.plan != nil {
+		d.Timetables = s.plan.Build(d.Now, s.cfg.Location)
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, d)

@@ -153,6 +153,7 @@ function renderShopping(list) {
 const MAX_HOMEWORK = 3;
 const MAX_EXAMS = 3;
 const MAX_SCHOOL_EVENTS = 8;
+const MAX_CARD_EVENTS = 4; // school calendar entries under a fixed timetable
 
 function lessonRow(l, isToday) {
   const now = new Date();
@@ -160,7 +161,8 @@ function lessonRow(l, isToday) {
   const past = isToday && l.end && at(l.end) <= now;
   const running = isToday && l.start && l.end && at(l.start) <= now && now < at(l.end);
   const cls = ["lesson", l.status || "", past ? "past" : "", running ? "now" : ""].join(" ");
-  const badge = l.status === "cancelled" ? `<span class="tag danger">entfällt</span>` : l.status === "substitution" ? `<span class="tag warn">Vertretung</span>` : "";
+  const badge = (l.status === "cancelled" ? `<span class="tag danger">entfällt</span>` : l.status === "substitution" ? `<span class="tag warn">Vertretung</span>` : "")
+    + (l.tag ? `<span class="tag">${esc(l.tag)}</span>` : "");
   return `<div class="${cls}">
     <span class="nr">${l.nr || ""}</span>
     <span class="t">${esc(l.start || "")}</span>
@@ -169,14 +171,15 @@ function lessonRow(l, isToday) {
   </div>`;
 }
 
-// beste.schule: one card per child
-function studentCard(st) {
+// beste.schule or fixed timetable: one card per child.
+// opts.color tints the dot, opts.cal/opts.events add the child's school calendar below.
+function studentCard(st, opts = {}) {
   const day = st.day || {};
   const isToday = day.date === ymd(new Date());
   const exams = (st.exams || []).slice(0, MAX_EXAMS);
   const hw = (st.homework || []).slice(0, MAX_HOMEWORK);
   return `<div class="panel fade">
-    <div class="head"><span class="dot" style="--c:var(--accent)"></span><span class="name">${esc(st.name || "Schule")}</span>
+    <div class="head"><span class="dot" style="--c:${opts.color ? esc(opts.color) : "var(--accent)"}"></span><span class="name">${esc(st.name || "Schule")}</span>
       <span class="meta">${day.noSchool ? "" : esc(relDay(day.date))}</span></div>
     ${(day.notices || []).map((n) => `<div class="notice">${esc(n)}</div>`).join("")}
     ${day.noSchool ? `<div class="empty">Keine Schule in Sicht 🎉</div>` : (day.lessons || []).map((l) => lessonRow(l, isToday)).join("")}
@@ -186,16 +189,17 @@ function studentCard(st) {
     ${hw.length ? `<div class="sub-h">Hausaufgaben</div>${hw.map((e) => `
       <div class="entry"><span class="when">${esc(shortDay(e.date))}</span>
         <span class="what"><b>${esc(e.subject || "")}</b>${e.text ? ` <span class="muted">${esc(e.text)}</span>` : ""}</span></div>`).join("")}` : ""}
+    ${opts.cal ? `<div class="sub-h">Termine</div>${calendarRows(opts.events || [], MAX_CARD_EVENTS) || `<div class="empty">Nichts eingetragen</div>`}` : ""}
   </div>`;
 }
 
-// a calendar with CALENDAR_n_PANEL=school: upcoming entries as a list
-function schoolCalendarCard(cal, events) {
+// upcoming entries of a school calendar as rows
+function calendarRows(events, max) {
   const now = new Date(), today = startOfDay(now);
   const upcoming = events
     .filter((e) => (e.allDay ? e.endDate > ymd(today) : new Date(e.end) > now))
-    .slice(0, MAX_SCHOOL_EVENTS);
-  const rows = upcoming.map((e) => {
+    .slice(0, max);
+  return upcoming.map((e) => {
     const date = e.allDay ? (e.startDate < ymd(today) ? ymd(today) : e.startDate) : ymd(new Date(e.start));
     const diff = dayDiff(date);
     const when = shortDay(date) + (e.allDay ? "" : " " + fmt.time.format(new Date(e.start)));
@@ -203,6 +207,11 @@ function schoolCalendarCard(cal, events) {
     return `<div class="entry wide ${cls}"><span class="when">${esc(when)}</span>
       <span class="what">${esc(e.title)}${e.location ? ` <span class="loc">· ${esc(e.location)}</span>` : ""}</span></div>`;
   }).join("");
+}
+
+// a calendar with CALENDAR_n_PANEL=school: upcoming entries as a list
+function schoolCalendarCard(cal, events) {
+  const rows = calendarRows(events, MAX_SCHOOL_EVENTS);
   return `<div class="panel fade" style="--c:${esc(cal.color)}">
     <div class="head"><span class="dot"></span><span class="name">${esc(cal.name)}</span><span class="meta">nächste 3 Wochen</span></div>
     ${rows || `<div class="empty">Nichts eingetragen</div>`}
@@ -218,7 +227,14 @@ function renderSchoolRow(d) {
       ? d.school.students.map(studentCard).join("")
       : `<div class="panel"><h2>Schule</h2><p class="hint">${esc(d.school.error || "Noch keine Daten von beste.schule.")}</p></div>`;
   }
-  for (const cal of cals.filter((c) => c.panel === "school")) {
+  // fixed timetables; a school calendar with the same name moves into the card
+  const used = new Set();
+  for (const t of d.timetables || []) {
+    const cal = t.calendar && cals.find((c) => c.panel === "school" && c.name.toLowerCase() === t.calendar.toLowerCase());
+    if (cal) used.add(cal.id);
+    html += studentCard(t, cal ? { color: cal.color, cal, events: events.filter((e) => e.cal === cal.id) } : {});
+  }
+  for (const cal of cals.filter((c) => c.panel === "school" && !used.has(c.id))) {
     html += schoolCalendarCard(cal, events.filter((e) => e.cal === cal.id));
   }
   $("school").innerHTML = html;

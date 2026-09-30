@@ -45,6 +45,9 @@ type Config struct {
 	SchoolURL      string
 	SchoolStudents []string // optional filter: student names or ids
 	SchoolRefresh  time.Duration
+
+	TimetableFile string // optional JSON override for the built-in fixed timetable
+	TimetableOff  bool
 }
 
 // Default colors used when a calendar has no explicit color.
@@ -67,6 +70,12 @@ func Load() (*Config, error) {
 		SchoolToken:   env("BESTESCHULE_TOKEN", ""),
 		SchoolURL:     strings.TrimRight(env("BESTESCHULE_URL", "https://beste.schule/api"), "/"),
 		SchoolRefresh: envDuration("BESTESCHULE_REFRESH", 15*time.Minute),
+
+		TimetableFile: env("TIMETABLE_FILE", ""),
+		TimetableOff:  strings.EqualFold(env("TIMETABLE_FILE", ""), "off"),
+	}
+	if c.TimetableOff {
+		c.TimetableFile = ""
 	}
 	for _, s := range strings.Split(env("BESTESCHULE_STUDENTS", ""), ",") {
 		if s = strings.TrimSpace(s); s != "" {

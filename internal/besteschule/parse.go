@@ -45,6 +45,7 @@ type Lesson struct {
 	Teacher string `json:"teacher,omitempty"`
 	Status  string `json:"status,omitempty"` // "", "cancelled", "substitution"
 	Info    string `json:"info,omitempty"`
+	Tag     string `json:"tag,omitempty"` // small label, e.g. "GTA" for an afternoon club
 }
 
 type Entry struct {

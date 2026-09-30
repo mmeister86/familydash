@@ -189,6 +189,7 @@ h2 {
   margin-left: 0.4rem;
   vertical-align: 0.1em;
 }
+.tag { background: color-mix(in srgb, var(--muted) 18%, transparent); color: var(--muted); }
 .tag.danger { background: color-mix(in srgb, var(--danger) 22%, transparent); color: var(--danger); }
 .tag.warn { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
 

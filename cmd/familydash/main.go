@@ -19,6 +19,7 @@ import (
 	"familydash/internal/calendar"
 	"familydash/internal/config"
 	"familydash/internal/server"
+	"familydash/internal/timetable"
 	"familydash/internal/weather"
 	"familydash/web"
 )
@@ -80,9 +81,17 @@ func main() {
 		go sc.Run(ctx, cfg.SchoolRefresh)
 	}
 
+	var plan *timetable.File
+	if !cfg.TimetableOff {
+		if plan, err = timetable.Load(cfg.TimetableFile); err != nil {
+			slog.Error("timetable", "err", err) // keep running without it
+			plan = nil
+		}
+	}
+
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           server.New(cfg, version, cal, wx, br, sc, web.Static()).Handler(),
+		Handler:           server.New(cfg, version, cal, wx, br, sc, plan, web.Static()).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	go func() {
@@ -94,7 +103,7 @@ func main() {
 
 	slog.Info("familydash started", "version", version, "addr", cfg.ListenAddr,
 		"calendars", len(cfg.Calendars), "weather", cfg.WeatherEnabled(), "tz", cfg.Location.String(),
-		"bring", cfg.BringEnabled(), "besteschule", cfg.SchoolEnabled())
+		"bring", cfg.BringEnabled(), "besteschule", cfg.SchoolEnabled(), "timetable", plan != nil)
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("server", "err", err)
 		os.Exit(1)

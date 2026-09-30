@@ -1,0 +1,38 @@
+{
+  "children": [
+    {
+      "name": "Hannah",
+      "calendar": "Hannah",
+      "validFrom": "2026-08-17",
+      "validTo": "2027-07-09",
+      "periods": [
+        ["08:15", "09:00"],
+        ["09:10", "09:55"],
+        ["10:05", "10:50"],
+        ["11:15", "12:00"],
+        ["12:20", "13:05"],
+        ["13:10", "13:55"]
+      ],
+      "days": {
+        "Mo": ["Sport / Eislaufen", "Deutsch", "Deutsch", "Mathe", "Englisch", "Sachunterricht"],
+        "Di": ["Deutsch", "Musik", "Mathe", "Sachunterricht / Schulgarten", "Religion", "Sport"],
+        "Mi": ["Englisch", "Mathe", "Sachunterricht", "Deutsch", "Kunst / Werken", "Kunst / Werken"],
+        "Do": ["Deutsch", "Deutsch", "Mathe", "Sport", "Kunst", "Ethik"],
+        "Fr": ["Förder Deutsch", "Mathe", "Deutsch", "Förder Mathe"]
+      },
+      "extra": [
+        { "day": "Di", "start": "14:00", "end": "15:00", "subject": "Kreativwerkstatt", "tag": "GTA" },
+        { "day": "Do", "start": "14:00", "end": "15:00", "subject": "Ballspiele", "tag": "GTA" }
+      ],
+      "noSchool": [
+        { "from": "2026-10-12", "to": "2026-10-24", "name": "Herbstferien" },
+        { "from": "2026-11-18", "to": "2026-11-18", "name": "Buß- und Bettag" },
+        { "from": "2026-12-23", "to": "2027-01-02", "name": "Weihnachtsferien" },
+        { "from": "2027-02-08", "to": "2027-02-19", "name": "Winterferien" },
+        { "from": "2027-03-26", "to": "2027-04-02", "name": "Osterferien" },
+        { "from": "2027-05-06", "to": "2027-05-07", "name": "Himmelfahrt" },
+        { "from": "2027-05-15", "to": "2027-05-18", "name": "Pfingstferien" }
+      ]
+    }
+  ]
+}
