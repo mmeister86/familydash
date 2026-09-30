@@ -1,0 +1,12 @@
+# For Unraid's "Docker Compose Manager" plugin or plain `docker compose up -d`.
+services:
+  familydash:
+    image: ghcr.io/OWNER/familydash:latest
+    # build: .            # alternatively build locally on Unraid
+    container_name: familydash
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file: .env
+    volumes:
+      - /mnt/user/appdata/familydash:/data

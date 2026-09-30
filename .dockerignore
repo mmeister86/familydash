@@ -1,0 +1,7 @@
+.git
+.github
+bridges
+docs
+deploy
+*.md
+.env

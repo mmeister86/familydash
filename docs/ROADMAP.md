@@ -1,0 +1,40 @@
+# Roadmap
+
+## Next
+
+- [ ] Tap-to-complete reminders on a touch display (needs a pull channel back to the Mac bridge, e.g. bridge polls `GET /api/reminders/completions`)
+- [ ] Tasks & points from the SwiftUI family app (Convex) as a fourth panel
+- [ ] Calendar legend / per-person filter
+- [ ] Configurable night dimming (`NIGHT_FROM`/`NIGHT_TO` passed via `/api/dashboard`)
+
+## Voice control (later)
+
+### Hardware
+
+No Raspberry Pi model has a built-in microphone. Options:
+
+- USB conference speakerphone (mic + speaker, echo cancellation, plug & play) – simplest
+- ReSpeaker-style mic array HAT/USB board – better far-field pickup, more tinkering
+
+### Architecture
+
+```
+Pi: mic → wake word (openWakeWord, on-device) → record until silence
+    → POST audio to Unraid STT
+Unraid: Parakeet container → text
+    → POST /api/command (familydash) → intent → action
+       "Milch auf die Einkaufsliste" → reminder (via Mac bridge pull)
+       "Was steht morgen an?"        → TTS answer (Piper) back to the Pi
+```
+
+- **STT:** `parakeet-tdt-0.6b-v3` is multilingual (25 European languages incl. German, automatic language detection).
+  There's a community FastAPI server with an **OpenAI-compatible** `/v1/audio/transcriptions` endpoint and a CPU Docker profile:
+  https://github.com/groxaxo/parakeet-tdt-0.6b-v3-fastapi-openai
+- **Run it on the Xeon CPU.** The RX 580 in the Unraid box won't help – Parakeet/NeMo tooling targets CUDA, and current ROCm no longer supports Polaris GPUs. For short voice commands the CPU is plenty.
+- Keep the STT endpoint generic (OpenAI-compatible) so Parakeet can be swapped for faster-whisper etc.
+- Wake word and VAD run on the Pi so no audio leaves the room until the wake word fires.
+
+### familydash side (to build)
+
+- `POST /api/command` `{ "text": "…" }` → simple rule-based intents first (list add, "what's today/tomorrow", weather). No LLM needed for v1.
+- Frontend: small listening/answer overlay, pushed via Server-Sent Events.
