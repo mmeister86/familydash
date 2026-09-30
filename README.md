@@ -84,7 +84,7 @@ single first name also matches a full name (`Lukas` ↔ `Meister Lukas`). Anythi
 ### Fixed timetable (school without beste.schule)
 
 `internal/timetable/stundenplan.json` holds a weekly plan that is compiled into the image and shows up as the same card as a beste.schule child:
-lesson times, subjects per weekday (`""` = free period), extras such as afternoon clubs (`"tag": "GTA"`) and holidays (`noSchool`).
+lesson times, subjects per weekday (`""` = free period, `{"A": "Werken", "B": "Kunst"}` = alternating weekly, counted from `weekA`), extras such as afternoon clubs (`"tag": "GTA"`) and holidays (`noSchool`).
 It switches to the next school day after the last lesson, like beste.schule. With `"calendar": "<name>"` the upcoming entries of the
 `CALENDAR_n_PANEL=school` calendar with that name appear at the bottom of the card instead of in a card of their own.
 Edit the file and push, or mount your own and point `TIMETABLE_FILE` at it.

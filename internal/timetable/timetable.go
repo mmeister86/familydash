@@ -26,14 +26,39 @@ type Child struct {
 	Name string `json:"name"`
 	// Calendar is the name of a CALENDAR_n_PANEL=school calendar; its entries
 	// are shown at the bottom of this child's card instead of a card of its own.
-	Calendar  string              `json:"calendar,omitempty"`
-	ValidFrom string              `json:"validFrom,omitempty"` // YYYY-MM-DD
-	ValidTo   string              `json:"validTo,omitempty"`
-	Periods   [][2]string         `json:"periods"` // lesson n (1-based) → [start, end]
-	Days      map[string][]string `json:"days"`    // "Mo" … "Fr" → subject per lesson, "" = free
-	Extra     []Extra             `json:"extra,omitempty"`
-	NoSchool  []Range             `json:"noSchool,omitempty"`
+	Calendar  string            `json:"calendar,omitempty"`
+	ValidFrom string            `json:"validFrom,omitempty"` // YYYY-MM-DD
+	ValidTo   string            `json:"validTo,omitempty"`
+	Periods   [][2]string       `json:"periods"` // lesson n (1-based) → [start, end]
+	Days      map[string][]Slot `json:"days"`    // "Mo" … "Fr" → subject per lesson, "" = free
+	// WeekA is any date in an A week. Lessons written as {"A": …, "B": …}
+	// alternate weekly from there (calendar weeks, holidays included).
+	WeekA    string  `json:"weekA,omitempty"`
+	Extra    []Extra `json:"extra,omitempty"`
+	NoSchool []Range `json:"noSchool,omitempty"`
 }
+
+// Slot is one lesson: a plain subject ("Mathe"), or {"A": "Werken", "B": "Kunst"}
+// for a subject that alternates between A and B weeks ("" = free that week).
+type Slot struct {
+	A, B string
+}
+
+func (s *Slot) UnmarshalJSON(b []byte) error {
+	var plain string
+	if err := json.Unmarshal(b, &plain); err == nil {
+		s.A, s.B = plain, plain
+		return nil
+	}
+	var ab struct{ A, B string }
+	if err := json.Unmarshal(b, &ab); err != nil {
+		return fmt.Errorf("Stunde muss \"Fach\" oder {\"A\": …, \"B\": …} sein: %s", b)
+	}
+	s.A, s.B = ab.A, ab.B
+	return nil
+}
+
+func (s Slot) alternates() bool { return s.A != s.B }
 
 // Extra is something outside the numbered lessons, e.g. an afternoon club.
 type Extra struct {
@@ -92,9 +117,19 @@ func Load(path string) (*File, error) {
 		return nil, fmt.Errorf("stundenplan: %w", err)
 	}
 	for _, c := range f.Children {
-		for k := range c.Days {
+		for k, slots := range c.Days {
 			if _, ok := weekdayOf(k); !ok {
 				return nil, fmt.Errorf("stundenplan %s: unbekannter Wochentag %q", c.Name, k)
+			}
+			for _, sl := range slots {
+				if sl.alternates() && c.WeekA == "" {
+					return nil, fmt.Errorf("stundenplan %s: A/B-Stunden brauchen \"weekA\"", c.Name)
+				}
+			}
+		}
+		if c.WeekA != "" {
+			if _, err := time.Parse("2006-01-02", c.WeekA); err != nil {
+				return nil, fmt.Errorf("stundenplan %s: weekA: %w", c.Name, err)
 			}
 		}
 		for _, e := range c.Extra {
@@ -156,11 +191,16 @@ func (c *Child) lessonsOn(d time.Time) []besteschule.Lesson {
 		return nil
 	}
 	var out []besteschule.Lesson
+	bWeek := c.isBWeek(d)
 	for key, subjects := range c.Days {
 		if wd, _ := weekdayOf(key); wd != d.Weekday() {
 			continue
 		}
-		for i, s := range subjects {
+		for i, sl := range subjects {
+			s := sl.A
+			if bWeek {
+				s = sl.B
+			}
 			if s = strings.TrimSpace(s); s == "" {
 				continue
 			}
@@ -178,6 +218,23 @@ func (c *Child) lessonsOn(d time.Time) []besteschule.Lesson {
 	}
 	sortLessons(out)
 	return out
+}
+
+// isBWeek counts whole weeks between the Monday of WeekA and d's Monday.
+func (c *Child) isBWeek(d time.Time) bool {
+	if c.WeekA == "" {
+		return false
+	}
+	a, err := time.ParseInLocation("2006-01-02", c.WeekA, d.Location())
+	if err != nil {
+		return false
+	}
+	monday := func(t time.Time) time.Time {
+		t = time.Date(t.Year(), t.Month(), t.Day(), 12, 0, 0, 0, t.Location()) // noon: DST-safe
+		return t.AddDate(0, 0, -((int(t.Weekday()) + 6) % 7))
+	}
+	weeks := int(monday(d).Sub(monday(a)).Hours()/24+0.5) / 7
+	return weeks%2 != 0
 }
 
 func sortLessons(ls []besteschule.Lesson) {

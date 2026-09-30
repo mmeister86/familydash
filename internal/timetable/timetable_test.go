@@ -1,6 +1,7 @@
 package timetable
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
@@ -112,5 +113,48 @@ func TestWeekdayNames(t *testing.T) {
 	}
 	if _, ok := weekdayOf("Xy"); ok {
 		t.Error("Xy accepted")
+	}
+}
+
+func TestABWeeks(t *testing.T) {
+	f := plan(t)
+	// week A (28.09.): Schulgarten Tue, Werken Wed
+	if got := subjects(f.Build(at("2026-09-29 07:00"), berlin)[0]); got[3] != "Schulgarten" {
+		t.Fatalf("Di A = %v", got)
+	}
+	if got := subjects(f.Build(at("2026-09-30 07:00"), berlin)[0]); got[4] != "Werken" || got[5] != "Werken" {
+		t.Fatalf("Mi A = %v", got)
+	}
+	// week B (05.10.): Sachunterricht Tue, Kunst Wed
+	if got := subjects(f.Build(at("2026-10-06 07:00"), berlin)[0]); got[3] != "Sachunterricht" {
+		t.Fatalf("Di B = %v", got)
+	}
+	if got := subjects(f.Build(at("2026-10-07 07:00"), berlin)[0]); got[4] != "Kunst" || got[5] != "Kunst" {
+		t.Fatalf("Mi B = %v", got)
+	}
+	// after the 2-week autumn break: 26.10. is 4 weeks after 28.09. → A again
+	if got := subjects(f.Build(at("2026-10-27 07:00"), berlin)[0]); got[3] != "Schulgarten" {
+		t.Fatalf("Di 27.10. = %v", got)
+	}
+	// across the year boundary (ISO week 53): 04.01.2027 is 14 weeks later → A
+	if f.Children[0].isBWeek(at("2027-01-05 07:00")) {
+		t.Fatal("05.01.2027 should be an A week")
+	}
+}
+
+func TestThursdayWithoutEthik(t *testing.T) {
+	got := subjects(plan(t).Build(at("2026-10-01 07:00"), berlin)[0])
+	if len(got) != 6 || got[4] != "Kunst" || got[5] != "Ballspiele" {
+		t.Fatalf("Do = %v", got)
+	}
+}
+
+func TestSlotJSON(t *testing.T) {
+	f := &File{}
+	if err := json.Unmarshal([]byte(`{"children":[{"name":"X","days":{"Mo":["Mathe",{"A":"Werken","B":""}]}}]}`), f); err != nil {
+		t.Fatal(err)
+	}
+	if s := f.Children[0].Days["Mo"]; s[0].A != "Mathe" || s[0].B != "Mathe" || s[1].A != "Werken" || s[1].B != "" {
+		t.Fatalf("slots = %+v", s)
 	}
 }

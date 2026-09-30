@@ -5,6 +5,7 @@
       "calendar": "Hannah",
       "validFrom": "2026-08-17",
       "validTo": "2027-07-09",
+      "weekA": "2026-09-28",
       "periods": [
         ["08:15", "09:00"],
         ["09:10", "09:55"],
@@ -15,9 +16,9 @@
       ],
       "days": {
         "Mo": ["Sport / Eislaufen", "Deutsch", "Deutsch", "Mathe", "Englisch", "Sachunterricht"],
-        "Di": ["Deutsch", "Musik", "Mathe", "Sachunterricht / Schulgarten", "Religion", "Sport"],
-        "Mi": ["Englisch", "Mathe", "Sachunterricht", "Deutsch", "Kunst / Werken", "Kunst / Werken"],
-        "Do": ["Deutsch", "Deutsch", "Mathe", "Sport", "Kunst", "Ethik"],
+        "Di": ["Deutsch", "Musik", "Mathe", { "A": "Schulgarten", "B": "Sachunterricht" }, "Religion", "Sport"],
+        "Mi": ["Englisch", "Mathe", "Sachunterricht", "Deutsch", { "A": "Werken", "B": "Kunst" }, { "A": "Werken", "B": "Kunst" }],
+        "Do": ["Deutsch", "Deutsch", "Mathe", "Sport", "Kunst"],
         "Fr": ["Förder Deutsch", "Mathe", "Deutsch", "Förder Mathe"]
       },
       "extra": [
