@@ -227,7 +227,10 @@ function renderSchoolRow(d) {
 
 // ------------------------------------------------------------------ calendar columns
 
-function calendarColumn(cal, events, days) {
+// a column shows one calendar plus any calendars merged into it via
+// CALENDAR_n_COLUMN; entries of merged calendars keep their own color
+function calendarColumn(cal, events, days, merged = []) {
+  const tint = (e) => (e.cal === cal.id ? "" : ` style="--c:${esc(e.color)}"`);
   const now = new Date(), today = startOfDay(now);
   let html = "";
   for (let i = 0; i < days; i++) {
@@ -237,12 +240,12 @@ function calendarColumn(cal, events, days) {
     const label = i === 0 ? "Heute" : i === 1 ? "Morgen" : fmt.weekday.format(day);
     html += `<div class="cday${i === 0 ? " today" : ""}">
       <div class="cday-h">${label}<span>${fmt.dayMonthShort.format(day)}</span></div>`;
-    if (allDay.length) html += `<div class="allday">${allDay.map((e) => `<span class="chip">${esc(e.title)}</span>`).join("")}</div>`;
+    if (allDay.length) html += `<div class="allday">${allDay.map((e) => `<span class="chip"${tint(e)}>${esc(e.title)}</span>`).join("")}</div>`;
     for (const e of timed) {
       const past = +e.s === +e.en ? e.s < now : e.en <= now;
       const running = e.s <= now && now < e.en;
       const when = e.s >= day ? fmt.time.format(e.s) : "…";
-      html += `<div class="ev${past ? " past" : ""}${running ? " now" : ""}">
+      html += `<div class="ev${past ? " past" : ""}${running ? " now" : ""}${e.cal === cal.id ? "" : " other"}"${tint(e)}>
         <span class="when">${when}</span>
         <span><div class="what">${esc(e.title)}</div>${e.location ? `<div class="where">${esc(e.location)}</div>` : ""}</span>
       </div>`;
@@ -251,16 +254,22 @@ function calendarColumn(cal, events, days) {
     html += `</div>`;
   }
   return `<div class="calcol" style="--c:${esc(cal.color)}">
-    <div class="head"><span class="dot"></span><span class="name">${esc(cal.name)}</span></div>
+    <div class="head"><span class="dot"></span><span class="name">${esc(cal.name)}</span>${merged.map((m) =>
+      `<span class="also" style="--c:${esc(m.color)}"><span class="dot"></span>${esc(m.name)}</span>`).join("")}</div>
     ${html}
   </div>`;
 }
 
 function renderCalendars(d) {
-  const cals = (d.calendar?.calendars || []).filter((c) => c.panel !== "school");
+  const all = d.calendar?.calendars || [];
+  const cols = all.filter((c) => c.panel !== "school" && !(c.into >= 0));
   const events = d.calendar?.events || [];
-  $("calendars").innerHTML = cals.length
-    ? cals.map((c) => calendarColumn(c, events.filter((e) => e.cal === c.id), d.days || 7)).join("")
+  $("calendars").innerHTML = cols.length
+    ? cols.map((c) => {
+        const merged = all.filter((m) => m.into === c.id);
+        const ids = new Set([c.id, ...merged.map((m) => m.id)]);
+        return calendarColumn(c, events.filter((e) => ids.has(e.cal)), d.days || 7, merged);
+      }).join("")
     : `<div class="calcol"><h2>Kalender</h2><p class="hint">Setze <code>CALENDAR_1_URL</code> auf die „Privatadresse im iCal-Format“ aus Google Kalender.</p></div>`;
 }
 

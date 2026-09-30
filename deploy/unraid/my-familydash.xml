@@ -32,6 +32,10 @@
   <Config Name="Kalender 4 – iCal-URL" Target="CALENDAR_4_URL" Default="" Type="Variable" Display="always" Required="false" Mask="true"></Config>
   <Config Name="Kalender 4 – Farbe" Target="CALENDAR_4_COLOR" Default="#A77BF3" Type="Variable" Display="advanced" Required="false">#A77BF3</Config>
   <Config Name="Kalender 4 – Anzeige" Target="CALENDAR_4_PANEL" Default="column" Description="column = Spalte unten, school = Schulkarte oben" Type="Variable" Display="always" Required="false">column</Config>
+  <Config Name="Kalender 5 – Name" Target="CALENDAR_5_NAME" Default="Feiertage" Type="Variable" Display="always" Required="false">Feiertage</Config>
+  <Config Name="Kalender 5 – iCal-URL" Target="CALENDAR_5_URL" Default="" Description="z. B. https://www.feiertage-deutschland.de/kalender-download/ics/feiertage-deutschland.ics" Type="Variable" Display="always" Required="false"></Config>
+  <Config Name="Kalender 5 – Farbe" Target="CALENDAR_5_COLOR" Default="#F76C5E" Type="Variable" Display="advanced" Required="false">#F76C5E</Config>
+  <Config Name="Kalender 5 – in Spalte von" Target="CALENDAR_5_COLUMN" Default="1" Description="Nummer eines anderen Kalenders: Kalender 5 erscheint in dessen Spalte. Leer = eigene Spalte" Type="Variable" Display="always" Required="false">1</Config>
   <Config Name="Tage im Kalender" Target="CALENDAR_DAYS" Default="7" Type="Variable" Display="advanced" Required="false">7</Config>
 
   <Config Name="Wetter – Ortsname" Target="WEATHER_NAME" Default="Crimmitschau" Type="Variable" Display="always" Required="false">Crimmitschau</Config>

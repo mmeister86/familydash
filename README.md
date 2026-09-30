@@ -35,6 +35,7 @@ All settings are environment variables.
 | `CALENDAR_n_NAME` | `Kalender n` | |
 | `CALENDAR_n_COLOR` | palette | Hex color for bars/chips |
 | `CALENDAR_n_PANEL` | `column` | `column` = own column in the calendar row, `school` = card next to beste.schule (next 3 weeks) |
+| `CALENDAR_n_COLUMN` | – | Number `m` of another calendar: show this one **inside calendar m's column** instead of its own (entries keep their own color), e.g. public holidays in the family column |
 | `CALENDAR_DAYS` | `7` | Days shown (today + n-1) |
 | `CALENDAR_REFRESH` | `5m` | Go duration |
 | `WEATHER_LAT` / `WEATHER_LON` | – | Weather is off until set |
@@ -67,6 +68,9 @@ Built for a **portrait** wall display (landscape works too):
 ```
 
 For a child without beste.schule, keep their school dates in a Google calendar and set `CALENDAR_n_PANEL=school`.
+
+To show two calendars in one column, point the second one at the first: `CALENDAR_5_COLUMN=1` puts calendar 5 into calendar 1's column.
+Good for a holiday feed next to the family calendar, e.g. `https://www.feiertage-deutschland.de/kalender-download/ics/feiertage-deutschland.ics`.
 
 ### Google Calendar
 

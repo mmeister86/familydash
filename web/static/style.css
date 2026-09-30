@@ -253,6 +253,10 @@ h2 {
 .ev .where { color: var(--muted); font-size: 0.78rem; }
 .ev.past { opacity: 0.38; }
 .ev.now .what { color: var(--c); font-weight: 600; }
+/* entries of a calendar merged into this column (CALENDAR_n_COLUMN) */
+.ev.other .what::before { content: ""; display: inline-block; width: 0.5rem; height: 0.5rem; margin-right: 0.35rem; border-radius: 50%; background: var(--c); vertical-align: 0.1em; }
+.calcol .head .also { display: inline-flex; flex: none; align-items: center; gap: 0.3rem; white-space: nowrap; font-size: 0.78rem; color: var(--muted); }
+.calcol .head .also .dot { width: 0.5rem; height: 0.5rem; }
 
 /* ---------- status */
 .status {

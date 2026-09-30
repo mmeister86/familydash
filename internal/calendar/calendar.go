@@ -124,6 +124,7 @@ type CalendarInfo struct {
 	Name  string `json:"name"`
 	Color string `json:"color"`
 	Panel string `json:"panel"`
+	Into  int    `json:"into"` // id of the column this calendar joins, -1 = own column
 }
 
 type Snapshot struct {
@@ -152,7 +153,7 @@ func (s *Service) Snapshot() Snapshot {
 	}
 	infos := make([]CalendarInfo, len(s.cals))
 	for i, c := range s.cals {
-		infos[i] = CalendarInfo{ID: i, Name: c.Name, Color: c.Color, Panel: c.Panel}
+		infos[i] = CalendarInfo{ID: i, Name: c.Name, Color: c.Color, Panel: c.Panel, Into: c.Into}
 	}
 	return Snapshot{Calendars: infos, Events: all, Errors: errs, UpdatedAt: s.update}
 }

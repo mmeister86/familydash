@@ -15,6 +15,11 @@ type Calendar struct {
 	Color string
 	URL   string
 	Panel string // "column" (own column in the calendar row) or "school" (card next to beste.schule)
+	Num   int    // n from CALENDAR_n_*
+	// Into is the index (in Config.Calendars) of the column this calendar is
+	// shown in together with its own events, or -1 for its own column.
+	// Set via CALENDAR_n_COLUMN=<m>, e.g. holidays inside the family column.
+	Into int
 }
 
 type Config struct {
@@ -84,6 +89,7 @@ func Load() (*Config, error) {
 	}
 
 	// CALENDAR_1_URL, CALENDAR_1_NAME, CALENDAR_1_COLOR, CALENDAR_2_… (up to 20, gaps allowed)
+	intoNum := map[int]int{} // calendar index -> requested target calendar number
 	for i := 1; i <= 20; i++ {
 		url := env(fmt.Sprintf("CALENDAR_%d_URL", i), "")
 		if url == "" {
@@ -98,9 +104,35 @@ func Load() (*Config, error) {
 			Name:  env(fmt.Sprintf("CALENDAR_%d_NAME", i), fmt.Sprintf("Kalender %d", i)),
 			Color: env(fmt.Sprintf("CALENDAR_%d_COLOR", i), palette[(i-1)%len(palette)]),
 			Panel: panel,
+			Num:   i,
+			Into:  -1,
 		})
+		if n := envInt(fmt.Sprintf("CALENDAR_%d_COLUMN", i), 0); n > 0 && n != i {
+			intoNum[len(c.Calendars)-1] = n
+		}
 	}
+	c.resolveColumns(intoNum)
 	return c, nil
+}
+
+// resolveColumns turns CALENDAR_n_COLUMN=<m> into an index. The target must
+// exist, be a column itself and not be merged into another column; otherwise
+// the setting is ignored and the calendar keeps its own column.
+func (c *Config) resolveColumns(intoNum map[int]int) {
+	byNum := map[int]int{}
+	for i, cal := range c.Calendars {
+		byNum[cal.Num] = i
+	}
+	for i, n := range intoNum {
+		t, ok := byNum[n]
+		if !ok || c.Calendars[i].Panel != "column" || c.Calendars[t].Panel != "column" {
+			continue
+		}
+		if _, merged := intoNum[t]; merged {
+			continue // no chains: the target must stay a real column
+		}
+		c.Calendars[i].Into = t
+	}
 }
 
 func (c *Config) WeatherEnabled() bool { return c.WeatherLat != 0 || c.WeatherLon != 0 }
