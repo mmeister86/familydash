@@ -12,8 +12,9 @@
   --sun: #F7C548;
   --rain: #5AA9F7;
   --radius: 18px;
-  --gap: clamp(12px, 1.4vw, 28px);
-  font-size: clamp(14px, 1.05vw, 22px);
+  --gap: clamp(10px, 1.1vmax, 24px);
+  /* the wall display hangs in portrait: size text from the short edge */
+  font-size: clamp(13px, 1.62vmin, 24px);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -31,193 +32,111 @@ html, body {
 body { transition: filter 2s ease; }
 body.night { filter: brightness(0.35); }
 
+/* ---------- grid (portrait first, see sketch) */
 .board {
-  height: calc(100% - 2rem);
+  height: calc(100% - 1.8rem);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.55fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 0.9fr) minmax(0, 1.15fr) minmax(0, 1.75fr);
+  grid-template-areas:
+    "clock shop"
+    "school school"
+    "cals cals";
   gap: var(--gap);
   padding: var(--gap) var(--gap) 0;
 }
+.board.no-school {
+  grid-template-rows: minmax(0, 0.9fr) minmax(0, 2.4fr);
+  grid-template-areas: "clock shop" "cals cals";
+}
+.board.no-school .school-row { display: none; }
 
-.col { min-height: 0; display: flex; flex-direction: column; gap: var(--gap); }
+.clock-card { grid-area: clock; }
+.shopping   { grid-area: shop; }
+.school-row { grid-area: school; }
+.calendars  { grid-area: cals; }
+
+/* landscape fallback: top row of four cards, calendars below */
+@media (orientation: landscape) {
+  .board {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1.25fr);
+    grid-template-areas: "clock shop school school" "cals cals cals cals";
+  }
+  .board.no-school { grid-template-areas: "clock shop shop shop" "cals cals cals cals"; }
+}
 
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 1.2rem 1.4rem;
+  padding: 1.1rem 1.25rem;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+/* soft fade instead of a hard cut when content overflows */
+.panel.fade, .calcol {
+  -webkit-mask-image: linear-gradient(to bottom, black 88%, transparent);
+          mask-image: linear-gradient(to bottom, black 88%, transparent);
 }
 
 h2 {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
-  margin-bottom: 0.8rem;
+  margin-bottom: 0.7rem;
 }
 
-/* ---------- clock */
-.clock { padding: 0.4rem 0.2rem 0; }
+.head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.7rem; }
+.head .dot { width: 0.7rem; height: 0.7rem; border-radius: 50%; background: var(--c, var(--accent)); flex: none; }
+.head .name { font-size: 1.2rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.head .meta { margin-left: auto; color: var(--muted); font-size: 0.9rem; white-space: nowrap; }
+
+.empty { color: var(--faint); font-size: 0.95rem; }
+.hint { color: var(--muted); font-size: 0.95rem; line-height: 1.5; }
+.hint code { color: var(--text); font-size: 0.85rem; }
+.muted { color: var(--muted); }
+.more { color: var(--faint); font-size: 0.85rem; padding-top: 0.4rem; }
+
+/* ---------- clock + weather */
+.clock-card { display: flex; flex-direction: column; }
 .time {
-  font-size: 5.6rem;
+  font-size: 4.6rem;
   font-weight: 250;
   line-height: 1;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
 }
-.date { font-size: 1.45rem; color: var(--muted); margin-top: 0.4rem; }
-
-/* ---------- weather */
-.weather { display: flex; flex-direction: column; gap: 1.2rem; flex: 1; min-height: 0; }
-.wx-now { display: flex; align-items: center; gap: 1rem; }
-.wx-now .icon { width: 5.2rem; height: 5.2rem; flex: none; }
-.wx-temp { font-size: 3.8rem; font-weight: 300; line-height: 1; font-variant-numeric: tabular-nums; }
-.wx-label { font-size: 1.1rem; margin-top: 0.3rem; }
-.wx-meta { color: var(--muted); font-size: 0.9rem; margin-top: 0.2rem; }
-
-.wx-hours {
+.date { font-size: 1.2rem; color: var(--muted); margin-top: 0.3rem; }
+.weather { margin-top: auto; padding-top: 0.8rem; }
+.wx-now { display: flex; align-items: center; gap: 0.8rem; }
+.wx-now .icon { width: 3.6rem; height: 3.6rem; flex: none; }
+.wx-temp { font-size: 2.6rem; font-weight: 300; line-height: 1; font-variant-numeric: tabular-nums; }
+.wx-label { font-size: 0.95rem; }
+.wx-meta { color: var(--muted); font-size: 0.8rem; margin-top: 0.1rem; }
+.wx-days {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 0.3rem;
+  grid-template-columns: repeat(5, 1fr);
   text-align: center;
-  padding: 0.8rem 0;
+  gap: 0.2rem;
+  margin-top: 0.8rem;
+  padding-top: 0.7rem;
   border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
 }
-.wx-hours .h { font-size: 0.8rem; color: var(--muted); }
-.wx-hours .icon { width: 1.9rem; height: 1.9rem; margin: 0.3rem auto; display: block; }
-.wx-hours .t { font-size: 1rem; font-variant-numeric: tabular-nums; }
-.wx-hours .p { font-size: 0.72rem; color: var(--rain); min-height: 1em; }
-
-.wx-days { display: flex; flex-direction: column; gap: 0.55rem; }
-.wx-day { display: grid; grid-template-columns: 2.6rem 1.9rem 1fr auto; align-items: center; gap: 0.7rem; font-size: 1rem; }
-.wx-day .icon { width: 1.8rem; height: 1.8rem; }
-.wx-day .p { color: var(--rain); font-size: 0.8rem; }
-.wx-day .range { font-variant-numeric: tabular-nums; }
-.wx-day .range .min { color: var(--muted); margin-left: 0.4rem; }
-.wx-sun { margin-top: auto; color: var(--muted); font-size: 0.85rem; padding-top: 0.8rem; border-top: 1px solid var(--line); }
+.wx-days .d { font-size: 0.75rem; color: var(--muted); }
+.wx-days .icon { width: 1.7rem; height: 1.7rem; display: block; margin: 0.2rem auto; }
+.wx-days .r { font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.wx-days .r span { color: var(--muted); margin-left: 0.2rem; }
+.wx-days .p { font-size: 0.68rem; color: var(--rain); min-height: 1em; }
 
 .icon { color: var(--muted); }
 .icon .sun { color: var(--sun); }
 .icon .drop { color: var(--rain); }
 
-/* ---------- agenda */
-.agenda {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-  -webkit-mask-image: linear-gradient(to bottom, black 88%, transparent);
-          mask-image: linear-gradient(to bottom, black 88%, transparent);
-}
-.day { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem 1.3rem; }
-.day.today { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
-.day-head { display: flex; align-items: baseline; gap: 0.7rem; margin-bottom: 0.7rem; }
-.day-name { font-size: 1.25rem; font-weight: 600; }
-.day.today .day-name { color: var(--accent); }
-.day-date { color: var(--muted); font-size: 0.95rem; }
-.day-empty { color: var(--faint); font-size: 0.95rem; }
-
-.allday { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-bottom: 0.6rem; }
-.chip {
-  font-size: 0.9rem;
-  padding: 0.25rem 0.7rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--c) 22%, transparent);
-  border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
-}
-
-.ev { display: grid; grid-template-columns: 4px 5.2rem 1fr; gap: 0.8rem; align-items: start; padding: 0.35rem 0; }
-.ev .bar { align-self: stretch; border-radius: 4px; background: var(--c); }
-.ev .when { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.95rem; padding-top: 0.08rem; }
-.ev .when b { color: var(--text); font-weight: 500; font-size: 1.05rem; display: block; }
-.ev .what { font-size: 1.1rem; line-height: 1.3; }
-.ev .where { color: var(--muted); font-size: 0.85rem; margin-top: 0.1rem; }
-.ev .cal { color: var(--faint); font-size: 0.8rem; }
-.ev.past { opacity: 0.38; }
-.ev.now .what::after {
-  content: "jetzt";
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--bg);
-  background: var(--accent);
-  border-radius: 6px;
-  padding: 0.1rem 0.4rem;
-  margin-left: 0.5rem;
-  vertical-align: middle;
-}
-
-/* ---------- right column: school + shopping */
-#side { display: flex; flex-direction: column; gap: var(--gap); min-height: 0; overflow: hidden; flex: 1;
-  -webkit-mask-image: linear-gradient(to bottom, black 92%, transparent);
-          mask-image: linear-gradient(to bottom, black 92%, transparent); }
-.list-head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.7rem; }
-.list-head .dot { width: 0.7rem; height: 0.7rem; border-radius: 50%; background: var(--c, var(--accent)); }
-.list-head .name { font-size: 1.15rem; font-weight: 600; }
-.list-head .count { margin-left: auto; color: var(--muted); font-size: 0.9rem; }
-.list-empty { color: var(--faint); font-size: 0.95rem; }
-.more { color: var(--faint); font-size: 0.85rem; padding-top: 0.4rem; }
-.muted { color: var(--muted); }
-
-.notice {
-  font-size: 0.85rem;
-  color: var(--warn);
-  background: color-mix(in srgb, var(--warn) 12%, transparent);
-  border-radius: 8px;
-  padding: 0.35rem 0.6rem;
-  margin-bottom: 0.5rem;
-}
-
-.lesson {
-  display: grid;
-  grid-template-columns: 1.3rem 3rem 1fr auto;
-  gap: 0.6rem;
-  align-items: baseline;
-  padding: 0.22rem 0;
-  font-size: 1rem;
-}
-.lesson .nr { color: var(--faint); font-size: 0.8rem; text-align: right; font-variant-numeric: tabular-nums; }
-.lesson .t { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
-.lesson .room { color: var(--muted); font-size: 0.85rem; }
-.lesson .info { display: block; color: var(--muted); font-size: 0.78rem; }
-.lesson.past { opacity: 0.38; }
-.lesson.now .s { color: var(--accent); font-weight: 600; }
-.lesson.cancelled .s { text-decoration: line-through; color: var(--muted); }
-.lesson.substitution .s { color: var(--warn); }
-.tag {
-  font-size: 0.65rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  border-radius: 5px;
-  padding: 0.05rem 0.35rem;
-  margin-left: 0.45rem;
-  vertical-align: 0.1em;
-}
-.tag.danger { background: color-mix(in srgb, var(--danger) 22%, transparent); color: var(--danger); }
-.tag.warn { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
-
-.sub-h {
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin: 0.9rem 0 0.35rem;
-  padding-top: 0.7rem;
-  border-top: 1px solid var(--line);
-}
-.entry { display: grid; grid-template-columns: 4.6rem 1fr; gap: 0.6rem; padding: 0.2rem 0; font-size: 0.92rem; line-height: 1.3; }
-.entry .when { color: var(--muted); font-size: 0.8rem; white-space: nowrap; padding-top: 0.1rem; }
-.entry .what { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.entry b { font-weight: 600; }
-.entry.exam .when { color: var(--danger); }
-
+/* ---------- shopping (Bring!) */
 .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .chips .item {
   font-size: 0.95rem;
@@ -228,29 +147,125 @@ h2 {
 }
 .chips .item small { color: var(--muted); font-size: 0.75rem; margin-left: 0.35rem; }
 
-.hint { color: var(--muted); font-size: 0.95rem; line-height: 1.5; }
-.hint code { color: var(--text); font-size: 0.85rem; }
+/* ---------- school row (beste.schule + school calendars) */
+.school-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--gap);
+  min-height: 0;
+}
+.notice {
+  font-size: 0.8rem;
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  border-radius: 8px;
+  padding: 0.3rem 0.55rem;
+  margin-bottom: 0.45rem;
+}
+.lesson {
+  display: grid;
+  grid-template-columns: 1.1rem 2.9rem 1fr auto;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.14rem 0;
+  font-size: 0.95rem;
+}
+.lesson .nr { color: var(--faint); font-size: 0.75rem; text-align: right; font-variant-numeric: tabular-nums; }
+.lesson .t { color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+.lesson .room { color: var(--muted); font-size: 0.8rem; }
+.lesson .info { display: block; color: var(--muted); font-size: 0.74rem; }
+.lesson.past { opacity: 0.38; }
+.lesson.now .s { color: var(--accent); font-weight: 600; }
+.lesson.cancelled .s { text-decoration: line-through; color: var(--muted); }
+.lesson.substitution .s { color: var(--warn); }
+.tag {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-radius: 5px;
+  padding: 0.05rem 0.35rem;
+  margin-left: 0.4rem;
+  vertical-align: 0.1em;
+}
+.tag.danger { background: color-mix(in srgb, var(--danger) 22%, transparent); color: var(--danger); }
+.tag.warn { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
+
+.sub-h {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0.7rem 0 0.3rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--line);
+}
+.entry { display: grid; grid-template-columns: 4.4rem 1fr; gap: 0.55rem; padding: 0.18rem 0; font-size: 0.9rem; line-height: 1.3; }
+.entry .when { color: var(--muted); font-size: 0.78rem; white-space: nowrap; padding-top: 0.1rem; font-variant-numeric: tabular-nums; }
+.entry .what { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.entry.wide { grid-template-columns: 6.2rem 1fr; }
+.entry b { font-weight: 600; }
+.entry.exam .when, .entry.soon .when { color: var(--danger); }
+.entry.today .when { color: var(--accent); }
+.entry .loc { color: var(--muted); font-size: 0.8rem; }
+
+/* ---------- calendar columns */
+.calendars {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  min-height: 0;
+  overflow: hidden;
+}
+.calcol { padding: 1.1rem 1.1rem 0; min-height: 0; overflow: hidden; }
+.calcol + .calcol { border-left: 1px solid var(--line); }
+.calcol .head { padding-bottom: 0.6rem; border-bottom: 2px solid var(--c); }
+
+.cday { margin-top: 0.8rem; }
+.cday-h {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+.cday.today .cday-h { color: var(--accent); }
+.cday-h span { font-weight: 400; letter-spacing: 0; text-transform: none; margin-left: 0.3rem; color: var(--faint); }
+
+.allday { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.3rem; }
+.chip {
+  font-size: 0.82rem;
+  padding: 0.18rem 0.6rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+}
+.ev { display: grid; grid-template-columns: 2.9rem 1fr; gap: 0.5rem; padding: 0.22rem 0; align-items: baseline; }
+.ev .when { font-size: 0.82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ev .what { font-size: 0.98rem; line-height: 1.25; }
+.ev .where { color: var(--muted); font-size: 0.78rem; }
+.ev.past { opacity: 0.38; }
+.ev.now .what { color: var(--c); font-weight: 600; }
 
 /* ---------- status */
 .status {
-  height: 2rem;
+  height: 1.8rem;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 1.2rem;
   padding: 0 var(--gap);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: var(--faint);
+  white-space: nowrap;
+  overflow: hidden;
 }
 .status .err { color: var(--warn); }
 .status .off { color: var(--danger); }
-
-/* ---------- portrait displays */
-@media (orientation: portrait) {
-  :root { font-size: clamp(14px, 2vw, 26px); }
-  .board { grid-template-columns: 1fr 1fr; grid-template-rows: auto minmax(0, 1fr); }
-  .col-left { grid-column: 1 / -1; flex-direction: row; align-items: stretch; }
-  .col-left .clock { flex: 1; }
-  .col-left .weather { flex: 1.4; }
-  .wx-hours, .wx-days, .wx-sun { display: none; }
-}

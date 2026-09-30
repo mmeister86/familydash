@@ -69,19 +69,11 @@ function tickClock() {
 
 function renderWeather(w) {
   const el = $("weather");
-  if (!w || !w.current || w.daily == null) {
-    el.hidden = !w;
-    if (w) el.innerHTML = `<h2>Wetter</h2><p class="hint">Noch keine Wetterdaten.</p>`;
-    return;
-  }
-  el.hidden = false;
+  if (!w) { el.innerHTML = ""; return; }
+  if (!w.current || !w.daily) { el.innerHTML = `<p class="hint">Noch keine Wetterdaten.</p>`; return; }
   const c = w.current;
-  const hours = (w.hourly || []).filter((_, i) => i % 2 === 0).slice(0, 6);
-  const days = (w.daily || []).slice(0, 5);
   const today = ymd(new Date());
-
   el.innerHTML = `
-    <h2>${esc(w.location || "Wetter")}</h2>
     <div class="wx-now">
       ${icon(c.icon)}
       <div>
@@ -90,30 +82,38 @@ function renderWeather(w) {
         <div class="wx-meta">gefühlt ${round(c.feels)}° · Wind ${round(c.wind)} km/h</div>
       </div>
     </div>
-    <div class="wx-hours">
-      ${hours.map((h) => `
-        <div>
-          <div class="h">${fmt.hour.format(new Date(h.time))}</div>
-          ${icon(h.icon)}
-          <div class="t">${round(h.temp)}°</div>
-          <div class="p">${h.precipProb >= 20 ? h.precipProb + " %" : ""}</div>
-        </div>`).join("")}
-    </div>
     <div class="wx-days">
-      ${days.map((d) => `
-        <div class="wx-day">
-          <span>${d.date === today ? "Heute" : fmt.wdShort.format(new Date(d.date + "T12:00"))}</span>
+      ${w.daily.slice(0, 5).map((d) => `
+        <div>
+          <div class="d">${d.date === today ? "Heute" : fmt.wdShort.format(new Date(d.date + "T12:00"))}</div>
           ${icon(d.icon)}
-          <span class="p">${d.precipProb >= 20 ? d.precipProb + " %" : ""}</span>
-          <span class="range">${round(d.max)}°<span class="min">${round(d.min)}°</span></span>
+          <div class="r">${round(d.max)}°<span>${round(d.min)}°</span></div>
+          <div class="p">${d.precipProb >= 20 ? d.precipProb + " %" : ""}</div>
         </div>`).join("")}
-    </div>
-    ${days[0]?.sunrise ? `<div class="wx-sun">Sonnenaufgang ${fmt.time.format(new Date(days[0].sunrise))} · Sonnenuntergang ${fmt.time.format(new Date(days[0].sunset))}</div>` : ""}`;
+    </div>`;
 }
 
-// ------------------------------------------------------------------ calendar
+// ------------------------------------------------------------------ date helpers
 
-function eventsForDay(events, day) {
+const dayDiff = (dateStr) => Math.round((new Date(dateStr + "T00:00") - startOfDay(new Date())) / 86_400_000);
+
+function relDay(dateStr) {
+  const diff = dayDiff(dateStr), d = new Date(dateStr + "T00:00");
+  if (diff === 0) return "Heute";
+  if (diff === 1) return "Morgen";
+  if (diff > 1 && diff < 7) return fmt.weekday.format(d);
+  return `${fmt.wdShort.format(d)} ${fmt.dayMonthShort.format(d)}`;
+}
+
+function shortDay(dateStr) {
+  const diff = dayDiff(dateStr), d = new Date(dateStr + "T00:00");
+  if (diff === 0) return "heute";
+  if (diff === 1) return "morgen";
+  return `${fmt.wdShort.format(d)} ${fmt.dayMonthShort.format(d)}`;
+}
+
+// events of one calendar on one local day, split into all-day and timed
+function eventsOn(events, day) {
   const dayStart = day, dayEnd = addDays(day, 1), key = ymd(day);
   const allDay = [], timed = [];
   for (const e of events) {
@@ -122,85 +122,37 @@ function eventsForDay(events, day) {
       continue;
     }
     const s = new Date(e.start), en = new Date(e.end);
-    const overlaps = s < dayEnd && (en > dayStart || (+s === +en && s >= dayStart));
-    if (overlaps) timed.push({ ...e, s, en });
+    if (s < dayEnd && (en > dayStart || (+s === +en && s >= dayStart))) timed.push({ ...e, s, en });
   }
   return { allDay, timed };
 }
 
-function dayLabel(i, day) {
-  if (i === 0) return "Heute";
-  if (i === 1) return "Morgen";
-  return fmt.weekday.format(day);
-}
+// ------------------------------------------------------------------ shopping (Bring!)
 
-function renderAgenda(data) {
-  const el = $("agenda");
-  const events = data.calendar?.events || [];
-  const days = data.days || 7;
-  const now = new Date();
-  const today = startOfDay(now);
-
-  if (!events.length && !Object.keys(data.calendar?.errors || {}).length && data.calendar?.updatedAt?.startsWith("0001")) {
-    el.innerHTML = `<div class="panel"><h2>Kalender</h2><p class="hint">Kein Kalender konfiguriert. Setze <code>CALENDAR_1_URL</code> auf die „Privatadresse im iCal-Format“ aus den Google-Kalender-Einstellungen.</p></div>`;
-    return;
-  }
-
-  let html = "";
-  for (let i = 0; i < days; i++) {
-    const day = addDays(today, i);
-    const { allDay, timed } = eventsForDay(events, day);
-    if (i >= 2 && !allDay.length && !timed.length) continue; // hide empty days after tomorrow
-
-    html += `<div class="day${i === 0 ? " today" : ""}">
-      <div class="day-head"><span class="day-name">${dayLabel(i, day)}</span><span class="day-date">${fmt.dayMonth.format(day)}</span></div>`;
-    if (allDay.length) {
-      html += `<div class="allday">${allDay.map((e) => `<span class="chip" style="--c:${esc(e.color)}">${esc(e.title)}</span>`).join("")}</div>`;
-    }
-    for (const e of timed) {
-      const startsToday = e.s >= day;
-      const endsToday = e.en <= addDays(day, 1);
-      const past = +e.s === +e.en ? e.s < now : e.en <= now;
-      const running = e.s <= now && now < e.en;
-      const from = startsToday ? fmt.time.format(e.s) : "…";
-      const to = +e.s === +e.en ? "" : endsToday ? fmt.time.format(e.en) : "…";
-      html += `<div class="ev${past ? " past" : ""}${running ? " now" : ""}" style="--c:${esc(e.color)}">
-        <span class="bar"></span>
-        <span class="when"><b>${from}</b>${to}</span>
-        <span><div class="what">${esc(e.title)}</div>
-          ${e.location ? `<div class="where">${esc(e.location)}</div>` : ""}
-        </span>
-      </div>`;
-    }
-    if (!allDay.length && !timed.length) html += `<div class="day-empty">Nichts geplant</div>`;
-    html += `</div>`;
-  }
-  el.innerHTML = html;
-}
-
-// ------------------------------------------------------------------ school (beste.schule)
-
-const MAX_HOMEWORK = 5;
-const MAX_EXAMS = 4;
 const MAX_SHOPPING = 40;
 
-function relDay(dateStr) {
-  const today = startOfDay(new Date());
-  const d = new Date(dateStr + "T00:00");
-  const diff = Math.round((d - today) / 86_400_000);
-  if (diff === 0) return "Heute";
-  if (diff === 1) return "Morgen";
-  if (diff > 1 && diff < 7) return fmt.weekday.format(d);
-  return `${fmt.wdShort.format(d)} ${fmt.dayMonthShort.format(d)}`;
+function renderShopping(list) {
+  const el = $("shopping");
+  if (!list) {
+    el.innerHTML = `<h2>Einkauf</h2><p class="hint">Setze <code>BRING_EMAIL</code> und <code>BRING_PASSWORD</code>.</p>`;
+    return;
+  }
+  const items = list.items || [];
+  const shown = items.slice(0, MAX_SHOPPING);
+  el.className = "panel shopping fade";
+  el.innerHTML = `
+    <div class="head"><span class="dot" style="--c:#46C28E"></span><span class="name">${esc(list.name || "Einkauf")}</span><span class="meta">${items.length || ""}</span></div>
+    ${list.error && !items.length ? `<p class="hint">${esc(list.error)}</p>` : shown.length
+      ? `<div class="chips">${shown.map((it) => `<span class="item">${esc(it.name)}${it.spec ? `<small>${esc(it.spec)}</small>` : ""}</span>`).join("")}</div>`
+      : `<div class="empty">Nichts zu kaufen ✓</div>`}
+    ${items.length > shown.length ? `<div class="more">+ ${items.length - shown.length} weitere</div>` : ""}`;
 }
 
-function shortDay(dateStr) {
-  const d = new Date(dateStr + "T00:00");
-  const diff = Math.round((d - startOfDay(new Date())) / 86_400_000);
-  if (diff === 0) return "heute";
-  if (diff === 1) return "morgen";
-  return `${fmt.wdShort.format(d)} ${fmt.dayMonthShort.format(d)}`;
-}
+// ------------------------------------------------------------------ school row
+
+const MAX_HOMEWORK = 3;
+const MAX_EXAMS = 3;
+const MAX_SCHOOL_EVENTS = 8;
 
 function lessonRow(l, isToday) {
   const now = new Date();
@@ -217,53 +169,99 @@ function lessonRow(l, isToday) {
   </div>`;
 }
 
-function renderSchool(school) {
-  if (!school) return "";
-  if (!school.students?.length) {
-    return `<div class="panel"><h2>Schule</h2><p class="hint">${school.error ? esc(school.error) : "Noch keine Daten von beste.schule."}</p></div>`;
-  }
-  return school.students.map((st) => {
-    const day = st.day || {};
-    const isToday = day.date === ymd(new Date());
-    const lessons = day.lessons || [];
-    const exams = (st.exams || []).slice(0, MAX_EXAMS);
-    const hw = (st.homework || []).slice(0, MAX_HOMEWORK);
-    return `<div class="panel school">
-      <div class="list-head">
-        <span class="dot" style="--c:var(--accent)"></span>
-        <span class="name">${esc(st.name || "Schule")}</span>
-        <span class="count">${day.noSchool ? "" : esc(relDay(day.date))}</span>
-      </div>
-      ${(day.notices || []).map((n) => `<div class="notice">${esc(n)}</div>`).join("")}
-      ${day.noSchool ? `<div class="list-empty">Keine Schule in Sicht 🎉</div>` : lessons.map((l) => lessonRow(l, isToday)).join("")}
-      ${exams.length ? `<div class="sub-h">Arbeiten</div>${exams.map((e) => `
-        <div class="entry exam"><span class="when">${esc(shortDay(e.date))}</span>
-          <span class="what"><b>${esc(e.subject || e.kind || "Arbeit")}</b> ${esc(e.kind && e.subject ? e.kind : "")}${e.text ? ` · <span class="muted">${esc(e.text)}</span>` : ""}</span></div>`).join("")}` : ""}
-      ${hw.length ? `<div class="sub-h">Hausaufgaben</div>${hw.map((e) => `
-        <div class="entry"><span class="when">${esc(shortDay(e.date))}</span>
-          <span class="what"><b>${esc(e.subject || "")}</b>${e.text ? ` <span class="muted">${esc(e.text)}</span>` : ""}</span></div>`).join("")}` : ""}
-    </div>`;
-  }).join("");
-}
-
-// ------------------------------------------------------------------ shopping (Bring!)
-
-function renderShopping(list) {
-  if (!list) return "";
-  const items = list.items || [];
-  const shown = items.slice(0, MAX_SHOPPING);
-  return `<div class="panel shopping">
-    <div class="list-head"><span class="dot" style="--c:#46C28E"></span><span class="name">${esc(list.name || "Einkauf")}</span><span class="count">${items.length || ""}</span></div>
-    ${list.error && !items.length ? `<p class="hint">${esc(list.error)}</p>` : shown.length
-      ? `<div class="chips">${shown.map((it) => `<span class="item">${esc(it.name)}${it.spec ? `<small>${esc(it.spec)}</small>` : ""}</span>`).join("")}</div>`
-      : `<div class="list-empty">Nichts zu kaufen ✓</div>`}
-    ${items.length > shown.length ? `<div class="more">+ ${items.length - shown.length} weitere</div>` : ""}
+// beste.schule: one card per child
+function studentCard(st) {
+  const day = st.day || {};
+  const isToday = day.date === ymd(new Date());
+  const exams = (st.exams || []).slice(0, MAX_EXAMS);
+  const hw = (st.homework || []).slice(0, MAX_HOMEWORK);
+  return `<div class="panel fade">
+    <div class="head"><span class="dot" style="--c:var(--accent)"></span><span class="name">${esc(st.name || "Schule")}</span>
+      <span class="meta">${day.noSchool ? "" : esc(relDay(day.date))}</span></div>
+    ${(day.notices || []).map((n) => `<div class="notice">${esc(n)}</div>`).join("")}
+    ${day.noSchool ? `<div class="empty">Keine Schule in Sicht 🎉</div>` : (day.lessons || []).map((l) => lessonRow(l, isToday)).join("")}
+    ${exams.length ? `<div class="sub-h">Arbeiten</div>${exams.map((e) => `
+      <div class="entry exam"><span class="when">${esc(shortDay(e.date))}</span>
+        <span class="what"><b>${esc(e.subject || e.kind || "Arbeit")}</b> ${esc(e.kind && e.subject ? e.kind : "")}${e.text ? ` · <span class="muted">${esc(e.text)}</span>` : ""}</span></div>`).join("")}` : ""}
+    ${hw.length ? `<div class="sub-h">Hausaufgaben</div>${hw.map((e) => `
+      <div class="entry"><span class="when">${esc(shortDay(e.date))}</span>
+        <span class="what"><b>${esc(e.subject || "")}</b>${e.text ? ` <span class="muted">${esc(e.text)}</span>` : ""}</span></div>`).join("")}` : ""}
   </div>`;
 }
 
-function renderRight(d) {
-  const html = renderSchool(d.school) + renderShopping(d.shopping);
-  $("side").innerHTML = html || `<div class="panel"><h2>Schule & Einkauf</h2><p class="hint">Setze <code>BESTESCHULE_TOKEN</code> und/oder <code>BRING_EMAIL</code>/<code>BRING_PASSWORD</code>.</p></div>`;
+// a calendar with CALENDAR_n_PANEL=school: upcoming entries as a list
+function schoolCalendarCard(cal, events) {
+  const now = new Date(), today = startOfDay(now);
+  const upcoming = events
+    .filter((e) => (e.allDay ? e.endDate > ymd(today) : new Date(e.end) > now))
+    .slice(0, MAX_SCHOOL_EVENTS);
+  const rows = upcoming.map((e) => {
+    const date = e.allDay ? (e.startDate < ymd(today) ? ymd(today) : e.startDate) : ymd(new Date(e.start));
+    const diff = dayDiff(date);
+    const when = shortDay(date) + (e.allDay ? "" : " " + fmt.time.format(new Date(e.start)));
+    const cls = diff === 0 ? "today" : diff === 1 ? "soon" : "";
+    return `<div class="entry wide ${cls}"><span class="when">${esc(when)}</span>
+      <span class="what">${esc(e.title)}${e.location ? ` <span class="loc">· ${esc(e.location)}</span>` : ""}</span></div>`;
+  }).join("");
+  return `<div class="panel fade" style="--c:${esc(cal.color)}">
+    <div class="head"><span class="dot"></span><span class="name">${esc(cal.name)}</span><span class="meta">nächste 3 Wochen</span></div>
+    ${rows || `<div class="empty">Nichts eingetragen</div>`}
+  </div>`;
+}
+
+function renderSchoolRow(d) {
+  const cals = d.calendar?.calendars || [];
+  const events = d.calendar?.events || [];
+  let html = "";
+  if (d.school) {
+    html += d.school.students?.length
+      ? d.school.students.map(studentCard).join("")
+      : `<div class="panel"><h2>Schule</h2><p class="hint">${esc(d.school.error || "Noch keine Daten von beste.schule.")}</p></div>`;
+  }
+  for (const cal of cals.filter((c) => c.panel === "school")) {
+    html += schoolCalendarCard(cal, events.filter((e) => e.cal === cal.id));
+  }
+  $("school").innerHTML = html;
+  $("board").classList.toggle("no-school", !html);
+}
+
+// ------------------------------------------------------------------ calendar columns
+
+function calendarColumn(cal, events, days) {
+  const now = new Date(), today = startOfDay(now);
+  let html = "";
+  for (let i = 0; i < days; i++) {
+    const day = addDays(today, i);
+    const { allDay, timed } = eventsOn(events, day);
+    if (i > 0 && !allDay.length && !timed.length) continue;
+    const label = i === 0 ? "Heute" : i === 1 ? "Morgen" : fmt.weekday.format(day);
+    html += `<div class="cday${i === 0 ? " today" : ""}">
+      <div class="cday-h">${label}<span>${fmt.dayMonthShort.format(day)}</span></div>`;
+    if (allDay.length) html += `<div class="allday">${allDay.map((e) => `<span class="chip">${esc(e.title)}</span>`).join("")}</div>`;
+    for (const e of timed) {
+      const past = +e.s === +e.en ? e.s < now : e.en <= now;
+      const running = e.s <= now && now < e.en;
+      const when = e.s >= day ? fmt.time.format(e.s) : "…";
+      html += `<div class="ev${past ? " past" : ""}${running ? " now" : ""}">
+        <span class="when">${when}</span>
+        <span><div class="what">${esc(e.title)}</div>${e.location ? `<div class="where">${esc(e.location)}</div>` : ""}</span>
+      </div>`;
+    }
+    if (i === 0 && !allDay.length && !timed.length) html += `<div class="empty">Nichts geplant</div>`;
+    html += `</div>`;
+  }
+  return `<div class="calcol" style="--c:${esc(cal.color)}">
+    <div class="head"><span class="dot"></span><span class="name">${esc(cal.name)}</span></div>
+    ${html}
+  </div>`;
+}
+
+function renderCalendars(d) {
+  const cals = (d.calendar?.calendars || []).filter((c) => c.panel !== "school");
+  const events = d.calendar?.events || [];
+  $("calendars").innerHTML = cals.length
+    ? cals.map((c) => calendarColumn(c, events.filter((e) => e.cal === c.id), d.days || 7)).join("")
+    : `<div class="calcol"><h2>Kalender</h2><p class="hint">Setze <code>CALENDAR_1_URL</code> auf die „Privatadresse im iCal-Format“ aus Google Kalender.</p></div>`;
 }
 
 // ------------------------------------------------------------------ status
@@ -304,8 +302,9 @@ function render() {
   const d = state.data;
   if (d) {
     renderWeather(d.weather);
-    renderAgenda(d);
-    renderRight(d);
+    renderShopping(d.shopping);
+    renderSchoolRow(d);
+    renderCalendars(d);
   }
   renderStatus();
 }

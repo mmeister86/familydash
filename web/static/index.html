@@ -8,22 +8,18 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234F8EF7'/><path d='M8 16l8-7 8 7v8H8z' fill='white'/></svg>">
 </head>
 <body>
-  <main class="board">
-    <section class="col col-left">
-      <header class="clock">
-        <div class="time" id="time">--:--</div>
-        <div class="date" id="date"></div>
-      </header>
-      <div class="panel weather" id="weather" hidden></div>
+  <main class="board" id="board">
+    <section class="panel clock-card">
+      <div class="time" id="time">--:--</div>
+      <div class="date" id="date"></div>
+      <div class="weather" id="weather"></div>
     </section>
 
-    <section class="col col-center">
-      <div class="agenda" id="agenda"></div>
-    </section>
+    <section class="panel shopping" id="shopping"></section>
 
-    <section class="col col-right">
-      <div id="side"></div>
-    </section>
+    <section class="school-row" id="school"></section>
+
+    <section class="calendars" id="calendars"></section>
   </main>
 
   <footer class="status" id="status"></footer>

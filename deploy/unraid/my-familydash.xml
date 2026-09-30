@@ -28,6 +28,10 @@
   <Config Name="Kalender 3 – Name" Target="CALENDAR_3_NAME" Default="" Type="Variable" Display="always" Required="false"></Config>
   <Config Name="Kalender 3 – iCal-URL" Target="CALENDAR_3_URL" Default="" Type="Variable" Display="always" Required="false" Mask="true"></Config>
   <Config Name="Kalender 3 – Farbe" Target="CALENDAR_3_COLOR" Default="#F2B53A" Type="Variable" Display="advanced" Required="false">#F2B53A</Config>
+  <Config Name="Kalender 4 – Name" Target="CALENDAR_4_NAME" Default="" Type="Variable" Display="always" Required="false"></Config>
+  <Config Name="Kalender 4 – iCal-URL" Target="CALENDAR_4_URL" Default="" Type="Variable" Display="always" Required="false" Mask="true"></Config>
+  <Config Name="Kalender 4 – Farbe" Target="CALENDAR_4_COLOR" Default="#A77BF3" Type="Variable" Display="advanced" Required="false">#A77BF3</Config>
+  <Config Name="Kalender 4 – Anzeige" Target="CALENDAR_4_PANEL" Default="column" Description="column = Spalte unten, school = Schulkarte oben" Type="Variable" Display="always" Required="false">column</Config>
   <Config Name="Tage im Kalender" Target="CALENDAR_DAYS" Default="7" Type="Variable" Display="advanced" Required="false">7</Config>
 
   <Config Name="Wetter – Ortsname" Target="WEATHER_NAME" Default="Crimmitschau" Type="Variable" Display="always" Required="false">Crimmitschau</Config>
