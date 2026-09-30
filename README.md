@@ -89,7 +89,7 @@ single first name also matches a full name (`Lukas` ↔ `Meister Lukas`). Anythi
 ### Waste collection
 
 For districts that only publish a printable plan ("mittwochs gerade Kalenderwoche"): one `WASTE_n_*` set per bin.
-The clock card shows the next collection of each bin; tomorrow's is highlighted (put it out tonight), today's counts as done after 14:00.
+The clock card shows a chip for each bin collected **tomorrow** (put it out tonight) – nothing otherwise.
 Holiday shifts follow the common rule (Saxon public holidays, +1 day per holiday on or before the collection day in that week) –
 check it against your district's announcements around holidays.
 

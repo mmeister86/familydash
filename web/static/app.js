@@ -129,21 +129,14 @@ function eventsOn(events, day) {
 
 // ------------------------------------------------------------------ waste collection
 
-const WASTE_DONE_HOUR = 14; // today's collection counts as done after this hour
-
+// only bins collected tomorrow – the reminder to put them out tonight
 function renderWaste(list) {
-  const el = $("waste");
-  if (!list?.length) { el.innerHTML = ""; return; }
-  const now = new Date(), today = ymd(now);
-  const next = list.map((b) => {
-    const date = (b.dates || []).find((d) => d > today || (d === today && now.getHours() < WASTE_DONE_HOUR));
-    return date && { ...b, date, moved: (b.shifted || []).includes(date) };
-  }).filter(Boolean).sort((a, b) => a.date.localeCompare(b.date));
-  el.innerHTML = next.map((b) => {
-    const diff = dayDiff(b.date);
-    const cls = diff === 0 ? " today" : diff === 1 ? " soon" : "";
-    return `<span class="bin${cls}" style="--c:${esc(b.color)}"><span class="dot"></span>${esc(b.name)}
-      <span class="when">${esc(shortDay(b.date))}${b.moved ? " (verlegt)" : ""}</span></span>`;
+  const tomorrow = ymd(addDays(new Date(), 1));
+  const due = (list || []).filter((b) => (b.dates || []).includes(tomorrow));
+  $("waste").innerHTML = due.map((b) => {
+    const moved = (b.shifted || []).includes(tomorrow);
+    return `<span class="bin" style="--c:${esc(b.color)}"><span class="dot"></span>${esc(b.name)}
+      <span class="when">morgen${moved ? " (verlegt)" : ""}</span></span>`;
   }).join("");
 }
 
