@@ -223,6 +223,7 @@ function studentCard(st, opts = {}) {
       <div class="entry"><span class="when">${esc(shortDay(e.date))}</span>
         <span class="what"><b>${esc(e.subject || "")}</b>${e.text ? ` <span class="muted">${esc(e.text)}</span>` : ""}</span></div>`).join("")}` : ""}
     </div>
+    ${opts.todos?.length ? `<div class="kid-sec"><div class="sub-h">To-dos</div>${kidTodoRows(opts.todos)}</div>` : ""}
     ${opts.cal ? `<div class="kid-sec"><div class="sub-h">Termine</div>${calendarRows(opts.events || [], MAX_CARD_EVENTS) || `<div class="empty">Nichts eingetragen</div>`}</div>` : ""}
     ${opts.meal ? `<div class="kid-sec"><div class="sub-h">Essen</div>${mealRows(opts.meal)}</div>` : ""}
   </div>`;
@@ -271,7 +272,8 @@ function renderSchoolRow(d) {
   const cals = d.calendar?.calendars || [];
   const events = d.calendar?.events || [];
   const meals = d.meals?.children || [];
-  const usedCals = new Set(), usedMeals = new Set();
+  const todos = d.todos?.tasks || [];
+  const usedCals = new Set(), usedMeals = new Set(), usedTodos = new Set();
 
   const extras = (name, calName) => {
     const opts = {};
@@ -287,6 +289,13 @@ function renderSchoolRow(d) {
       opts.meal = meals[mi];
       opts.color ||= meals[mi].color;
     }
+    const mine = [];
+    for (const t of todos) {
+      if (usedTodos.has(t.id)) continue;
+      const own = todoFor(t, name);
+      if (own) { usedTodos.add(t.id); mine.push(own); }
+    }
+    if (mine.length) opts.todos = mine;
     return opts;
   };
 
@@ -302,6 +311,7 @@ function renderSchoolRow(d) {
   }
   $("school").innerHTML = html;
   $("board").classList.toggle("no-school", !html);
+  kidTodoIds = usedTodos;
   return meals.filter((_, i) => !usedMeals.has(i));
 }
 
@@ -432,7 +442,7 @@ const FOCUS_WIDGETS = {
   hints: (d) => hintsCard("Heute", weatherHints(d.weather, ymd(new Date()), 7, 16)),
   checklist: () => "", // TODO: morning checklist per child (CHECKLIST_n_*), + "Sportbeutel" from the timetable
   tomorrow: (d) => tomorrowCard(d),
-  todos: (d) => todosCard(d.todos),
+  todos: (d) => todosCard(d.todos && { ...d.todos, tasks: (d.todos.tasks || []).filter((t) => !kidTodoIds.has(t.id)) }),
 };
 
 function renderFocus(d, sc) {
@@ -537,6 +547,32 @@ function todoRow(t) {
     <span class="box">${CHECK_SVG}</span>
     <span class="what"><span class="t">${esc(t.title)}</span>${t.done ? "" : due}${t.evening && !t.done ? `<span class="eve" title="Heute Abend">🌙</span>` : ""}${meta ? `<span class="sub">${meta}</span>` : ""}</span>
   </div>`;
+}
+
+// A to-do belongs to a child when it has the child's name as a Things tag
+// ("Lukas") or starts with it ("Lukas: Zimmer aufräumen" – the prefix is
+// dropped in the child's card). Returns the task as shown there, or null.
+const TODO_PREFIX = /^\s*([^:]{1,40}):\s*(\S.*)$/;
+let kidTodoIds = new Set(); // ids shown in a child's card (set by renderSchoolRow)
+
+function todoFor(t, kid) {
+  if ((t.tags || []).some((tag) => sameKid(tag, kid))) return t;
+  const m = TODO_PREFIX.exec(t.title || "");
+  if (m && sameKid(m[1], kid)) return { ...t, title: m[2] };
+  return null;
+}
+
+const MAX_KID_TODOS = 4;
+const KID_DONE_SHOWN = 2;
+
+function kidTodoRows(tasks) {
+  const open = tasks.filter((t) => !t.done), done = tasks.filter((t) => t.done);
+  const shownOpen = open.slice(0, MAX_KID_TODOS);
+  const shownDone = done.slice(0, Math.max(0, Math.min(KID_DONE_SHOWN, MAX_KID_TODOS + 1 - shownOpen.length)));
+  return shownOpen.map(todoRow).join("")
+    + (open.length > shownOpen.length ? `<div class="more">+ ${open.length - shownOpen.length} weitere</div>` : "")
+    + (!open.length ? `<div class="empty">Alles erledigt 🎉</div>` : "")
+    + shownDone.map(todoRow).join("");
 }
 
 function todosCard(list) {
@@ -662,11 +698,11 @@ function render() {
     const sc = currentScene(d);
     applyScene(sc);
     slideshow.set(d.photos);
+    renderMeals(renderSchoolRow(d)); // first: decides which to-dos move into child cards
     renderFocus(d, sc);
     renderWeather(d.weather);
     renderWaste(d.waste);
     renderShopping(d.shopping);
-    renderMeals(renderSchoolRow(d));
     renderCalendars(d);
   }
   renderStatus();

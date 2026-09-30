@@ -179,6 +179,10 @@ Put the family's to-dos into one Things area (default `Familie`) and set `THINGS
 plus what was ticked off today, struck through. Deadlines today or overdue get a red tag, checklists show their progress.
 It disappears when there's nothing to show.
 
+**To-dos for a child** move into that child's card (school → To-dos → Termine → Essen): give the task the child's name
+as a Things **tag** (`Lukas`) or start the title with it (`Lukas: Zimmer aufräumen` – the prefix is dropped in the card).
+Names match like everywhere else (`Lukas` = `Meister Lukas`). What no child card takes stays in the general card.
+
 Things has **no public API**. The image ships [things3](https://github.com/evanpurkhiser/things3-cloud), a CLI that syncs with
 Things Cloud like the apps do (reverse-engineered, pinned to a release in the `Dockerfile`). It may break when Cultured Code changes
 something; only the to-do card is affected then. familydash only runs fixed, **read-only** commands (`find --json`) and never starts
