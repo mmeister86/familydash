@@ -7,18 +7,15 @@ COPY go.mod ./
 COPY . .
 ARG TARGETOS TARGETARCH VERSION=dev
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/familydash ./cmd/familydash \
- && mkdir -p /out/data
+    go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/familydash ./cmd/familydash
 
 # ~8 MB final image: just the static binary + CA certs.
 FROM scratch
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build /out/familydash /familydash
-# 99:100 = nobody:users, the Unraid default owner of /mnt/user/appdata
-COPY --from=build --chown=99:100 /out/data /data
+# stateless – no volume needed; runs as nobody:users (Unraid default)
 USER 99:100
-ENV TZ=Europe/Berlin DATA_DIR=/data LISTEN_ADDR=:8080
+ENV TZ=Europe/Berlin LISTEN_ADDR=:8080
 EXPOSE 8080
-VOLUME /data
 HEALTHCHECK --interval=60s --timeout=5s --start-period=10s CMD ["/familydash", "-healthcheck"]
 ENTRYPOINT ["/familydash"]

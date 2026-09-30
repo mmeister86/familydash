@@ -10,13 +10,12 @@
   <Network>bridge</Network>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
-  <Overview>Leichtgewichtiges Familiendashboard fürs Wanddisplay: Google Kalender (iCal), Apple Erinnerungen (Push), Wetter (Open-Meteo). Ein statisches Go-Binary, ~8 MB Image.</Overview>
+  <Overview>Leichtgewichtiges Familiendashboard fürs Wanddisplay: Google Kalender (iCal), Wetter (Open-Meteo), Stundenplan/Vertretungen/Hausaufgaben (beste.schule), Einkaufsliste (Bring!). Ein statisches Go-Binary, ~8 MB Image.</Overview>
   <Category>Productivity: HomeAutomation:</Category>
   <WebUI>http://[IP]:[PORT:8080]/</WebUI>
   <ExtraParams>--restart unless-stopped</ExtraParams>
 
   <Config Name="WebUI Port" Target="8080" Default="8080" Mode="tcp" Type="Port" Display="always" Required="true">8080</Config>
-  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/familydash" Mode="rw" Type="Path" Display="advanced" Required="true">/mnt/user/appdata/familydash</Config>
 
   <Config Name="Zeitzone" Target="TZ" Default="Europe/Berlin" Type="Variable" Display="always" Required="true">Europe/Berlin</Config>
 
@@ -35,5 +34,10 @@
   <Config Name="Wetter – Breitengrad" Target="WEATHER_LAT" Default="50.815" Type="Variable" Display="always" Required="false">50.815</Config>
   <Config Name="Wetter – Längengrad" Target="WEATHER_LON" Default="12.388" Type="Variable" Display="always" Required="false">12.388</Config>
 
-  <Config Name="Erinnerungen – Token" Target="REMINDERS_TOKEN" Default="" Description="Gemeinsames Geheimnis für POST /api/reminders (openssl rand -hex 24)" Type="Variable" Display="always" Required="false" Mask="true"></Config>
+  <Config Name="beste.schule – Token" Target="BESTESCHULE_TOKEN" Default="" Description="beste.schule → Benutzerkonto → API → Personal Access Token" Type="Variable" Display="always" Required="false" Mask="true"></Config>
+  <Config Name="beste.schule – Kinder" Target="BESTESCHULE_STUDENTS" Default="" Description="Optional: nur diese Vornamen/IDs anzeigen, kommagetrennt" Type="Variable" Display="advanced" Required="false"></Config>
+
+  <Config Name="Bring! – E-Mail" Target="BRING_EMAIL" Default="" Type="Variable" Display="always" Required="false"></Config>
+  <Config Name="Bring! – Passwort" Target="BRING_PASSWORD" Default="" Type="Variable" Display="always" Required="false" Mask="true"></Config>
+  <Config Name="Bring! – Liste" Target="BRING_LIST" Default="" Description="Optional: Listenname, sonst Standardliste" Type="Variable" Display="always" Required="false"></Config>
 </Container>

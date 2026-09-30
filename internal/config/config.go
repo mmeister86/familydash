@@ -18,7 +18,6 @@ type Calendar struct {
 
 type Config struct {
 	ListenAddr string
-	DataDir    string
 	Location   *time.Location
 
 	Calendars       []Calendar
@@ -30,8 +29,16 @@ type Config struct {
 	WeatherName    string
 	WeatherRefresh time.Duration
 
-	RemindersToken string
-	RemindersStale time.Duration
+	BringEmail    string
+	BringPassword string
+	BringList     string // list name; empty = the account's default list
+	BringLocale   string
+	BringRefresh  time.Duration
+
+	SchoolToken    string
+	SchoolURL      string
+	SchoolStudents []string // optional filter: student names or ids
+	SchoolRefresh  time.Duration
 }
 
 // Default colors used when a calendar has no explicit color.
@@ -40,13 +47,25 @@ var palette = []string{"#4F8EF7", "#F76C5E", "#46C28E", "#F2B53A", "#A77BF3", "#
 func Load() (*Config, error) {
 	c := &Config{
 		ListenAddr:      env("LISTEN_ADDR", ":8080"),
-		DataDir:         env("DATA_DIR", "/data"),
 		CalendarDays:    envInt("CALENDAR_DAYS", 7),
 		CalendarRefresh: envDuration("CALENDAR_REFRESH", 5*time.Minute),
 		WeatherName:     env("WEATHER_NAME", ""),
 		WeatherRefresh:  envDuration("WEATHER_REFRESH", 15*time.Minute),
-		RemindersToken:  env("REMINDERS_TOKEN", ""),
-		RemindersStale:  envDuration("REMINDERS_STALE_AFTER", 2*time.Hour),
+
+		BringEmail:    env("BRING_EMAIL", ""),
+		BringPassword: env("BRING_PASSWORD", ""),
+		BringList:     env("BRING_LIST", ""),
+		BringLocale:   env("BRING_LOCALE", "de-DE"),
+		BringRefresh:  envDuration("BRING_REFRESH", 2*time.Minute),
+
+		SchoolToken:   env("BESTESCHULE_TOKEN", ""),
+		SchoolURL:     strings.TrimRight(env("BESTESCHULE_URL", "https://beste.schule/api"), "/"),
+		SchoolRefresh: envDuration("BESTESCHULE_REFRESH", 15*time.Minute),
+	}
+	for _, s := range strings.Split(env("BESTESCHULE_STUDENTS", ""), ",") {
+		if s = strings.TrimSpace(s); s != "" {
+			c.SchoolStudents = append(c.SchoolStudents, s)
+		}
 	}
 
 	tz := env("TZ", "Europe/Berlin")
@@ -65,7 +84,7 @@ func Load() (*Config, error) {
 
 	// CALENDAR_1_URL, CALENDAR_1_NAME, CALENDAR_1_COLOR, CALENDAR_2_… (up to 20, gaps allowed)
 	for i := 1; i <= 20; i++ {
-		url := strings.TrimSpace(os.Getenv(fmt.Sprintf("CALENDAR_%d_URL", i)))
+		url := env(fmt.Sprintf("CALENDAR_%d_URL", i), "")
 		if url == "" {
 			continue
 		}
@@ -79,23 +98,32 @@ func Load() (*Config, error) {
 }
 
 func (c *Config) WeatherEnabled() bool { return c.WeatherLat != 0 || c.WeatherLon != 0 }
+func (c *Config) BringEnabled() bool   { return c.BringEmail != "" && c.BringPassword != "" }
+func (c *Config) SchoolEnabled() bool  { return c.SchoolToken != "" }
 
+// env reads a variable, trims whitespace and one pair of surrounding quotes.
+// docker --env-file passes quotes through literally, so KEY="value" would
+// otherwise end up with the quotes inside the value.
 func env(key, def string) string {
-	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
-		return v
+	v := strings.TrimSpace(os.Getenv(key))
+	if len(v) >= 2 && (v[0] == '"' || v[0] == '\'') && v[len(v)-1] == v[0] {
+		v = strings.TrimSpace(v[1 : len(v)-1])
 	}
-	return def
+	if v == "" {
+		return def
+	}
+	return v
 }
 
 func envInt(key string, def int) int {
-	if v, err := strconv.Atoi(os.Getenv(key)); err == nil && v > 0 {
+	if v, err := strconv.Atoi(env(key, "")); err == nil && v > 0 {
 		return v
 	}
 	return def
 }
 
 func envFloat(key string, def float64) (float64, error) {
-	v := strings.TrimSpace(os.Getenv(key))
+	v := env(key, "")
 	if v == "" {
 		return def, nil
 	}
@@ -107,7 +135,7 @@ func envFloat(key string, def float64) (float64, error) {
 }
 
 func envDuration(key string, def time.Duration) time.Duration {
-	if d, err := time.ParseDuration(os.Getenv(key)); err == nil && d > 0 {
+	if d, err := time.ParseDuration(env(key, "")); err == nil && d > 0 {
 		return d
 	}
 	return def

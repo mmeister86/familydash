@@ -2,7 +2,8 @@
 
 ## Next
 
-- [ ] Tap-to-complete reminders on a touch display (needs a pull channel back to the Mac bridge, e.g. bridge polls `GET /api/reminders/completions`)
+- [ ] Refine the beste.schule parser against real data (`-besteschule-dump`)
+- [ ] Tap-to-check Bring! items on a touch display (Bring! batch update endpoint)
 - [ ] Tasks & points from the SwiftUI family app (Convex) as a fourth panel
 - [ ] Calendar legend / per-person filter
 - [ ] Configurable night dimming (`NIGHT_FROM`/`NIGHT_TO` passed via `/api/dashboard`)
@@ -23,7 +24,7 @@ Pi: mic → wake word (openWakeWord, on-device) → record until silence
     → POST audio to Unraid STT
 Unraid: Parakeet container → text
     → POST /api/command (familydash) → intent → action
-       "Milch auf die Einkaufsliste" → reminder (via Mac bridge pull)
+       "Milch auf die Einkaufsliste" → Bring! item
        "Was steht morgen an?"        → TTS answer (Piper) back to the Pi
 ```
 

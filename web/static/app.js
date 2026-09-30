@@ -2,7 +2,6 @@
 
 const POLL_MS = 60_000;
 const NIGHT = { from: 22, to: 6 }; // dim the display between these hours
-const MAX_ITEMS_PER_LIST = 12;
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -179,41 +178,92 @@ function renderAgenda(data) {
   el.innerHTML = html;
 }
 
-// ------------------------------------------------------------------ reminders
+// ------------------------------------------------------------------ school (beste.schule)
 
-function dueBadge(item) {
-  if (!item.due) return "";
-  const due = new Date(item.due);
+const MAX_HOMEWORK = 5;
+const MAX_EXAMS = 4;
+const MAX_SHOPPING = 40;
+
+function relDay(dateStr) {
   const today = startOfDay(new Date());
-  const dueDay = startOfDay(due);
-  const diff = Math.round((dueDay - today) / 86_400_000);
-  const timeStr = item.dueAllDay ? "" : " " + fmt.time.format(due);
-  if (diff < 0 || (!item.dueAllDay && diff === 0 && due < new Date())) return `<span class="due overdue">überfällig</span>`;
-  if (diff === 0) return `<span class="due today">heute${timeStr}</span>`;
-  if (diff === 1) return `<span class="due">morgen${timeStr}</span>`;
-  if (diff < 7) return `<span class="due">${fmt.wdShort.format(due)}${timeStr}</span>`;
-  return `<span class="due">${fmt.dayMonthShort.format(due)}</span>`;
+  const d = new Date(dateStr + "T00:00");
+  const diff = Math.round((d - today) / 86_400_000);
+  if (diff === 0) return "Heute";
+  if (diff === 1) return "Morgen";
+  if (diff > 1 && diff < 7) return fmt.weekday.format(d);
+  return `${fmt.wdShort.format(d)} ${fmt.dayMonthShort.format(d)}`;
 }
 
-function renderReminders(r) {
-  const el = $("reminders");
-  const lists = (r?.lists || []);
-  if (!lists.length) {
-    el.innerHTML = `<div class="panel"><h2>Erinnerungen</h2><p class="hint">Noch nichts empfangen. Die Mac-Bridge oder ein Kurzbefehl pusht nach <code>/api/reminders</code>.</p></div>`;
-    return;
+function shortDay(dateStr) {
+  const d = new Date(dateStr + "T00:00");
+  const diff = Math.round((d - startOfDay(new Date())) / 86_400_000);
+  if (diff === 0) return "heute";
+  if (diff === 1) return "morgen";
+  return `${fmt.wdShort.format(d)} ${fmt.dayMonthShort.format(d)}`;
+}
+
+function lessonRow(l, isToday) {
+  const now = new Date();
+  const at = (hm) => { const [h, m] = hm.split(":").map(Number); const d = new Date(); d.setHours(h, m, 0, 0); return d; };
+  const past = isToday && l.end && at(l.end) <= now;
+  const running = isToday && l.start && l.end && at(l.start) <= now && now < at(l.end);
+  const cls = ["lesson", l.status || "", past ? "past" : "", running ? "now" : ""].join(" ");
+  const badge = l.status === "cancelled" ? `<span class="tag danger">entfällt</span>` : l.status === "substitution" ? `<span class="tag warn">Vertretung</span>` : "";
+  return `<div class="${cls}">
+    <span class="nr">${l.nr || ""}</span>
+    <span class="t">${esc(l.start || "")}</span>
+    <span class="subj"><span class="s">${esc(l.subject)}</span>${badge}${l.info ? `<span class="info">${esc(l.info)}</span>` : ""}</span>
+    <span class="room">${esc(l.room || "")}</span>
+  </div>`;
+}
+
+function renderSchool(school) {
+  if (!school) return "";
+  if (!school.students?.length) {
+    return `<div class="panel"><h2>Schule</h2><p class="hint">${school.error ? esc(school.error) : "Noch keine Daten von beste.schule."}</p></div>`;
   }
-  el.innerHTML = lists.map((l) => {
-    const items = l.items || [];
-    const shown = items.slice(0, MAX_ITEMS_PER_LIST);
-    return `<div class="panel" style="--c:${esc(l.color || "var(--accent)")}">
-      <div class="list-head"><span class="dot"></span><span class="name">${esc(l.name)}</span><span class="count">${items.length || ""}</span></div>
-      ${shown.length ? shown.map((it) => `
-        <div class="rem${it.priority === 1 ? " prio" : ""}">
-          <span class="circle"></span><span class="title">${esc(it.title)}</span>${dueBadge(it)}
-        </div>`).join("") : `<div class="list-empty">Alles erledigt ✓</div>`}
-      ${items.length > shown.length ? `<div class="more">+ ${items.length - shown.length} weitere</div>` : ""}
+  return school.students.map((st) => {
+    const day = st.day || {};
+    const isToday = day.date === ymd(new Date());
+    const lessons = day.lessons || [];
+    const exams = (st.exams || []).slice(0, MAX_EXAMS);
+    const hw = (st.homework || []).slice(0, MAX_HOMEWORK);
+    return `<div class="panel school">
+      <div class="list-head">
+        <span class="dot" style="--c:var(--accent)"></span>
+        <span class="name">${esc(st.name || "Schule")}</span>
+        <span class="count">${day.noSchool ? "" : esc(relDay(day.date))}</span>
+      </div>
+      ${(day.notices || []).map((n) => `<div class="notice">${esc(n)}</div>`).join("")}
+      ${day.noSchool ? `<div class="list-empty">Keine Schule in Sicht 🎉</div>` : lessons.map((l) => lessonRow(l, isToday)).join("")}
+      ${exams.length ? `<div class="sub-h">Arbeiten</div>${exams.map((e) => `
+        <div class="entry exam"><span class="when">${esc(shortDay(e.date))}</span>
+          <span class="what"><b>${esc(e.subject || e.kind || "Arbeit")}</b> ${esc(e.kind && e.subject ? e.kind : "")}${e.text ? ` · <span class="muted">${esc(e.text)}</span>` : ""}</span></div>`).join("")}` : ""}
+      ${hw.length ? `<div class="sub-h">Hausaufgaben</div>${hw.map((e) => `
+        <div class="entry"><span class="when">${esc(shortDay(e.date))}</span>
+          <span class="what"><b>${esc(e.subject || "")}</b>${e.text ? ` <span class="muted">${esc(e.text)}</span>` : ""}</span></div>`).join("")}` : ""}
     </div>`;
   }).join("");
+}
+
+// ------------------------------------------------------------------ shopping (Bring!)
+
+function renderShopping(list) {
+  if (!list) return "";
+  const items = list.items || [];
+  const shown = items.slice(0, MAX_SHOPPING);
+  return `<div class="panel shopping">
+    <div class="list-head"><span class="dot" style="--c:#46C28E"></span><span class="name">${esc(list.name || "Einkauf")}</span><span class="count">${items.length || ""}</span></div>
+    ${list.error && !items.length ? `<p class="hint">${esc(list.error)}</p>` : shown.length
+      ? `<div class="chips">${shown.map((it) => `<span class="item">${esc(it.name)}${it.spec ? `<small>${esc(it.spec)}</small>` : ""}</span>`).join("")}</div>`
+      : `<div class="list-empty">Nichts zu kaufen ✓</div>`}
+    ${items.length > shown.length ? `<div class="more">+ ${items.length - shown.length} weitere</div>` : ""}
+  </div>`;
+}
+
+function renderRight(d) {
+  const html = renderSchool(d.school) + renderShopping(d.shopping);
+  $("side").innerHTML = html || `<div class="panel"><h2>Schule & Einkauf</h2><p class="hint">Setze <code>BESTESCHULE_TOKEN</code> und/oder <code>BRING_EMAIL</code>/<code>BRING_PASSWORD</code>.</p></div>`;
 }
 
 // ------------------------------------------------------------------ status
@@ -225,7 +275,8 @@ function renderStatus() {
   if (d) {
     for (const [name, err] of Object.entries(d.calendar?.errors || {})) parts.push(`<span class="err">${esc(name)}: ${esc(err)}</span>`);
     if (d.weather?.error) parts.push(`<span class="err">Wetter: ${esc(d.weather.error)}</span>`);
-    if (d.reminders?.stale) parts.push(`<span class="err">Erinnerungen seit ${fmt.time.format(new Date(d.reminders.updatedAt))} nicht aktualisiert</span>`);
+    if (d.school?.error && d.school.students?.length) parts.push(`<span class="err">Schule: ${esc(d.school.error)}</span>`);
+    if (d.shopping?.error && d.shopping.items?.length) parts.push(`<span class="err">Bring!: ${esc(d.shopping.error)}</span>`);
   }
   if (state.lastOk) parts.push(`<span>aktualisiert ${fmt.time.format(new Date(state.lastOk))}</span>`);
   $("status").innerHTML = parts.join("");
@@ -254,7 +305,7 @@ function render() {
   if (d) {
     renderWeather(d.weather);
     renderAgenda(d);
-    renderReminders(d.reminders);
+    renderRight(d);
   }
   renderStatus();
 }

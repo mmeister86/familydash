@@ -1,6 +1,6 @@
 # familydash
 
-A lightweight family wall dashboard: **Google Calendar**, **Apple Reminders** and **weather** on one screen.
+A lightweight family wall dashboard: **Google Calendar**, **weather**, the **school timetable** from beste.schule and the **Bring! shopping list** on one screen.
 Runs as a single static Go binary in an ~8 MB container on Unraid; a Raspberry Pi only runs a browser in kiosk mode.
 
 ![Wall display](docs/screenshot.png)
@@ -11,17 +11,15 @@ Runs as a single static Go binary in an ~8 MB container on Unraid; a Raspberry P
 - Keeps the last good data per source, so a flaky feed never blanks the screen
 
 ```
- Google Calendar ──(iCal secret URL, pull 5 min)──┐
- Open-Meteo      ──(HTTPS, pull 15 min)───────────┤
-                                                  ▼
- Mac (EventKit bridge) ──POST /api/reminders──▶ familydash (Unraid, :8080) ◀── Chromium kiosk (Raspberry Pi)
- iPhone Shortcut ────────POST /api/reminders──┘      /data/reminders.json
+ Google Calendar ──(iCal secret URL, 5 min)──┐
+ Open-Meteo      ──(15 min)──────────────────┤
+ beste.schule    ──(API token, 15 min)───────┼──▶ familydash (Unraid, :8080) ◀── Chromium kiosk (Raspberry Pi)
+ Bring!          ──(login, 2 min)────────────┘
 ```
 
 ## Quick start (Unraid)
 
-1. Push this repo to GitHub → the workflow builds `ghcr.io/<you>/familydash` (amd64 + arm64).
-   Replace `OWNER` in `docker-compose.yml` and `deploy/unraid/my-familydash.xml`.
+1. Every push to `main` builds `ghcr.io/mmeister86/familydash` (amd64 + arm64) via GitHub Actions.
 2. **Either** copy `deploy/unraid/my-familydash.xml` to `/boot/config/plugins/dockerMan/templates-user/` and add the container via *Docker → Add Container*,
    **or** use the Compose Manager plugin with `docker-compose.yml` + `.env` (see `.env.example`).
 3. Open `http://<unraid-ip>:8080`.
@@ -41,10 +39,17 @@ All settings are environment variables.
 | `WEATHER_LAT` / `WEATHER_LON` | – | Weather is off until set |
 | `WEATHER_NAME` | – | Label above the weather panel |
 | `WEATHER_REFRESH` | `15m` | |
-| `REMINDERS_TOKEN` | – | Bearer token for `POST /api/reminders`; push is disabled when empty |
-| `REMINDERS_STALE_AFTER` | `2h` | Show a hint in the status bar if no push arrived for this long |
-| `DATA_DIR` | `/data` | Stores `reminders.json` |
+| `BESTESCHULE_TOKEN` | – | Personal Access Token; school panel is off until set |
+| `BESTESCHULE_STUDENTS` | all | Comma-separated first names or ids to show |
+| `BESTESCHULE_REFRESH` | `15m` | |
+| `BESTESCHULE_URL` | `https://beste.schule/api` | |
+| `BRING_EMAIL` / `BRING_PASSWORD` | – | Bring! account; shopping panel is off until set |
+| `BRING_LIST` | account default | Name of the list to show, e.g. `Zuhause` |
+| `BRING_LOCALE` | `de-DE` | Language for catalog item names |
+| `BRING_REFRESH` | `2m` | |
 | `LISTEN_ADDR` | `:8080` | |
+
+Values may be wrapped in quotes (`KEY="value"`) – they are stripped, since `docker --env-file` would otherwise keep them.
 
 ### Google Calendar
 
@@ -58,32 +63,34 @@ The parser handles what Google/iCloud/Outlook export in practice: time zones, al
 
 Note: Google refreshes the secret iCal feed itself only every few minutes to hours; that delay is on Google's side.
 
-### Apple Reminders
+### beste.schule
 
-Apple has no server API for iCloud Reminders (they left CalDAV with the iOS 13 upgrade), so the dashboard can't pull them.
-Something that *can* read them pushes a snapshot instead:
+beste.schule → user menu (top right) → **API** → create a *Personal Access Token* → `BESTESCHULE_TOKEN`.
+Works with a parent account; each child gets its own card.
 
-- **Mac bridge (recommended)** – `bridges/reminders-mac/`: a small Swift/EventKit tool that pushes on every change (debounced) and every 5 min.
-  Needs a Mac that is usually on and signed in to the family iCloud.
-  ```sh
-  cd bridges/reminders-mac && ./build.sh
-  DASH_URL=http://<unraid-ip>:8080/api/reminders DASH_TOKEN=<token> ./familydash-reminders   # first run: grant access
-  # then install the LaunchAgent: see comment in de.matthiasmeister.familydash.reminders.plist
-  ```
-- **iOS Shortcut** – `bridges/shortcuts/README.md`: no Mac needed, but only runs on time/app triggers.
+Per child the dashboard shows:
 
-Push API:
+- **Timetable** for today while school is running, afterwards for the next school day (weekends, holidays and `no_school_dates` are skipped)
+- **Cancellations and substitutions** from the substitution plan inline (struck through / "Vertretung", incl. room changes) plus day notices
+- **Exams** (Klassenarbeit, Leistungskontrolle, Test …) for the next 3 weeks and **homework** for the next 2 weeks from the class journal
 
-```http
-POST /api/reminders
-Authorization: Bearer <REMINDERS_TOKEN>
-Content-Type: application/json
+The beste.schule API returns nested, loosely structured data, so the parser is deliberately tolerant
+(modelled on the Home Assistant integration [RF1705/beste-schule](https://github.com/RF1705/beste-schule)).
+If something looks wrong for your school, inspect what the API returns:
 
-{"source":"mac","lists":[{"name":"Einkauf","color":"#34C759","items":[{"title":"Milch"},{"title":"Arzt","due":"2026-10-01T09:00:00+02:00","priority":1}]}]}
+```sh
+docker exec familydash /familydash -besteschule-preview   # what the dashboard would show
+docker exec familydash /familydash -besteschule-dump      # raw API responses (contains personal data!)
 ```
 
-`lists` replaces everything from that `source`. For a single list you can also send
-`{"source":"iphone","list":"Einkauf","items":["Milch","Brot"]}` or `{"list":"Einkauf","text":"Milch\nBrot"}`.
+### Bring!
+
+Set `BRING_EMAIL`, `BRING_PASSWORD` and optionally `BRING_LIST`. This needs a classic e-mail/password login –
+if you sign in to Bring! with Apple/Google only, the login will fail.
+
+Bring! has **no public API** – this uses the endpoints of the Bring! apps as documented by the community
+library [bring-api](https://github.com/miaucl/bring-api) (also used by Home Assistant). It may break when Bring! changes something;
+only the shopping panel is affected then.
 
 ### Weather
 
@@ -106,7 +113,6 @@ The page dims itself 22:00–06:00 (`NIGHT` in `web/static/app.js`). Portrait an
 | | |
 |---|---|
 | `GET /api/dashboard` | Everything the frontend needs (JSON) |
-| `POST /api/reminders` | Reminders push, see above |
 | `GET /healthz` | Liveness |
 
 ## Development
@@ -114,7 +120,7 @@ The page dims itself 22:00–06:00 (`NIGHT` in `web/static/app.js`). Portrait an
 ```sh
 go test ./...
 cp .env.example .env   # fill in
-set -a; . ./.env; set +a; DATA_DIR=./data go run ./cmd/familydash
+set -a; . ./.env; set +a; go run ./cmd/familydash
 ```
 
 Frontend: edit `web/static/*`, restart the binary (files are embedded).
