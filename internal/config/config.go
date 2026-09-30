@@ -8,8 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"familydash/internal/waste"
 )
 
 type Calendar struct {
@@ -54,10 +52,6 @@ type Config struct {
 	// VielfaltMenü school lunch, one login per child (VIELFALT_n_*)
 	Meals        []MealAccount
 	MealsRefresh time.Duration
-
-	// Bin collection rules (WASTE_n_NAME/_DAY/_WEEKS/_COLOR)
-	Waste      []waste.Bin
-	WasteShift bool // WASTE_HOLIDAY_SHIFT, default on
 }
 
 type MealAccount struct {
@@ -139,30 +133,6 @@ func Load() (*Config, error) {
 		}
 	}
 	c.resolveColumns(intoNum)
-
-	// WASTE_1_NAME=Restabfall, WASTE_1_DAY=Mi, WASTE_1_WEEKS=gerade … (up to 10)
-	wasteColors := []string{"#8A8F98", "#F2C94C", "#4F8EF7", "#8B5E3C", "#46C28E"}
-	c.WasteShift = !strings.EqualFold(env("WASTE_HOLIDAY_SHIFT", "on"), "off")
-	for i := 1; i <= 10; i++ {
-		name := env(fmt.Sprintf("WASTE_%d_NAME", i), "")
-		if name == "" {
-			continue
-		}
-		wd, err := waste.ParseWeekday(env(fmt.Sprintf("WASTE_%d_DAY", i), ""))
-		if err != nil {
-			return nil, fmt.Errorf("WASTE_%d_DAY: %w", i, err)
-		}
-		weeks, err := waste.ParseParity(env(fmt.Sprintf("WASTE_%d_WEEKS", i), ""))
-		if err != nil {
-			return nil, fmt.Errorf("WASTE_%d_WEEKS: %w", i, err)
-		}
-		c.Waste = append(c.Waste, waste.Bin{
-			Name:    name,
-			Color:   env(fmt.Sprintf("WASTE_%d_COLOR", i), wasteColors[(i-1)%len(wasteColors)]),
-			Weekday: wd,
-			Weeks:   weeks,
-		})
-	}
 
 	// VIELFALT_1_USER, VIELFALT_1_PASSWORD, VIELFALT_1_NAME, VIELFALT_1_COLOR, VIELFALT_2_… (up to 6)
 	for i := 1; i <= 6; i++ {

@@ -130,18 +130,6 @@ h2 {
 }
 .date { font-size: 1.2rem; color: var(--muted); margin-top: 0.3rem; }
 .weather { margin-top: auto; padding-top: 0.8rem; }
-.waste { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.7rem; }
-.waste:empty { display: none; }
-.bin {
-  display: inline-flex; align-items: center; gap: 0.4rem;
-  font-size: 0.85rem; padding: 0.22rem 0.6rem; border-radius: 999px;
-  background: var(--panel-2); border: 1px solid var(--line);
-}
-.bin .dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--c); }
-.bin .when { color: var(--muted); font-size: 0.78rem; font-variant-numeric: tabular-nums; }
-.bin.soon { border-color: var(--c); background: color-mix(in srgb, var(--c) 16%, var(--panel-2)); }
-.bin.soon .when { color: var(--text); font-weight: 600; }
-.bin.today .when { color: var(--accent); font-weight: 600; }
 .wx-now { display: flex; align-items: center; gap: 0.8rem; }
 .wx-now .icon { width: 3.6rem; height: 3.6rem; flex: none; }
 .wx-temp { font-size: 2.6rem; font-weight: 300; line-height: 1; font-variant-numeric: tabular-nums; }
