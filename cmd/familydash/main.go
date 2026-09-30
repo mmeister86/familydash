@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -13,9 +14,10 @@ import (
 	"time"
 	_ "time/tzdata" // embed zoneinfo → works in a scratch image
 
+	"familydash/internal/besteschule"
+	"familydash/internal/bring"
 	"familydash/internal/calendar"
 	"familydash/internal/config"
-	"familydash/internal/reminders"
 	"familydash/internal/server"
 	"familydash/internal/weather"
 	"familydash/web"
@@ -27,9 +29,11 @@ var version = "dev"
 
 func main() {
 	healthcheck := flag.Bool("healthcheck", false, "probe /healthz and exit (for Docker HEALTHCHECK)")
+	schoolDump := flag.Bool("besteschule-dump", false, "print the raw beste.schule API responses as JSON and exit")
+	schoolPreview := flag.Bool("besteschule-preview", false, "print what the dashboard would show from beste.schule and exit")
 	flag.Parse()
 
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, nil)))
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -39,18 +43,15 @@ func main() {
 	if *healthcheck {
 		os.Exit(probe(cfg.ListenAddr))
 	}
+	if *schoolDump || *schoolPreview {
+		os.Exit(school(cfg, *schoolDump))
+	}
 	if version == "dev" {
 		version = fmt.Sprintf("dev-%d", time.Now().Unix())
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-
-	rem, err := reminders.NewStore(cfg.DataDir, cfg.RemindersStale)
-	if err != nil {
-		slog.Error("reminders store", "err", err)
-		os.Exit(1)
-	}
 
 	cal := calendar.NewService(cfg)
 	go cal.Run(ctx, cfg.CalendarRefresh)
@@ -64,9 +65,24 @@ func main() {
 		go wx.Run(ctx, cfg.WeatherRefresh)
 	}
 
+	var br *bring.Service
+	if cfg.BringEnabled() {
+		br = bring.NewService(cfg.BringEmail, cfg.BringPassword, cfg.BringList, cfg.BringLocale)
+		if u := os.Getenv("BRING_API_URL"); u != "" { // for local testing
+			br.BaseURL, br.LocaleURL = u+"/rest/", u+"/locale/"
+		}
+		go br.Run(ctx, cfg.BringRefresh)
+	}
+
+	var sc *besteschule.Service
+	if cfg.SchoolEnabled() {
+		sc = besteschule.NewService(cfg.SchoolURL, cfg.SchoolToken, cfg.Location, cfg.SchoolStudents)
+		go sc.Run(ctx, cfg.SchoolRefresh)
+	}
+
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           server.New(cfg, version, cal, wx, rem, web.Static()).Handler(),
+		Handler:           server.New(cfg, version, cal, wx, br, sc, web.Static()).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	go func() {
@@ -78,11 +94,40 @@ func main() {
 
 	slog.Info("familydash started", "version", version, "addr", cfg.ListenAddr,
 		"calendars", len(cfg.Calendars), "weather", cfg.WeatherEnabled(), "tz", cfg.Location.String(),
-		"remindersPush", cfg.RemindersToken != "")
+		"bring", cfg.BringEnabled(), "besteschule", cfg.SchoolEnabled())
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("server", "err", err)
 		os.Exit(1)
 	}
+}
+
+// school prints beste.schule data for debugging the parser against a real
+// account: `docker exec familydash /familydash -besteschule-dump > dump.json`
+func school(cfg *config.Config, rawDump bool) int {
+	if !cfg.SchoolEnabled() {
+		fmt.Fprintln(os.Stderr, "BESTESCHULE_TOKEN is not set")
+		return 1
+	}
+	s := besteschule.NewService(cfg.SchoolURL, cfg.SchoolToken, cfg.Location, cfg.SchoolStudents)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	raw, err := s.Fetch(ctx)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	var out any = raw
+	if !rawDump {
+		out = besteschule.Build(raw, time.Now(), cfg.Location, cfg.SchoolStudents)
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(out); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	return 0
 }
 
 func probe(addr string) int {
