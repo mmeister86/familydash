@@ -255,6 +255,10 @@ and sends only that to Gemini, with a JSON schema for the answer. Times and date
   endpoint first and switches to Vertex when the key is rejected there. With a key from the AI Studio free tier, Google may use the
   prompts to improve its products – enable billing (or use Vertex) since the facts contain your children's school data.
 
+On the wall the card appears with its scene: prepared from 06:25 / 18:40, shown from 06:45 / 19:00 (`BRIEFING_LEAD` before
+`SCENE_MORNING` / `SCENE_EVENING`). To look at it at any other time, open `http://<unraid-ip>:8095/?scene=evening` (or `morning`)
+on a laptop – the card for that scene is then made on request (first load waits a few seconds for Gemini, then it's cached).
+
 Check what the model gets and answers:
 
 ```sh

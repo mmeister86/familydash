@@ -92,9 +92,11 @@ func schema() map[string]any {
 	}
 }
 
-// Service keeps the current briefing fresh. It wakes up every minute, looks
-// at the scene that starts within Lead (morning → today, evening → tomorrow),
-// and asks the model again only when the facts changed – at most every MinGap.
+// Service keeps the briefings fresh. It wakes up every minute, looks at the
+// scene that starts within Lead (morning → today, evening → tomorrow), and
+// asks the model again only when the facts changed – at most every MinGap.
+// Morning and evening each keep their own card, so ?scene=… on a laptop can
+// look at the other one without disturbing the wall.
 type Service struct {
 	Model  *Gemini // nil = rule-based only
 	Sched  *scene.Schedule
@@ -104,17 +106,23 @@ type Service struct {
 	Gather func(now time.Time) Data
 
 	started time.Time
-	mu      sync.RWMutex
+	mu      sync.Mutex
+	slots   map[Kind]*slot
+}
+
+type slot struct {
+	key     string // kind + target date of cur
 	cur     *Briefing
-	key     string // kind + date of cur
-	hash    string // facts behind the last model answer for key
+	hash    string // facts behind cur (model answer or, without a model, the rules)
 	lastAI  time.Time
 	backoff time.Time
+	busy    bool // a model call is running
 }
 
 const (
 	warmup       = 90 * time.Second // let the sources load once before the first call
 	retryBackoff = 10 * time.Minute
+	previewWait  = 20 * time.Second // ?scene=…: wait this long for a first answer
 )
 
 func (s *Service) Run(ctx context.Context) {
@@ -133,7 +141,11 @@ func (s *Service) Run(ctx context.Context) {
 
 // KindAt is the briefing due at now: the one of the scene running Lead from now.
 func (s *Service) KindAt(now time.Time) (Kind, bool) {
-	switch s.Sched.At(now.Add(s.Lead), s.Loc).Name {
+	return kindOf(s.Sched.At(now.Add(s.Lead), s.Loc).Name)
+}
+
+func kindOf(sceneName string) (Kind, bool) {
+	switch sceneName {
 	case scene.Morning:
 		return Morning, true
 	case scene.Evening:
@@ -151,7 +163,23 @@ func (s *Service) tick(ctx context.Context, now time.Time) {
 		return
 	}
 	// prepared Lead ahead: the target day follows the scene's start, not now
-	target := Target(kind, now.Add(s.Lead), s.Loc)
+	s.refresh(ctx, kind, Target(kind, now.Add(s.Lead), s.Loc), now)
+}
+
+func (s *Service) slot(kind Kind) *slot {
+	if s.slots == nil {
+		s.slots = map[Kind]*slot{}
+	}
+	sl := s.slots[kind]
+	if sl == nil {
+		sl = &slot{}
+		s.slots[kind] = sl
+	}
+	return sl
+}
+
+// refresh brings the card of one kind up to date for target.
+func (s *Service) refresh(ctx context.Context, kind Kind, target, now time.Time) {
 	data := s.Gather(now)
 	facts := BuildFacts(kind, now, target, s.Loc, data)
 	key := string(kind) + "@" + target.Format(ymdLayout)
@@ -159,61 +187,102 @@ func (s *Service) tick(ctx context.Context, now time.Time) {
 	colors := Colors(data)
 
 	s.mu.Lock()
-	if key != s.key {
-		s.key, s.hash, s.cur = key, "", nil
+	sl := s.slot(kind)
+	if key != sl.key {
+		*sl = slot{key: key}
 	}
-	if hash == s.hash {
+	if hash == sl.hash || sl.busy {
 		s.mu.Unlock()
 		return
 	}
 	fallback := Fallback(kind, target, facts, colors)
 	if s.Model == nil {
-		s.cur, s.hash = fallback, hash
+		sl.cur, sl.hash = fallback, hash
 		s.mu.Unlock()
 		return
 	}
-	haveAI := s.cur != nil && s.cur.AI
-	if now.Before(s.backoff) || (haveAI && now.Sub(s.lastAI) < s.MinGap) {
-		if !haveAI {
-			s.cur = fallback // keep the fallback current until the model answers
-		}
+	haveAI := sl.cur != nil && sl.cur.AI
+	if !haveAI {
+		sl.cur = fallback // show the rule-based card until the model answers
+	}
+	if now.Before(sl.backoff) || (haveAI && now.Sub(sl.lastAI) < s.MinGap) {
 		s.mu.Unlock()
 		return
 	}
-	s.lastAI = now
+	sl.busy, sl.lastAI = true, now
 	s.mu.Unlock()
 
 	b, err := s.ask(ctx, kind, target, facts, colors)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.key != key {
+	sl.busy = false
+	if sl.key != key {
 		return // the day moved on while we waited
 	}
 	if err != nil {
 		slog.Warn("briefing: model call failed", "kind", kind, "err", err)
-		s.backoff = now.Add(retryBackoff)
-		if s.cur == nil || !s.cur.AI {
-			fallback.Error = err.Error()
-			s.cur = fallback
-		} else {
-			s.cur.Error = err.Error()
+		sl.backoff = now.Add(retryBackoff)
+		if sl.cur != nil {
+			sl.cur.Error = err.Error()
 		}
 		return
 	}
-	s.cur, s.hash = b, hash
+	sl.cur, sl.hash = b, hash
 }
 
-// Snapshot returns the current briefing (nil until the first one is ready).
-func (s *Service) Snapshot() *Briefing {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if s.cur == nil {
+// Snapshot returns the card for the wall: the running scene's, or the one
+// being prepared for the next scene. nil = nothing (yet).
+func (s *Service) Snapshot() *Briefing { return s.snapshotAt(time.Now()) }
+
+func (s *Service) snapshotAt(now time.Time) *Briefing {
+	kind, ok := kindOf(s.Sched.At(now, s.Loc).Name)
+	if !ok {
+		if kind, ok = s.KindAt(now); !ok {
+			return nil
+		}
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return copyOf(s.slot(kind).cur)
+}
+
+// For returns the card of one kind on request (/api/dashboard?scene=evening),
+// whatever the time: today's morning briefing or the outlook on tomorrow.
+// The first request waits up to previewWait for the model; later ones answer
+// at once and update in the background.
+func (s *Service) For(kind Kind, now time.Time) *Briefing {
+	target := Target(kind, now, s.Loc)
+	key := string(kind) + "@" + target.Format(ymdLayout)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		s.refresh(context.Background(), kind, target, now)
+	}()
+	s.mu.Lock()
+	ready := s.slot(kind).key == key && s.slot(kind).cur != nil && s.slot(kind).cur.AI
+	s.mu.Unlock()
+	if !ready {
+		select {
+		case <-done:
+		case <-time.After(previewWait):
+		}
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if sl := s.slot(kind); sl.key == key {
+		return copyOf(sl.cur)
+	}
+	return nil
+}
+
+func copyOf(b *Briefing) *Briefing {
+	if b == nil {
 		return nil
 	}
-	b := *s.cur
-	b.Items = append([]Item(nil), s.cur.Items...)
-	return &b
+	c := *b
+	c.Items = append([]Item(nil), b.Items...)
+	return &c
 }
 
 // Generate builds one briefing right away (for -briefing-preview). With no

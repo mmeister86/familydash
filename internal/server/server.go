@@ -114,7 +114,7 @@ type dashboard struct {
 	Briefing *briefing.Briefing `json:"briefing,omitempty"`
 }
 
-func (s *Server) handleDashboard(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	d := dashboard{
 		Version:  s.version,
 		Now:      time.Now().In(s.cfg.Location),
@@ -160,7 +160,13 @@ func (s *Server) handleDashboard(w http.ResponseWriter, _ *http.Request) {
 		d.News = s.news.Snapshot()
 	}
 	if s.briefing != nil {
-		d.Briefing = s.briefing.Snapshot()
+		// ?scene=morning|evening (testing on a laptop): that scene's card, made on request
+		switch k := briefing.Kind(r.URL.Query().Get("scene")); k {
+		case briefing.Morning, briefing.Evening:
+			d.Briefing = s.briefing.For(k, d.Now)
+		default:
+			d.Briefing = s.briefing.Snapshot()
+		}
 	}
 	if _, info := findNightBG(s.cfg.NightBGCandidates()); info != nil {
 		d.NightBG = &nightBG{V: info.ModTime().Unix()}

@@ -293,14 +293,19 @@ func TestServiceTick(t *testing.T) {
 	s := service(m)
 	ctx := context.Background()
 
-	s.tick(ctx, at("2026-10-01 15:00")) // afternoon: nothing due
-	if s.Snapshot() != nil || hits != 0 {
+	now := at("2026-10-01 15:00") // afternoon: nothing due
+	s.tick(ctx, now)
+	if s.snapshotAt(now) != nil || hits != 0 {
 		t.Fatal("afternoon should not generate")
 	}
-	s.tick(ctx, at("2026-10-01 18:45")) // evening starts within the lead time
-	b := s.Snapshot()
+	now = at("2026-10-01 18:45") // evening starts within the lead time
+	s.tick(ctx, now)
+	b := s.snapshotAt(now)
 	if b == nil || !b.AI || b.Kind != Evening || b.Date != "2026-10-02" || hits != 1 {
 		t.Fatalf("evening card: %+v hits=%d", b, hits)
+	}
+	if b2 := s.snapshotAt(at("2026-10-01 19:30")); b2 == nil || b2.Headline != b.Headline {
+		t.Fatalf("evening scene should show the prepared card: %+v", b2)
 	}
 	if len(b.Items) != 3 || b.Items[0].Section != "tonight" || b.Items[1].Icon != "hinweis" {
 		t.Fatalf("normalized items: %+v", b.Items)
@@ -333,8 +338,9 @@ func TestServiceFallsBackOnError(t *testing.T) {
 	m := NewGemini("k", "m", "low", "gemini")
 	m.GeminiURL = srv.URL
 	s := service(m)
-	s.tick(context.Background(), at("2026-10-01 19:00"))
-	b := s.Snapshot()
+	now := at("2026-10-01 19:00")
+	s.tick(context.Background(), now)
+	b := s.snapshotAt(now)
 	if b == nil || b.AI || !strings.Contains(b.Error, "boom") || len(b.Items) == 0 {
 		t.Fatalf("fallback: %+v", b)
 	}
@@ -346,9 +352,34 @@ func TestServiceFallsBackOnError(t *testing.T) {
 
 func TestServiceWithoutModel(t *testing.T) {
 	s := service(nil)
-	s.tick(context.Background(), at("2026-10-02 06:30")) // morning starts 06:45
-	b := s.Snapshot()
+	now := at("2026-10-02 06:30") // morning starts 06:45
+	s.tick(context.Background(), now)
+	b := s.snapshotAt(now)
 	if b == nil || b.Kind != Morning || b.Date != "2026-10-02" || b.AI {
 		t.Fatalf("rule-based morning card: %+v", b)
+	}
+}
+
+// ?scene=evening in the afternoon: generated on request, then served from cache
+func TestServiceForOnRequest(t *testing.T) {
+	var hits int32
+	srv := fakeGemini(t, http.StatusOK, answer, &hits)
+	defer srv.Close()
+	m := NewGemini("k", "m", "low", "gemini")
+	m.GeminiURL = srv.URL
+	s := service(m)
+	now := at("2026-10-01 16:50")
+	b := s.For(Evening, now)
+	if b == nil || !b.AI || b.Date != "2026-10-02" || hits != 1 {
+		t.Fatalf("on request: %+v hits=%d", b, hits)
+	}
+	if s.For(Evening, now.Add(time.Minute)) == nil || hits != 1 {
+		t.Errorf("second request should come from the cache (%d)", hits)
+	}
+	if m := s.For(Morning, now); m == nil || m.Kind != Morning || m.Date != "2026-10-01" {
+		t.Errorf("morning on request: %+v", m)
+	}
+	if s.snapshotAt(now) != nil {
+		t.Error("afternoon wall should stay without a card")
 	}
 }

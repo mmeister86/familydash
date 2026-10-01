@@ -811,7 +811,8 @@ function renderStatus() {
 
 async function refresh() {
   try {
-    const res = await fetch("api/dashboard", { cache: "no-store" });
+    // ?scene=… also asks the server for that scene's AI card (made on request)
+    const res = await fetch("api/dashboard" + (urlScene ? "?scene=" + encodeURIComponent(urlScene) : ""), { cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     if (state.version && data.version !== state.version) {
