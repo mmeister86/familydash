@@ -67,7 +67,8 @@ function tickClock() {
 
 // ------------------------------------------------------------------ weather
 
-function renderWeather(w) {
+// hints: plain-language tips for the way to school (morning only)
+function renderWeather(w, hints = []) {
   const el = $("weather");
   if (!w) { el.innerHTML = ""; return; }
   if (!w.current || !w.daily) { el.innerHTML = `<p class="hint">Noch keine Wetterdaten.</p>`; return; }
@@ -90,7 +91,38 @@ function renderWeather(w) {
           <div class="r">${round(d.max)}°<span>${round(d.min)}°</span></div>
           <div class="p">${d.precipProb >= 20 ? d.precipProb + " %" : ""}</div>
         </div>`).join("")}
-    </div>`;
+    </div>
+    ${hints.length ? `<div class="wx-hints">${hints.map(([ic, what]) => `<span class="wx-hint"><span class="ic">${ic}</span>${esc(what)}</span>`).join("")}</div>` : ""}`;
+}
+
+// ------------------------------------------------------------------ weather picture
+
+// The clock card shows a photo matching the weather (WEATHER_BG_DIR, the
+// server picks the file) or, without one, a gradient for the condition.
+// Names match the photo files: klar, heiter, bewoelkt, nebel, regen, schnee, gewitter.
+const WX_NAME = {
+  sun: "klar", moon: "klar", partly: "heiter", "partly-night": "heiter", cloud: "bewoelkt",
+  fog: "nebel", drizzle: "regen", rain: "regen", sleet: "schnee", snow: "schnee", thunder: "gewitter",
+};
+
+function renderWeatherBg(d) {
+  const card = $("clock-card"), bg = $("wx-bg");
+  const c = d.weather?.current;
+  card.dataset.wx = c ? WX_NAME[c.icon] || "bewoelkt" : "";
+  card.classList.toggle("wx-night", !!c && !c.isDay);
+
+  const url = d.weatherBg ? `weather-bg/${encodeURIComponent(d.weatherBg.name)}?v=${d.weatherBg.v}` : "";
+  if (bg.dataset.url === url) return;
+  bg.dataset.url = url;
+  if (!url) { bg.style.backgroundImage = ""; card.classList.remove("wx-photo"); return; }
+  // swap only once the new picture is loaded – no blank frame on the wall
+  const img = new Image();
+  img.onload = () => {
+    if (bg.dataset.url !== url) return;
+    bg.style.backgroundImage = `url("${url}")`;
+    card.classList.add("wx-photo");
+  };
+  img.src = url;
 }
 
 // ------------------------------------------------------------------ night scene
@@ -283,11 +315,29 @@ function schoolCalendarCard(cal, events) {
   </div>`;
 }
 
+// Morning/evening: all children in ONE card, stacked – just the timetable,
+// in the evening plus tomorrow's lunch. The server already switches each
+// timetable to the next school day once today's lessons are over.
+function kidPlan(st, opts, withMeal) {
+  const day = st.day || {};
+  const isToday = day.date === ymd(new Date());
+  return `<div class="kid-plan">
+    <div class="head"><span class="dot" style="--c:${opts.color ? esc(opts.color) : "var(--accent)"}"></span><span class="name">${esc(st.name || "Schule")}</span>
+      <span class="meta">${day.noSchool ? "" : esc(relDay(day.date))}</span></div>
+    <div class="kid-main">
+      ${(day.notices || []).map((n) => `<div class="notice">${esc(n)}</div>`).join("")}
+      ${day.noSchool ? `<div class="empty">Keine Schule in Sicht 🎉</div>` : (day.lessons || []).map((l) => lessonRow(l, isToday)).join("")}
+    </div>
+    ${withMeal && opts.meal ? `<div class="kid-sec"><div class="sub-h">Essen</div>${mealRows(opts.meal, 1)}</div>` : ""}
+  </div>`;
+}
+
 // One card per child. A school calendar (CALENDAR_n_PANEL=school) and a lunch
 // account (VIELFALT_n_*) with the child's name move into that child's card;
 // a timetable's "calendar" field picks the calendar explicitly.
-// Returns the lunch accounts that found no card.
-function renderSchoolRow(d) {
+// mode: "full" (afternoon: everything, one card per child side by side),
+// "plan" (morning: timetables stacked in one card), "plan-meal" (evening: + lunch).
+function renderSchoolRow(d, mode) {
   const cals = d.calendar?.calendars || [];
   const events = d.calendar?.events || [];
   const meals = d.meals?.children || [];
@@ -318,20 +368,26 @@ function renderSchoolRow(d) {
     return opts;
   };
 
+  const kids = [...(d.school?.students || []).map((st) => [st, extras(st.name)]),
+                ...(d.timetables || []).map((t) => [t, extras(t.name, t.calendar)])];
+  const lonelyMeals = () => meals.filter((_, i) => !usedMeals.has(i));
+
   let html = "";
-  if (d.school) {
-    html += d.school.students?.length
-      ? d.school.students.map((st) => studentCard(st, extras(st.name))).join("")
-      : `<div class="panel"><h2>Schule</h2><p class="hint">${esc(d.school.error || "Noch keine Daten von beste.schule.")}</p></div>`;
-  }
-  for (const t of d.timetables || []) html += studentCard(t, extras(t.name, t.calendar));
-  for (const cal of cals.filter((c) => c.panel === "school" && !usedCals.has(c.id))) {
-    html += schoolCalendarCard(cal, events.filter((e) => e.cal === cal.id));
+  if (mode === "full") {
+    html = kids.map(([st, opts]) => studentCard(st, opts)).join("");
+    if (d.school && !d.school.students?.length) {
+      html = `<div class="panel"><h2>Schule</h2><p class="hint">${esc(d.school.error || "Noch keine Daten von beste.schule.")}</p></div>` + html;
+    }
+    for (const cal of cals.filter((c) => c.panel === "school" && !usedCals.has(c.id))) {
+      html += schoolCalendarCard(cal, events.filter((e) => e.cal === cal.id));
+    }
+    html += lonelyMeals().map(mealCard).join("");
+  } else if (kids.length) {
+    const withMeal = mode === "plan-meal";
+    html = `<div class="panel kid-stack">${kids.map(([st, opts]) => kidPlan(st, opts, withMeal)).join("")}</div>`;
   }
   $("school").innerHTML = html;
-  $("board").classList.toggle("no-school", !html);
-  kidTodoIds = usedTodos;
-  return meals.filter((_, i) => !usedMeals.has(i));
+  return !!html;
 }
 
 // ------------------------------------------------------------------ school lunch (VielfaltMenü)
@@ -354,11 +410,11 @@ function mealRow(day) {
   return `<div class="${cls}"><span class="when">${esc(relDay(day.date))}</span><span class="what">${what}</span></div>`;
 }
 
-function mealRows(ch) {
+function mealRows(ch, max = MEAL_DAYS) {
   const now = new Date(), today = ymd(now);
   const days = (ch.days || [])
     .filter((d) => d.date > today || (d.date === today && now.getHours() < LUNCH_OVER))
-    .slice(0, MEAL_DAYS);
+    .slice(0, max);
   return days.length
     ? days.map(mealRow).join("")
     : ch.error ? `<p class="hint">${esc(ch.error)}</p>` : `<div class="empty">Kein Essen in Sicht</div>`;
@@ -372,10 +428,6 @@ function mealCard(ch) {
   </div>`;
 }
 
-function renderMeals(kids) {
-  $("meals").innerHTML = kids.map(mealCard).join("");
-  $("board").classList.toggle("no-meals", !kids.length);
-}
 
 // ------------------------------------------------------------------ calendar columns
 
@@ -429,15 +481,18 @@ function renderCalendars(d) {
 
 // The server decides the scene from SCENE_* (school days vs. weekend) and
 // sends it with every poll. ?scene=evening in the URL overrides it – handy
-// for testing on the laptop. Each scene lists the widgets of the focus zone
-// (between clock and school row); the board's rows resize via CSS classes.
+// for testing on the laptop. Each scene lists its sections; the grid itself
+// (and what fills in when a section is empty) lives in style.css.
+//   wide:   clock left, weather picture right, across the full width
+//   school: "full" = one card per child, "plan"/"plan-meal" = stacked timetables
 const SCENES = {
-  morning:   { label: "Morgen",     focus: (sc) => (sc.schoolDay ? ["hints", "checklist", "todos"] : ["hints", "todos", "photos"]) },
-  day:       { label: "Tag",        focus: () => ["todos", "photos"] },
-  afternoon: { label: "Nachmittag", focus: () => ["todos", "photos"] },
-  evening:   { label: "Abend",      focus: () => ["tomorrow", "todos", "photos"] },
-  night:     { label: "Nacht",      focus: () => [] },
+  morning:   { label: "Morgen",     wide: true,  show: ["shopping", "news", "school"], school: "plan", hints: true },
+  day:       { label: "Tag",        wide: false, show: ["shopping", "photos", "news"] },
+  afternoon: { label: "Nachmittag", wide: false, show: ["shopping", "school"], school: "full" },
+  evening:   { label: "Abend",      wide: true,  show: ["photos", "school"], school: "plan-meal" },
+  night:     { label: "Nacht",      wide: false, show: [] },
 };
+const SECTIONS = { shopping: "shopping", news: "news", photos: "photo-frame", school: "school" };
 
 const urlScene = new URLSearchParams(location.search).get("scene");
 
@@ -454,26 +509,42 @@ function applyScene(sc) {
     board.classList.toggle("scene-" + n, n === sc.name);
     document.body.classList.toggle("scene-" + n, n === sc.name);
   }
+  const conf = SCENES[sc.name];
+  board.classList.toggle("wide-top", !!conf.wide);
+  for (const [key, id] of Object.entries(SECTIONS)) $(id).hidden = !conf.show.includes(key);
 }
 
-// focus widgets: each returns HTML, or "" when it has nothing to say
-const FOCUS_WIDGETS = {
-  hints: (d) => hintsCard("Heute", weatherHints(d.weather, ymd(new Date()), 7, 16)),
-  checklist: () => "", // TODO: morning checklist per child (CHECKLIST_n_*), + "Sportbeutel" from the timetable
-  tomorrow: (d) => tomorrowCard(d),
-  todos: (d) => todosCard(d.todos && { ...d.todos, tasks: (d.todos.tasks || []).filter((t) => !kidTodoIds.has(t.id)) }),
-};
+// ------------------------------------------------------------------ news (Google News & co.)
 
-function renderFocus(d, sc) {
-  const wanted = SCENES[sc.name].focus(sc);
-  const shown = wanted.filter((w) => FOCUS_WIDGETS[w]).map((w) => FOCUS_WIDGETS[w](d)).filter(Boolean);
-  const cards = shown.join("");
-  // two cards need the full width – the photo only joins a single card
-  const photos = wanted.includes("photos") && slideshow.has() && shown.length < 2;
-  $("focus-cards").innerHTML = cards;
-  $("focus").classList.toggle("no-photo", !photos);
-  $("board").classList.toggle("no-focus", !cards && !photos);
-  photos ? slideshow.start() : slideshow.stop();
+// Headlines without links (no touch): region first, then Germany. Groups
+// share the card; one that doesn't fit fades out at its bottom edge.
+function newsAge(iso, now = new Date()) {
+  if (!iso || iso.startsWith("0001")) return "";
+  const t = new Date(iso), min = Math.round((now - t) / 60_000);
+  if (min < 1) return "gerade eben";
+  if (min < 60) return `vor ${min} min`;
+  if (min < 6 * 60) return `vor ${Math.round(min / 60)} Std`;
+  if (startOfDay(t).getTime() === startOfDay(now).getTime()) return fmt.time.format(t);
+  if (startOfDay(t).getTime() === addDays(startOfDay(now), -1).getTime()) return "gestern";
+  return fmt.wdShort.format(t);
+}
+
+function renderNews(n) {
+  const el = $("news");
+  if (!n) {
+    el.innerHTML = `<div class="head"><span class="dot" style="--c:var(--danger)"></span><span class="name">News</span></div><p class="hint">Setze <code>NEWS_LOCAL</code>, z. B. <code>Crimmitschau,Landkreis Zwickau</code>.</p>`;
+    return false;
+  }
+  const groups = (n.groups || []).filter((g) => g.items?.length);
+  el.innerHTML = groups.length
+    ? groups.map((g, i) => `<div class="news-group">
+        <div class="head"><span class="dot" style="--c:${i ? "var(--muted)" : "var(--danger)"}"></span><span class="name">${esc(g.name)}</span></div>
+        ${g.items.map((it) => `<div class="headline"><div class="t">${esc(it.title)}</div>
+          <div class="src">${[esc(it.source), newsAge(it.published)].filter(Boolean).join(" · ")}</div></div>`).join("")}
+      </div>`).join("")
+    : `<div class="head"><span class="dot" style="--c:var(--danger)"></span><span class="name">News</span></div><p class="hint">${esc(n.error || "Noch keine Schlagzeilen.")}</p>`;
+  if (!el.hidden) for (const g of el.querySelectorAll(".news-group")) g.classList.toggle("cut", g.scrollHeight > g.clientHeight + 2);
+  return true;
 }
 
 // ------------------------------------------------------------------ weather hints
@@ -504,52 +575,11 @@ function weatherHints(w, dateStr, fromH, toH) {
   return out;
 }
 
-const hintRows = (hints) => hints.map(([ic, what, why]) =>
-  `<div class="hint-row"><span class="ic">${ic}</span><span class="what">${esc(what)}</span><span class="why">${esc(why)}</span></div>`).join("");
-
-function hintsCard(title, hints) {
-  if (!hints.length) return "";
-  return `<div class="panel focus-card">
-    <div class="head"><span class="dot" style="--c:var(--sun)"></span><span class="name">${esc(title)}</span><span class="meta">Wetter</span></div>
-    ${hintRows(hints)}
-  </div>`;
-}
-
-// ------------------------------------------------------------------ evening: "Morgen" card
-
-const MAX_TOMORROW = 5;
-
-function tomorrowCard(d) {
-  const tomorrow = addDays(new Date(), 1), key = ymd(tomorrow);
-  const bins = (d.waste || []).filter((b) => (b.dates || []).includes(key));
-  const { allDay, timed } = eventsOn(d.calendar?.events || [], tomorrow);
-  timed.sort((a, b) => a.s - b.s);
-  const hints = weatherHints(d.weather, key, 7, 16).filter(([ic]) => ic !== "👍");
-
-  const rows = [
-    ...bins.map((b) => `<div class="tm-row bin-row" style="--c:${esc(b.color)}"><span class="dot"></span><b>${esc(b.name)}</b> rausstellen</div>`),
-    ...(allDay.length ? [`<div class="allday">${allDay.map((e) => `<span class="chip" style="--c:${esc(e.color)}">${esc(e.title)}</span>`).join("")}</div>`] : []),
-    ...timed.slice(0, MAX_TOMORROW).map((e) => `<div class="ev" style="--c:${esc(e.color)}">
-        <span class="when">${e.s >= tomorrow ? fmt.time.format(e.s) : "…"}</span>
-        <span class="what"><span class="cdot"></span>${esc(e.title)}</span></div>`),
-    ...(timed.length > MAX_TOMORROW ? [`<div class="more">+ ${timed.length - MAX_TOMORROW} weitere</div>`] : []),
-    hintRows(hints),
-  ].filter(Boolean);
-
-  return `<div class="panel focus-card fade">
-    <div class="head"><span class="dot" style="--c:var(--accent)"></span><span class="name">Morgen</span>
-      <span class="meta">${esc(fmt.wdShort.format(tomorrow) + " " + fmt.dayMonthShort.format(tomorrow))}</span></div>
-    ${rows.length ? rows.join("") : `<div class="empty">Nichts Besonderes – ruhiger Tag 🙂</div>`}
-  </div>`;
-}
-
 // ------------------------------------------------------------------ to-dos (Things 3)
 
-// Today's to-dos of one Things area (THINGS_AREA). Open ones in Things' order
-// ("This Evening" last, with a moon), then what was ticked off today, struck
-// through. The card disappears when there's nothing open and nothing done.
-const MAX_TODOS = 8;
-const TODO_DONE_SHOWN = 3; // ticked-off tasks listed below the open ones
+// Today's to-dos of one Things area (THINGS_AREA) that belong to a child,
+// shown in that child's card (afternoon). Open ones in Things' order
+// ("This Evening" last, with a moon), then what was ticked off today.
 
 const CHECK_SVG = `<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.2"/><path class="tick" d="M6.2 10.4l2.5 2.5 5.1-5.6"/></svg>`;
 
@@ -572,7 +602,6 @@ function todoRow(t) {
 // ("Lukas") or starts with it ("Lukas: Zimmer aufräumen" – the prefix is
 // dropped in the child's card). Returns the task as shown there, or null.
 const TODO_PREFIX = /^\s*([^:]{1,40}):\s*(\S.*)$/;
-let kidTodoIds = new Set(); // ids shown in a child's card (set by renderSchoolRow)
 
 function todoFor(t, kid) {
   if ((t.tags || []).some((tag) => sameKid(tag, kid))) return t;
@@ -592,23 +621,6 @@ function kidTodoRows(tasks) {
     + (open.length > shownOpen.length ? `<div class="more">+ ${open.length - shownOpen.length} weitere</div>` : "")
     + (!open.length ? `<div class="empty">Alles erledigt 🎉</div>` : "")
     + shownDone.map(todoRow).join("");
-}
-
-function todosCard(list) {
-  if (!list) return "";
-  const tasks = list.tasks || [];
-  const open = tasks.filter((t) => !t.done), done = tasks.filter((t) => t.done);
-  if (!open.length && !done.length) return list.error ? `<div class="panel focus-card todos"><div class="head"><span class="dot" style="--c:var(--good)"></span><span class="name">To-dos</span></div><p class="hint">${esc(list.error)}</p></div>` : "";
-  const shownOpen = open.slice(0, MAX_TODOS);
-  const shownDone = done.slice(0, Math.max(0, Math.min(TODO_DONE_SHOWN, MAX_TODOS - shownOpen.length)));
-  const hidden = open.length - shownOpen.length;
-  return `<div class="panel focus-card todos fade">
-    <div class="head"><span class="dot" style="--c:var(--good)"></span><span class="name">To-dos</span>
-      <span class="meta">${open.length ? `${open.length} offen` : "alles erledigt 🎉"}</span></div>
-    ${shownOpen.map(todoRow).join("")}
-    ${hidden > 0 ? `<div class="more">+ ${hidden} weitere</div>` : ""}
-    ${shownDone.map(todoRow).join("")}
-  </div>`;
 }
 
 // ------------------------------------------------------------------ photo slideshow
@@ -724,6 +736,7 @@ function renderStatus() {
     if (d.shopping?.error && d.shopping.items?.length) parts.push(`<span class="err">Bring!: ${esc(d.shopping.error)}</span>`);
     for (const c of d.meals?.children || []) if (c.error && c.days?.length) parts.push(`<span class="err">Essen ${esc(c.name)}: ${esc(c.error)}</span>`);
     if (d.todos?.error && d.todos.tasks?.length) parts.push(`<span class="err">Things: ${esc(d.todos.error)}</span>`);
+    if (d.news?.error && d.news.groups?.some((g) => g.items?.length)) parts.push(`<span class="err">News: ${esc(d.news.error)}</span>`);
   }
   if (d) {
     const sc = currentScene(d);
@@ -754,12 +767,17 @@ async function refresh() {
 function render() {
   const d = state.data;
   if (d) {
-    const sc = currentScene(d);
+    const sc = currentScene(d), conf = SCENES[sc.name];
     applyScene(sc);
     slideshow.set(d.photos);
-    renderMeals(renderSchoolRow(d)); // first: decides which to-dos move into child cards
-    renderFocus(d, sc);
-    renderWeather(d.weather);
+    const board = $("board");
+    board.classList.toggle("no-school", !renderSchoolRow(d, conf.school || "full"));
+    board.classList.toggle("no-news", !renderNews(d.news));
+    const photos = conf.show.includes("photos") && slideshow.has();
+    board.classList.toggle("no-photos", !slideshow.has());
+    photos ? slideshow.start() : slideshow.stop();
+    renderWeather(d.weather, conf.hints && sc.schoolDay !== false ? weatherHints(d.weather, ymd(new Date()), 7, 16).filter(([ic]) => ic !== "👍") : []);
+    renderWeatherBg(d);
     renderNight(d);
     renderWaste(d.waste);
     renderShopping(d.shopping);

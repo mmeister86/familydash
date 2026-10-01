@@ -60,7 +60,7 @@ All settings are environment variables.
 | `BRING_REFRESH` | `2m` | |
 | `VIELFALT_n_USER` / `VIELFALT_n_PASSWORD` | – | VielfaltMenü login (Kundennummer + password) of child `n` = 1…6; lunch cards are off until set |
 | `VIELFALT_n_NAME` | name from the portal | Card title, e.g. `Lukas` |
-| `SCENE_MORNING` … `SCENE_NIGHT` | `06:00`, `08:00` (DAY), `15:00` (AFTERNOON), `18:00` (EVENING), `21:30` (NIGHT) | Start of each time-of-day layout on school days (Mon–Fri); `off` skips a scene |
+| `SCENE_MORNING` … `SCENE_NIGHT` | `06:45`, `09:00` (DAY), `14:00` (AFTERNOON), `19:00` (EVENING), `21:30` (NIGHT) | Start of each time-of-day layout on school days (Mon–Fri); `off` skips a scene |
 | `SCENE_<NAME>_WEEKEND` | MORNING `07:30`, DAY `10:00`, rest = school-day value | Same for Saturday/Sunday |
 | `SCENE_FORCE` | – | Always show this scene (`morning`, `day`, `afternoon`, `evening`, `night`) – for testing |
 | `PHOTOS_DIR` | `/data/pictures` | Folder with photos for the slideshow (subfolders ok); `off` disables it. May not exist yet – it's picked up once it does |
@@ -68,9 +68,17 @@ All settings are environment variables.
 | `PHOTOS_SHUFFLE` | `on` | Random order; `off` = alphabetical |
 | `PHOTOS_REFRESH` | `5m` | How often the folder is rescanned |
 | `NIGHT_BG` | `/data/bg.jpeg` (also `bg.jpg`, `.png`, `.webp`) | Full-screen picture behind the night clock; `off` = plain black. Replaced files show up with the next poll |
+| `WEATHER_BG_DIR` | `/data/wetter` | Folder with weather pictures behind the clock/weather card (see *Weather pictures*); `off` = gradients only |
+| `NEWS_LOCAL` | – | Comma-separated Google News searches shown together as the first news group, e.g. `Crimmitschau,Landkreis Zwickau` |
+| `NEWS_LOCAL_NAME` | `Region` | Title of that group |
+| `NEWS_LOCAL_DAYS` | `2` | Only articles from the last n days (Google `when:` filter – small towns otherwise bring up years-old stories) |
+| `NEWS_TOP` | `on` | Google News top stories for Germany as the second group (`NEWS_TOP_NAME`, default `Deutschland`); `off` to drop it |
+| `NEWS_n_URL` / `NEWS_n_NAME` | – | Up to 5 more RSS feeds, e.g. `https://www.tagesschau.de/index~rss2.xml` |
+| `NEWS` | `on` | `off` hides the news card completely |
+| `NEWS_REFRESH` / `NEWS_MAX_AGE` / `NEWS_PER_GROUP` | `20m` / `48h` / `12` | Polling (stay ≥ 15 min, Google rate-limits), oldest headline, headlines per group |
 | `VIELFALT_n_COLOR` | palette | Dot color of the card |
 | `VIELFALT_REFRESH` | `30m` | |
-| `THINGS_EMAIL` / `THINGS_PASSWORD` | – | Things Cloud account; the to-do card is off until set |
+| `THINGS_EMAIL` / `THINGS_PASSWORD` | – | Things Cloud account; children's to-dos are off until set |
 | `THINGS_AREA` | `Familie` | Things area whose **Today** to-dos are shown (title, case-insensitive substring) |
 | `THINGS_REFRESH` | `5m` | |
 | `THINGS_STATE_DIR` | `/data/things` | Sync cache of the CLI; falls back to `/tmp` when not writable (then it syncs from scratch after a restart) |
@@ -84,24 +92,28 @@ Values may be wrapped in quotes (`KEY="value"`) – they are stripped, since `do
 
 ### Layout
 
-Built for a **portrait** wall display (landscape works too):
+Built for a **portrait** wall display. Every time-of-day scene has its own layout (see *Time-of-day scenes*); the calendars always fill the bottom row:
 
 ```
-┌──────────────┬──────────────┐
-│ clock+weather│ Bring! list  │
-├──────────────┼──────────────┤
-│ beste.schule │ school cal.  │   one card per child / per CALENDAR_n_PANEL=school
-├──────────────┼──────────────┤
-│ lunch child 1│ lunch child 2│   one card per VIELFALT_n_*
-├────────┬─────┴──┬───────────┤
-│ cal 1  │ cal 2  │ cal 3 …   │   one column per CALENDAR_n_PANEL=column
-└────────┴────────┴───────────┘
+morning                         day / afternoon                 evening
+┌─────────────┬─────────────┐   ┌─────────────┬─────────────┐   ┌─────────────┬─────────────┐
+│ clock       │ weather pic │   │ clock+wx pic│ Bring! list │   │ clock       │ weather pic │
+├─────────────┼─────────────┤   ├─────────────┼─────────────┤   ├─────────────┼─────────────┤
+│ timetable 1 │ Bring! list │   │ day: photos │ day: news   │   │ photos      │ timetable 1 │
+│ ─────────── ├─────────────┤   │ afternoon:  │ afternoon:  │   │             │ + lunch     │
+│ timetable 2 │ news        │   │ child 1     │ child 2     │   │             │ timetable 2 │
+├────────┬────┴───┬─────────┤   ├────────┬────┴───┬─────────┤   ├────────┬────┴───┬─────────┤
+│ cal 1  │ cal 2  │ cal 3 … │   │ cal 1  │ cal 2  │ cal 3 … │   │ cal 1  │ cal 2  │ cal 3 … │
+└────────┴────────┴─────────┘   └────────┴────────┴─────────┘   └────────┴────────┴─────────┘
 ```
+
+A section with nothing to show (no photos, no news configured …) hands its space to its neighbour.
 
 For a child without beste.schule, keep their school dates in a Google calendar and set `CALENDAR_n_PANEL=school`.
 
-**One card per child:** a `CALENDAR_n_PANEL=school` calendar and a `VIELFALT_n_*` lunch account whose name matches a child's card
-(beste.schule or fixed timetable) move into that card, ordered *school → Termine → Essen*. Names match case-insensitively, and a
+**One card per child** (afternoon): a `CALENDAR_n_PANEL=school` calendar and a `VIELFALT_n_*` lunch account whose name matches a child's card
+(beste.schule or fixed timetable) move into that card, ordered *school → To-dos → Termine → Essen*. Morning and evening show only
+the timetables, stacked in one card (evening: plus the next lunch). Names match case-insensitively, and a
 single first name also matches a full name (`Lukas` ↔ `Meister Lukas`). Anything without a matching child keeps a card of its own.
 
 ### Waste collection
@@ -180,17 +192,16 @@ docker exec familydash /familydash -vielfalt-preview
 ### Things 3 (to-dos)
 
 Put the family's to-dos into one Things area (default `Familie`) and set `THINGS_EMAIL` / `THINGS_PASSWORD`
-(your Things Cloud login). The card shows what that area has in **Today** – in Things' order, „This Evening" last with a 🌙 –
-plus what was ticked off today, struck through. Deadlines today or overdue get a red tag, checklists show their progress.
-It disappears when there's nothing to show.
+(your Things Cloud login). **To-dos for a child** show up in that child's card in the afternoon (school → To-dos → Termine → Essen):
+give the task the child's name as a Things **tag** (`Lukas`) or start the title with it (`Lukas: Zimmer aufräumen` – the prefix is
+dropped in the card). Names match like everywhere else (`Lukas` = `Meister Lukas`). Only what's in **Today** counts – in Things' order,
+„This Evening" last with a 🌙 – plus what was ticked off today, struck through. Deadlines today or overdue get a red tag.
 
-**To-dos for a child** move into that child's card (school → To-dos → Termine → Essen): give the task the child's name
-as a Things **tag** (`Lukas`) or start the title with it (`Lukas: Zimmer aufräumen` – the prefix is dropped in the card).
-Names match like everywhere else (`Lukas` = `Meister Lukas`). What no child card takes stays in the general card.
+The scenes since 2026-10 have no general to-do card; tasks without a child's name aren't shown.
 
 Things has **no public API**. The image ships [things3](https://github.com/evanpurkhiser/things3-cloud), a CLI that syncs with
 Things Cloud like the apps do (reverse-engineered, pinned to a release in the `Dockerfile`). It may break when Cultured Code changes
-something; only the to-do card is affected then. familydash only runs fixed, **read-only** commands (`find --json`) and never starts
+something; only the children's to-dos are affected then. familydash only runs fixed, **read-only** commands (`find --json`) and never starts
 the CLI's built-in webserver, which would accept any command – including edits – from the network. The CLI keeps a sync cache
 (task titles, no password) in `THINGS_STATE_DIR`; with `-v /mnt/user/appdata/familydash:/data` that folder must be writable for
 `nobody:users` (`chown 99:100`), otherwise it lives in `/tmp` until the next restart. Check the login and area with:
@@ -201,19 +212,48 @@ docker exec familydash /familydash -things-preview
 
 ### Time-of-day scenes
 
-The board changes its layout with the time of day. A **focus zone** between the clock row and the school row shows what matters right now:
+The board changes its layout with the time of day:
 
-| Scene | Default (school day) | Focus zone |
+| Scene | Default (school day) | Shows (besides clock, weather and calendars) |
 |---|---|---|
-| `morning` | 06:00 | Weather hints for the way to school („Regenjacke mitnehmen"), checklist (planned), to-dos. Weekends: hints + to-dos + photos |
-| `day` | 08:00 | To-dos + photo slideshow |
-| `afternoon` | 15:00 | To-dos + photo slideshow |
-| `evening` | 18:00 | „Morgen": bins to put out, tomorrow's appointments, weather hints for tomorrow + to-dos + photos |
+| `morning` | 06:45 | Timetables of all children in one card, Bring!, news. Weather tips for the way to school („Regenjacke mitnehmen") on school days |
+| `day` | 09:00 | Bring!, photo slideshow, news |
+| `afternoon` | 14:00 | Bring!, one complete card per child (school, to-dos, Termine, lunch) |
+| `evening` | 19:00 | Photo slideshow, tomorrow's timetables + lunch in one card |
 | `night` | 21:30 | Everything hidden – only a dimmed clock, date and current weather (icon + temperature), on black or on the `NIGHT_BG` picture |
 
-Cards with nothing to say disappear. The photo only shares the zone with a single card – with two cards they get the full width.
+Morning and evening put the clock on the left and the weather (with its picture) on the right, across the full width;
+day and afternoon use a compact card with the picture behind clock and weather.
 
-Try a scene on your laptop with `http://<unraid-ip>:8095/?scene=evening`. Scenes and their widgets are defined in `SCENES` / `FOCUS_WIDGETS` in `web/static/app.js`, row heights in `.board.scene-*` in `style.css`.
+Try a scene on your laptop with `http://<unraid-ip>:8095/?scene=evening`. Scenes and their sections are defined in `SCENES` in
+`web/static/app.js`, the grid of each scene in `.board.scene-*` in `style.css`.
+
+### Weather pictures
+
+The clock/weather card shows a picture matching the current weather. Without pictures it paints a gradient per condition; to use
+photos, put JPEGs into the weather folder – with `-v /mnt/user/appdata/familydash:/data` that's `/mnt/user/appdata/familydash/wetter`:
+
+| File | Shown for |
+|---|---|
+| `klar.jpg` | clear sky |
+| `heiter.jpg` | sunny with some clouds |
+| `bewoelkt.jpg` | overcast |
+| `nebel.jpg` | fog |
+| `regen.jpg` | drizzle, rain, showers |
+| `schnee.jpg` | snow, sleet |
+| `gewitter.jpg` | thunderstorm |
+| `nacht.jpg` | any weather while it's dark |
+| `standard.jpg` | anything without a picture of its own |
+
+Optional night variants: `<name>-nacht.jpg`, e.g. `regen-nacht.jpg`. Lookup order at night: `regen-nacht` → `nacht` → `regen` → `standard`;
+by day: `regen` → `standard`; then the gradient. Lowercase names without umlauts; `.jpeg`, `.webp` and `.png` work too.
+About 1600 px wide and under 500 KB is plenty. The picture is darkened for legible text – calm skies work best. New files show up with the next poll.
+
+### News
+
+Headlines only (title, source, age) – the display has no touch. With `NEWS_LOCAL=Crimmitschau,Landkreis Zwickau` the card shows a
+*Region* group (both searches merged, duplicates removed) above Germany's top stories. Google News RSS is unofficial but has been stable
+for years; if it ever goes away, `NEWS_TOP=off` plus `NEWS_1_URL=https://www.tagesschau.de/index~rss2.xml` is a drop-in.
 
 ### Photos
 

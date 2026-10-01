@@ -30,74 +30,59 @@ html, body {
   cursor: none; /* kiosk */
 }
 
-/* ---------- grid (portrait first, see sketch)
-   Row heights live in --t-* so scenes and missing sections can change them
-   independently. Rows are separated by margin-top instead of row-gap, so a
-   hidden row (0px) doesn't leave a double gap behind. */
+/* ---------- grid: one layout per scene (portrait, see the sketches)
+   app.js hides the sections a scene doesn't show (SCENES[…].show) and sets
+   no-news / no-photos / no-school when a section has nothing to show –
+   the templates below then let the neighbour take over the space. */
+[hidden] { display: none !important; }
+
 .board {
-  --t-top: minmax(min-content, 0.9fr); /* clock + weather never get squeezed */
-  --t-focus: 0px;
-  --t-school: minmax(0, 1.15fr);
-  --t-meals: minmax(0, 0.5fr);
-  --t-cals: minmax(0, 1.6fr);
   height: calc(100% - var(--status-h));
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: var(--t-top) var(--t-focus) var(--t-school) var(--t-meals) var(--t-cals);
-  grid-template-areas:
-    "clock shop"
-    "focus focus"
-    "school school"
-    "meals meals"
-    "cals cals";
-  column-gap: var(--gap);
-  row-gap: 0;
+  gap: var(--gap);
   padding: var(--gap) var(--gap) 0;
 }
-.focus, .school-row, .meals-row, .calendars { margin-top: var(--gap); }
+.clock-card  { grid-area: top; }
+.shopping    { grid-area: shop; }
+.news        { grid-area: news; }
+.photo-frame { grid-area: photo; }
+.school-row  { grid-area: school; }
+.calendars   { grid-area: cals; }
 
-/* scenes: how much room the focus zone gets, and who gives it up */
-.board.scene-morning   { --t-focus: minmax(0, 0.6fr);  --t-school: minmax(0, 1.3fr);  --t-cals: minmax(0, 1.2fr); }
-.board.scene-day       { --t-focus: minmax(0, 1.05fr); --t-school: minmax(0, 1fr);    --t-cals: minmax(0, 1.35fr); }
-.board.scene-afternoon { --t-focus: minmax(0, 0.8fr);  --t-cals: minmax(0, 1.4fr); }
-.board.scene-evening   { --t-focus: minmax(0, 1fr);    --t-school: minmax(0, 0.9fr);  --t-cals: minmax(0, 1.3fr); }
-
-/* sections without content collapse (after the scenes, so they win) */
-.board.no-focus  { --t-focus: 0px; }
-.board.no-school { --t-school: 0px; }
-.board.no-meals  { --t-meals: 0px; }
-.board.no-focus .focus, .board.no-school .school-row, .board.no-meals .meals-row { display: none; }
-
-.clock-card { grid-area: clock; }
-.shopping   { grid-area: shop; }
-.focus      { grid-area: focus; }
-.school-row { grid-area: school; }
-.meals-row  { grid-area: meals; }
-.calendars  { grid-area: cals; }
-
-/* landscape fallback: top row of four cards, focus, meals, calendars below */
-@media (orientation: landscape) {
-  .board {
-    --t-top: minmax(min-content, 1fr);
-    --t-meals: minmax(0, 0.4fr);
-    --t-cals: minmax(0, 1.1fr);
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    grid-template-rows: var(--t-top) var(--t-focus) var(--t-meals) var(--t-cals);
-    grid-template-areas:
-      "clock shop school school"
-      "focus focus focus focus"
-      "meals meals meals meals"
-      "cals cals cals cals";
-  }
-  .school-row { margin-top: 0; }
-  .board.no-school {
-    grid-template-areas:
-      "clock shop shop shop"
-      "focus focus focus focus"
-      "meals meals meals meals"
-      "cals cals cals cals";
-  }
+/* morning: clock | weather across the top, timetables left, Bring! + news right */
+.board.scene-morning {
+  grid-template-rows: minmax(min-content, 0.85fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.25fr);
+  grid-template-areas: "top top" "school shop" "school news" "cals cals";
 }
+.board.scene-morning.no-news   { grid-template-areas: "top top" "school shop" "school shop" "cals cals"; }
+.board.scene-morning.no-school { grid-template-areas: "top top" "shop news" "shop news" "cals cals"; }
+.board.scene-morning.no-school.no-news { grid-template-areas: "top top" "shop shop" "shop shop" "cals cals"; }
+
+/* day: compact clock + Bring!, photos | news */
+.board.scene-day {
+  grid-template-rows: minmax(min-content, 1fr) minmax(0, 2fr) minmax(0, 1.3fr);
+  grid-template-areas: "top shop" "photo news" "cals cals";
+}
+.board.scene-day.no-photos { grid-template-areas: "top shop" "news news" "cals cals"; }
+.board.scene-day.no-news   { grid-template-areas: "top shop" "photo photo" "cals cals"; }
+.board.scene-day.no-photos.no-news { grid-template-areas: "top shop" "cals cals" "cals cals"; }
+
+/* afternoon: compact clock + Bring!, one complete card per child */
+.board.scene-afternoon {
+  grid-template-rows: minmax(min-content, 1fr) minmax(0, 2fr) minmax(0, 1.3fr);
+  grid-template-areas: "top shop" "school school" "cals cals";
+}
+.board.scene-afternoon.no-school { grid-template-areas: "top shop" "cals cals" "cals cals"; }
+
+/* evening: clock | weather across the top, photos | tomorrow's timetable + lunch */
+.board.scene-evening {
+  grid-template-rows: minmax(min-content, 0.9fr) minmax(0, 1.7fr) minmax(0, 1fr);
+  grid-template-areas: "top top" "photo school" "cals cals";
+}
+.board.scene-evening.no-photos { grid-template-areas: "top top" "school school" "cals cals"; }
+.board.scene-evening.no-school { grid-template-areas: "top top" "photo photo" "cals cals"; }
+.board.scene-evening.no-photos.no-school { grid-template-areas: "top top" "cals cals" "cals cals"; }
 
 /* ---------- night scene: dimmed clock + weather, on black or on a picture (NIGHT_BG) */
 .night-clock { display: none; }
@@ -171,8 +156,9 @@ h2 {
 .muted { color: var(--muted); }
 .more { color: var(--faint); font-size: 0.85rem; padding-top: 0.4rem; }
 
-/* ---------- clock + weather */
-.clock-card { display: flex; flex-direction: column; }
+/* ---------- clock + weather (+ weather picture) */
+.clock-card { display: flex; flex-direction: column; isolation: isolate; }
+.cc-clock, .cc-weather { position: relative; z-index: 1; }
 .time {
   font-size: 4.6rem;
   font-weight: 250;
@@ -197,6 +183,61 @@ h2 {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.55; transform: scale(1.08); }
 }
+
+/* weather picture: a gradient per condition, replaced by a photo from
+   WEATHER_BG_DIR when there is one. Compact: behind the whole card. */
+.wx-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: var(--wx-grad, var(--panel-2)) center / cover no-repeat;
+}
+/* darken for legible white text – more at the bottom where the numbers are */
+.wx-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(10, 13, 18, 0.35), rgba(10, 13, 18, 0.62));
+}
+.clock-card.wx-photo .wx-bg::after { background: linear-gradient(to bottom, rgba(10, 13, 18, 0.42), rgba(10, 13, 18, 0.72)); }
+.clock-card[data-wx] .date, .clock-card[data-wx] .wx-meta, .clock-card[data-wx] .wx-days .d,
+.clock-card[data-wx] .wx-days .r span { color: rgba(232, 236, 241, 0.78); }
+.clock-card[data-wx] .wx-days { border-top-color: rgba(255, 255, 255, 0.18); }
+.clock-card[data-wx] .icon { color: rgba(232, 236, 241, 0.85); --panel: transparent; }
+.clock-card .time, .clock-card .wx-temp, .clock-card .wx-label { text-shadow: 0 0.1rem 0.8rem rgba(0, 0, 0, 0.35); }
+
+.clock-card[data-wx="klar"]     { --wx-grad: linear-gradient(165deg, #2E6FB7 0%, #5B9BD8 55%, #E9B072 130%); }
+.clock-card[data-wx="heiter"]   { --wx-grad: linear-gradient(165deg, #3A6A9E 0%, #7EA4C8 60%, #D9C29A 130%); }
+.clock-card[data-wx="bewoelkt"] { --wx-grad: linear-gradient(165deg, #4A5463 0%, #6E7886 100%); }
+.clock-card[data-wx="nebel"]    { --wx-grad: linear-gradient(180deg, #737B86 0%, #9AA1AA 100%); }
+.clock-card[data-wx="regen"]    { --wx-grad: linear-gradient(165deg, #23384F 0%, #40607F 100%); }
+.clock-card[data-wx="schnee"]   { --wx-grad: linear-gradient(165deg, #5F7389 0%, #AEBCCB 110%); }
+.clock-card[data-wx="gewitter"] { --wx-grad: linear-gradient(165deg, #1F1C3A 0%, #4A3E70 100%); }
+.clock-card.wx-night            { --wx-grad: linear-gradient(170deg, #0A1024 0%, #18264A 70%, #2A3560 120%); }
+.clock-card.wx-night[data-wx="regen"], .clock-card.wx-night[data-wx="gewitter"] { --wx-grad: linear-gradient(170deg, #0B1020 0%, #1E2A40 100%); }
+.clock-card.wx-night[data-wx="bewoelkt"], .clock-card.wx-night[data-wx="nebel"] { --wx-grad: linear-gradient(170deg, #12161F 0%, #2A3140 100%); }
+.clock-card.wx-night[data-wx="schnee"] { --wx-grad: linear-gradient(170deg, #141C2C 0%, #3A475E 100%); }
+
+/* wide (morning, evening): clock on the plain left half, weather on the picture */
+.board.wide-top .clock-card { flex-direction: row; align-items: stretch; padding: 0; }
+.board.wide-top .cc-clock { flex: 1 1 0; padding: 1.4rem 1.6rem; display: flex; flex-direction: column; justify-content: center; }
+.board.wide-top .cc-weather { flex: 1 1 0; margin: 0; padding: 1.3rem 1.5rem; display: flex; flex-direction: column; justify-content: center; }
+.board.wide-top .wx-bg { left: 50%; border-radius: 0 var(--radius) var(--radius) 0; }
+.board.wide-top .time { font-size: 6.4rem; }
+.board.wide-top .date { font-size: 1.45rem; color: var(--muted); }
+.board.wide-top .bin svg { width: 3.2rem; height: 3.2rem; }
+
+.wx-hints { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.8rem; }
+.wx-hint {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font-size: 0.9rem; font-weight: 600;
+  padding: 0.25rem 0.7rem 0.25rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(10, 13, 18, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+.wx-hint .ic { font-size: 1.05rem; line-height: 1; }
+
 .wx-now { display: flex; align-items: center; gap: 0.8rem; }
 .wx-now .icon { width: 3.6rem; height: 3.6rem; flex: none; }
 .wx-temp { font-size: 2.6rem; font-weight: 300; line-height: 1; font-variant-numeric: tabular-nums; }
@@ -312,14 +353,6 @@ h2 {
 .kid-sec .meal .dish { font-size: 0.95rem; }
 
 /* ---------- school lunch (VielfaltMenü) */
-.meals-row {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: var(--gap);
-  min-height: 0;
-}
-.meals-row .head { margin-bottom: 0.45rem; }
 .meal {
   display: grid;
   grid-template-columns: 5.2rem 1fr;
@@ -385,29 +418,29 @@ h2 {
 .calcol .head .also { display: inline-flex; flex: none; align-items: center; gap: 0.3rem; white-space: nowrap; font-size: 0.78rem; color: var(--muted); }
 .calcol .head .also .dot { width: 0.5rem; height: 0.5rem; }
 
-/* ---------- focus zone (scene widgets + photo frame) */
-.focus { display: flex; gap: var(--gap); min-height: 0; }
-.focus-cards {
-  flex: 1.2 1 0;
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: var(--gap);
-  min-width: 0;
-  min-height: 0;
+/* ---------- morning/evening: all children's timetables stacked in one card */
+.panel.kid-stack { display: flex; flex-direction: column; gap: 0.9rem; }
+.kid-plan { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+.kid-plan + .kid-plan { padding-top: 0.9rem; border-top: 2px solid var(--line); }
+.kid-plan .head { margin-bottom: 0.45rem; }
+.kid-plan .kid-sec .sub-h { margin-top: 0.4rem; }
+
+/* ---------- news (Google News & co.) */
+.panel.news { display: flex; flex-direction: column; gap: 0.8rem; }
+/* groups take what they need and shrink together when it gets tight;
+   only a group that is actually cut off fades out (.cut, set in app.js) */
+.news-group { flex: 0 1 auto; min-height: 4.5rem; overflow: hidden; }
+.news-group.cut {
+  -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent);
+          mask-image: linear-gradient(to bottom, black 80%, transparent);
 }
-.focus-cards:empty { display: none; }
-.focus-card { display: flex; flex-direction: column; }
-
-.hint-row { display: grid; grid-template-columns: 2rem 1fr auto; gap: 0.6rem; align-items: baseline; padding: 0.2rem 0; }
-.hint-row .ic { font-size: 1.35rem; line-height: 1; }
-.hint-row .what { font-size: 1.15rem; font-weight: 600; }
-.hint-row .why { color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
-
-.tm-row { padding: 0.25rem 0; font-size: 1.05rem; line-height: 1.3; }
-.tm-row .dot { display: inline-block; width: 0.8rem; height: 0.8rem; margin-right: 0.45rem; border-radius: 50%; background: var(--c); vertical-align: -0.05em; }
-.bin-row { color: var(--text); }
-.focus-card .ev .cdot { display: inline-block; width: 0.5rem; height: 0.5rem; margin-right: 0.4rem; border-radius: 50%; background: var(--c); vertical-align: 0.1em; }
+.news-group + .news-group { padding-top: 0.8rem; border-top: 1px solid var(--line); }
+.news-group .head { margin-bottom: 0.4rem; }
+.news-group .head .name { font-size: 1.05rem; }
+.headline { padding: 0.3rem 0; }
+.headline + .headline { border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+.headline .t { font-size: 1rem; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.headline .src { color: var(--muted); font-size: 0.75rem; margin-top: 0.12rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- to-dos (Things 3) */
 .todo { display: grid; grid-template-columns: 1.5rem 1fr; gap: 0.55rem; align-items: start; padding: 0.24rem 0; }
@@ -425,16 +458,14 @@ h2 {
 
 /* slideshow: two stacked images crossfading. Opacity only – cheap on the Pi. */
 .photo-frame {
-  flex: 1 1 0;
   position: relative;
   min-width: 0;
+  min-height: 0;
   border-radius: var(--radius);
   overflow: hidden;
   background: var(--panel);
   border: 1px solid var(--line);
 }
-.focus.no-photo .photo-frame { display: none; }
-.focus-cards:empty + .photo-frame { flex-basis: 100%; }
 .photo-frame .ph {
   position: absolute;
   inset: 0;

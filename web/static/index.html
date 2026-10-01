@@ -9,26 +9,27 @@
 </head>
 <body>
   <main class="board" id="board">
-    <section class="panel clock-card">
-      <div class="time-row">
-        <div class="time" id="time">--:--</div>
-        <div class="waste" id="waste"></div>
+    <!-- clock + weather: wide (morning/evening, picture on the right half) or
+         compact (day/afternoon, picture behind everything) – see SCENES in app.js -->
+    <section class="panel clock-card" id="clock-card">
+      <div class="wx-bg" id="wx-bg"></div>
+      <div class="cc-clock">
+        <div class="time-row">
+          <div class="time" id="time">--:--</div>
+          <div class="waste" id="waste"></div>
+        </div>
+        <div class="date" id="date"></div>
       </div>
-      <div class="date" id="date"></div>
-      <div class="weather" id="weather"></div>
+      <div class="cc-weather weather" id="weather"></div>
     </section>
 
     <section class="panel shopping" id="shopping"></section>
 
-    <!-- focus zone: content changes with the time of day (see SCENES in app.js) -->
-    <section class="focus" id="focus">
-      <div class="focus-cards" id="focus-cards"></div>
-      <div class="photo-frame" id="photo-frame"><img class="ph" alt=""><img class="ph" alt=""></div>
-    </section>
+    <section class="panel news" id="news"></section>
+
+    <section class="photo-frame" id="photo-frame"><img class="ph" alt=""><img class="ph" alt=""></section>
 
     <section class="school-row" id="school"></section>
-
-    <section class="meals-row" id="meals"></section>
 
     <section class="calendars" id="calendars"></section>
   </main>
