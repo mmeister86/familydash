@@ -17,6 +17,7 @@ type Service struct {
 	token   string
 	loc     *time.Location
 	only    []string
+	fixes   []WeekFix
 	client  *http.Client
 
 	mu     sync.RWMutex
@@ -29,6 +30,9 @@ func NewService(baseURL, token string, loc *time.Location, only []string) *Servi
 	return &Service{baseURL: baseURL, token: token, loc: loc, only: only,
 		client: &http.Client{Timeout: 20 * time.Second}}
 }
+
+// SetWeekFixes corrects mislabelled A/B weeks (BESTESCHULE_WEEK_FIX).
+func (s *Service) SetWeekFixes(f []WeekFix) { s.fixes = f }
 
 func (s *Service) Run(ctx context.Context, every time.Duration) {
 	s.Refresh(ctx)
@@ -68,7 +72,7 @@ func (s *Service) Snapshot() *School {
 		}
 		return &School{Students: []Student{}, Error: errMsg}
 	}
-	sc := Build(raw, time.Now(), s.loc, s.only)
+	sc := Build(raw, time.Now(), s.loc, s.only, s.fixes...)
 	sc.UpdatedAt, sc.Error = update, errMsg
 	return &sc
 }

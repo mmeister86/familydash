@@ -44,6 +44,7 @@
 
   <Config Name="beste.schule – Token" Target="BESTESCHULE_TOKEN" Default="" Description="beste.schule → Benutzerkonto → API → Personal Access Token" Type="Variable" Display="always" Required="false" Mask="true"></Config>
   <Config Name="beste.schule – Kinder" Target="BESTESCHULE_STUDENTS" Default="" Description="Optional: nur diese Vornamen/IDs anzeigen, kommagetrennt" Type="Variable" Display="advanced" Required="false"></Config>
+  <Config Name="beste.schule – A/B-Korrektur" Target="BESTESCHULE_WEEK_FIX" Default="" Description="Optional: falsch markierte A/B-Stunden korrigieren, Tag:Fach=Woche, kommagetrennt, z.B. Fr:PH=A" Type="Variable" Display="advanced" Required="false"></Config>
 
   <Config Name="Müll 1 – Name" Target="WASTE_1_NAME" Default="Restabfall" Type="Variable" Display="always" Required="false">Restabfall</Config>
   <Config Name="Müll 1 – Wochentag" Target="WASTE_1_DAY" Default="Mi" Description="Mo … So" Type="Variable" Display="always" Required="false">Mi</Config>

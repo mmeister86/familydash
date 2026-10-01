@@ -74,8 +74,9 @@ const (
 )
 
 // Build turns raw responses into what the dashboard shows at time now.
-// only optionally restricts students by id or first name.
-func Build(raw *Raw, now time.Time, loc *time.Location, only []string) School {
+// only optionally restricts students by id or first name; fixes correct
+// mislabelled A/B weeks.
+func Build(raw *Raw, now time.Time, loc *time.Location, only []string, fixes ...WeekFix) School {
 	now = now.In(loc)
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 
@@ -86,6 +87,9 @@ func Build(raw *Raw, now time.Time, loc *time.Location, only []string) School {
 	}
 
 	tt := timetableOf(raw.Timetable)
+	for i, l := range tt.lessons {
+		tt.lessons[i] = applyWeekFixes(l, fixes)
+	}
 	var out []Student
 	for _, st := range students {
 		s := Student{ID: idOf(st), Name: studentName(st), Homework: []Entry{}, Exams: []Entry{}}

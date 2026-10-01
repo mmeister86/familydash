@@ -92,6 +92,7 @@ func main() {
 	var sc *besteschule.Service
 	if cfg.SchoolEnabled() {
 		sc = besteschule.NewService(cfg.SchoolURL, cfg.SchoolToken, cfg.Location, cfg.SchoolStudents)
+		sc.SetWeekFixes(cfg.SchoolWeekFix)
 		go sc.Run(ctx, cfg.SchoolRefresh)
 	}
 
@@ -178,7 +179,7 @@ func school(cfg *config.Config, rawDump bool) int {
 	}
 	var out any = raw
 	if !rawDump {
-		out = besteschule.Build(raw, time.Now(), cfg.Location, cfg.SchoolStudents)
+		out = besteschule.Build(raw, time.Now(), cfg.Location, cfg.SchoolStudents, cfg.SchoolWeekFix...)
 	}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")

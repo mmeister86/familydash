@@ -46,6 +46,7 @@ All settings are environment variables.
 | `WEATHER_REFRESH` | `15m` | |
 | `BESTESCHULE_TOKEN` | – | Personal Access Token; school panel is off until set |
 | `BESTESCHULE_STUDENTS` | all | Comma-separated first names or ids to show |
+| `BESTESCHULE_WEEK_FIX` | – | Corrects mislabelled A/B lessons: `Tag:Fach=Woche`, comma-separated, e.g. `Fr:PH=A` (Fach = short name, full name or group) |
 | `BESTESCHULE_REFRESH` | `15m` | |
 | `BESTESCHULE_URL` | `https://beste.schule/api` | |
 | `WASTE_n_NAME` | – | Bin name, `n` = 1…10, e.g. `Gelbe Tonne`; waste chips are off until set |

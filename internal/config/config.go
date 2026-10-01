@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"familydash/internal/besteschule"
 	"familydash/internal/news"
 	"familydash/internal/scene"
 	"familydash/internal/uptime"
@@ -48,7 +49,8 @@ type Config struct {
 
 	SchoolToken    string
 	SchoolURL      string
-	SchoolStudents []string // optional filter: student names or ids
+	SchoolStudents []string              // optional filter: student names or ids
+	SchoolWeekFix  []besteschule.WeekFix // BESTESCHULE_WEEK_FIX=Fr:PH=A
 	SchoolRefresh  time.Duration
 
 	TimetableFile string // optional JSON override for the built-in fixed timetable
@@ -180,6 +182,11 @@ func Load() (*Config, error) {
 			c.SchoolStudents = append(c.SchoolStudents, s)
 		}
 	}
+	fixes, err := besteschule.ParseWeekFixes(env("BESTESCHULE_WEEK_FIX", ""))
+	if err != nil {
+		return nil, fmt.Errorf("BESTESCHULE_WEEK_FIX: %w", err)
+	}
+	c.SchoolWeekFix = fixes
 
 	tz := env("TZ", "Europe/Berlin")
 	loc, err := time.LoadLocation(tz)
