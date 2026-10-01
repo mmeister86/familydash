@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 
 	"familydash/internal/scene"
@@ -112,5 +113,27 @@ func TestUptime(t *testing.T) {
 	t.Setenv("UPTIME_URL", "http://192.168.188.127:3001")
 	if _, err := Load(); err == nil {
 		t.Error("URL without /status/<slug> should fail")
+	}
+}
+
+func TestNewsFeeds(t *testing.T) {
+	t.Setenv("NEWS_LOCAL", "Crimmitschau, Landkreis Zwickau")
+	t.Setenv("NEWS_1_URL", "https://www.tagesschau.de/index~rss2.xml")
+	t.Setenv("NEWS_1_NAME", "Tagesschau")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var groups []string
+	for _, f := range c.NewsFeeds {
+		groups = append(groups, f.Group)
+	}
+	if got := strings.Join(groups, ","); got != "Region,Region,Deutschland,Tagesschau" {
+		t.Errorf("groups %q", got)
+	}
+
+	t.Setenv("NEWS", "off")
+	if c, _ = Load(); c.NewsEnabled() {
+		t.Error("NEWS=off still has feeds")
 	}
 }

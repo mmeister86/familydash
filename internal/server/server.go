@@ -12,6 +12,7 @@ import (
 	"familydash/internal/bring"
 	"familydash/internal/calendar"
 	"familydash/internal/config"
+	"familydash/internal/news"
 	"familydash/internal/photos"
 	"familydash/internal/scene"
 	"familydash/internal/things"
@@ -35,6 +36,7 @@ type Server struct {
 	photos   *photos.Service      // nil if not configured
 	todos    *things.Service      // nil if not configured
 	uptime   *uptime.Service      // nil if not configured
+	news     *news.Service        // nil if not configured
 	static   fs.FS
 }
 
@@ -49,11 +51,12 @@ type Sources struct {
 	Photos  *photos.Service
 	Todos   *things.Service
 	Uptime  *uptime.Service
+	News    *news.Service
 }
 
 func New(cfg *config.Config, version string, cal *calendar.Service, src Sources, static fs.FS) *Server {
 	return &Server{cfg: cfg, version: version, calendar: cal, weather: src.Weather, bring: src.Bring, school: src.School,
-		plan: src.Plan, meals: src.Meals, waste: src.Waste, photos: src.Photos, todos: src.Todos, uptime: src.Uptime, static: static}
+		plan: src.Plan, meals: src.Meals, waste: src.Waste, photos: src.Photos, todos: src.Todos, uptime: src.Uptime, news: src.News, static: static}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -63,6 +66,7 @@ func (s *Server) Handler() http.Handler {
 		mux.Handle("GET /photos/{path...}", s.photos)
 	}
 	mux.HandleFunc("GET /night-bg", s.handleNightBG)
+	mux.HandleFunc("GET /weather-bg/{name}", s.handleWeatherBG)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	files := http.FileServerFS(s.static)
 	mux.Handle("GET /", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -98,6 +102,10 @@ type dashboard struct {
 	NightBG *nightBG `json:"nightBg,omitempty"`
 	// Monitors of one Uptime Kuma status page, shown in the footer (UPTIME_*)
 	Uptime *uptime.Status `json:"uptime,omitempty"`
+	// Picture for the current weather (WEATHER_BG_DIR); file at /weather-bg/<name>?v=<v>
+	WeatherBG *weatherBG `json:"weatherBg,omitempty"`
+	// Headlines (NEWS_*), grouped: region first, then Germany
+	News *news.Snapshot `json:"news,omitempty"`
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, _ *http.Request) {
@@ -114,6 +122,9 @@ func (s *Server) handleDashboard(w http.ResponseWriter, _ *http.Request) {
 	}
 	if s.weather != nil {
 		d.Weather = s.weather.Snapshot()
+		if d.Weather != nil && d.Weather.Current.Icon != "" {
+			d.WeatherBG = pickWeatherBG(s.cfg.WeatherBGDir, d.Weather.Current.Icon, d.Weather.Current.IsDay)
+		}
 	}
 	if s.bring != nil {
 		d.Shopping = s.bring.Snapshot()
@@ -138,6 +149,9 @@ func (s *Server) handleDashboard(w http.ResponseWriter, _ *http.Request) {
 	}
 	if s.uptime != nil {
 		d.Uptime = s.uptime.Snapshot()
+	}
+	if s.news != nil {
+		d.News = s.news.Snapshot()
 	}
 	if _, info := findNightBG(s.cfg.NightBGCandidates()); info != nil {
 		d.NightBG = &nightBG{V: info.ModTime().Unix()}

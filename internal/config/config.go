@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"familydash/internal/news"
 	"familydash/internal/scene"
 	"familydash/internal/uptime"
 	"familydash/internal/waste"
@@ -74,6 +75,16 @@ type Config struct {
 	// for bg.jpeg/bg.jpg/bg.png/bg.webp in /data, "off" = plain black
 	NightBG string
 
+	// Weather pictures behind the weather (WEATHER_BG_DIR): klar.jpg, regen.jpg, …
+	// "" = off; missing files fall back to a built-in gradient
+	WeatherBGDir string
+
+	// Headlines (NEWS_*): Google News searches + top stories + extra RSS feeds
+	NewsFeeds    []news.Feed
+	NewsRefresh  time.Duration
+	NewsMaxAge   time.Duration
+	NewsPerGroup int
+
 	// Things 3 to-dos of one area (THINGS_*), read via the things3 CLI
 	ThingsEmail    string
 	ThingsPassword string
@@ -127,6 +138,11 @@ func Load() (*Config, error) {
 		PhotosShuffle:  !strings.EqualFold(env("PHOTOS_SHUFFLE", "on"), "off"),
 		PhotosRefresh:  envDuration("PHOTOS_REFRESH", 5*time.Minute),
 		NightBG:        env("NIGHT_BG", ""),
+		WeatherBGDir:   env("WEATHER_BG_DIR", "/data/wetter"),
+
+		NewsRefresh:  envDuration("NEWS_REFRESH", 20*time.Minute),
+		NewsMaxAge:   envDuration("NEWS_MAX_AGE", 48*time.Hour),
+		NewsPerGroup: envInt("NEWS_PER_GROUP", 12),
 
 		ThingsEmail:    env("THINGS_EMAIL", ""),
 		ThingsPassword: env("THINGS_PASSWORD", ""),
@@ -149,6 +165,10 @@ func Load() (*Config, error) {
 	if strings.EqualFold(c.PhotosDir, "off") {
 		c.PhotosDir = ""
 	}
+	if strings.EqualFold(c.WeatherBGDir, "off") {
+		c.WeatherBGDir = ""
+	}
+	c.loadNews()
 	if err := c.loadScenes(); err != nil {
 		return nil, err
 	}
@@ -288,6 +308,34 @@ func (c *Config) loadScenes() error {
 	return nil
 }
 
+// loadNews builds the feed list, in display order:
+//   - NEWS_LOCAL=Crimmitschau,Landkreis Zwickau → one Google News search per
+//     term (last NEWS_LOCAL_DAYS days), shown together as NEWS_LOCAL_NAME
+//   - NEWS_TOP=on (default) → Google News top stories Germany
+//   - NEWS_1_URL/NEWS_1_NAME … NEWS_5_* → any other RSS feed
+//
+// NEWS=off switches the whole card off.
+func (c *Config) loadNews() {
+	if strings.EqualFold(env("NEWS", "on"), "off") {
+		return
+	}
+	localName := env("NEWS_LOCAL_NAME", "Region")
+	days := envInt("NEWS_LOCAL_DAYS", 2)
+	for _, term := range strings.Split(env("NEWS_LOCAL", ""), ",") {
+		if term = strings.TrimSpace(term); term != "" {
+			c.NewsFeeds = append(c.NewsFeeds, news.Feed{Group: localName, URL: news.GoogleSearch(term, days)})
+		}
+	}
+	if !strings.EqualFold(env("NEWS_TOP", "on"), "off") {
+		c.NewsFeeds = append(c.NewsFeeds, news.Feed{Group: env("NEWS_TOP_NAME", "Deutschland"), URL: news.GoogleTop()})
+	}
+	for i := 1; i <= 5; i++ {
+		if u := env(fmt.Sprintf("NEWS_%d_URL", i), ""); u != "" {
+			c.NewsFeeds = append(c.NewsFeeds, news.Feed{Group: env(fmt.Sprintf("NEWS_%d_NAME", i), "News"), URL: u})
+		}
+	}
+}
+
 // NightBGCandidates lists the files tried for the night background, in order.
 // The first one that exists wins; none = plain black night clock.
 func (c *Config) NightBGCandidates() []string {
@@ -306,6 +354,7 @@ func (c *Config) SchoolEnabled() bool  { return c.SchoolToken != "" }
 func (c *Config) MealsEnabled() bool   { return len(c.Meals) > 0 }
 func (c *Config) ThingsEnabled() bool  { return c.ThingsEmail != "" && c.ThingsPassword != "" }
 func (c *Config) UptimeEnabled() bool  { return c.UptimeBase != "" }
+func (c *Config) NewsEnabled() bool    { return len(c.NewsFeeds) > 0 }
 
 // env reads a variable, trims whitespace and one pair of surrounding quotes.
 // docker --env-file passes quotes through literally, so KEY="value" would
