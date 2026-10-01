@@ -39,7 +39,7 @@ type Schedule struct {
 
 // Defaults: SCENE_<NAME> for school days, SCENE_<NAME>_WEEKEND for Sat/Sun.
 var (
-	DefaultSchoolDay = map[string]string{Morning: "06:00", Day: "08:00", Afternoon: "15:00", Evening: "18:00", Night: "21:30"}
+	DefaultSchoolDay = map[string]string{Morning: "06:45", Day: "09:00", Afternoon: "14:00", Evening: "19:00", Night: "21:30"}
 	DefaultWeekend   = map[string]string{Morning: "07:30", Day: "10:00"} // others fall back to the school-day time
 )
 

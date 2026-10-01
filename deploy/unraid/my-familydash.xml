@@ -85,10 +85,10 @@
   <Config Name="Uptime Kuma – Zertifikat warnen ab (Tage)" Target="UPTIME_CERT_WARN_DAYS" Default="14" Type="Variable" Display="advanced" Required="false">14</Config>
   <Config Name="Things – Cache" Target="/data/things" Default="/mnt/user/appdata/familydash/things" Mode="rw" Description="Sync-Cache der things3-CLI (muss nobody:users gehören)" Type="Path" Display="advanced" Required="false">/mnt/user/appdata/familydash/things</Config>
 
-  <Config Name="Szene Morgen" Target="SCENE_MORNING" Default="06:00" Description="Schultage Mo–Fr; off = Szene auslassen" Type="Variable" Display="advanced" Required="false">06:00</Config>
-  <Config Name="Szene Tag" Target="SCENE_DAY" Default="08:00" Type="Variable" Display="advanced" Required="false">08:00</Config>
-  <Config Name="Szene Nachmittag" Target="SCENE_AFTERNOON" Default="15:00" Type="Variable" Display="advanced" Required="false">15:00</Config>
-  <Config Name="Szene Abend" Target="SCENE_EVENING" Default="18:00" Type="Variable" Display="advanced" Required="false">18:00</Config>
+  <Config Name="Szene Morgen" Target="SCENE_MORNING" Default="06:45" Description="Schultage Mo–Fr; off = Szene auslassen" Type="Variable" Display="advanced" Required="false">06:45</Config>
+  <Config Name="Szene Tag" Target="SCENE_DAY" Default="09:00" Type="Variable" Display="advanced" Required="false">09:00</Config>
+  <Config Name="Szene Nachmittag" Target="SCENE_AFTERNOON" Default="14:00" Type="Variable" Display="advanced" Required="false">14:00</Config>
+  <Config Name="Szene Abend" Target="SCENE_EVENING" Default="19:00" Type="Variable" Display="advanced" Required="false">19:00</Config>
   <Config Name="Szene Nacht" Target="SCENE_NIGHT" Default="21:30" Type="Variable" Display="advanced" Required="false">21:30</Config>
   <Config Name="Szene Morgen (Wochenende)" Target="SCENE_MORNING_WEEKEND" Default="07:30" Type="Variable" Display="advanced" Required="false">07:30</Config>
   <Config Name="Szene Tag (Wochenende)" Target="SCENE_DAY_WEEKEND" Default="10:00" Type="Variable" Display="advanced" Required="false">10:00</Config>
