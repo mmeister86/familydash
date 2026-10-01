@@ -222,7 +222,14 @@ h2 {
 .board.wide-top .clock-card { flex-direction: row; align-items: stretch; padding: 0; }
 .board.wide-top .cc-clock { flex: 1 1 0; padding: 1.4rem 1.6rem; display: flex; flex-direction: column; justify-content: center; }
 .board.wide-top .cc-weather { flex: 1 1 0; margin: 0; padding: 1.3rem 1.5rem; display: flex; flex-direction: column; justify-content: center; }
-.board.wide-top .wx-bg { left: 50%; border-radius: 0 var(--radius) var(--radius) 0; }
+/* the picture starts left of the middle and fades in from the left, so there's
+   no hard edge between the plain clock half and the weather half */
+.board.wide-top .wx-bg {
+  left: 30%;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.35) 15%, rgba(0, 0, 0, 0.8) 28%, #000 40%);
+          mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.35) 15%, rgba(0, 0, 0, 0.8) 28%, #000 40%);
+}
 .board.wide-top .time { font-size: 6.4rem; }
 .board.wide-top .date { font-size: 1.45rem; color: var(--muted); }
 .board.wide-top .bin svg { width: 3.2rem; height: 3.2rem; }
