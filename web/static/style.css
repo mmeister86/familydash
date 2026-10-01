@@ -369,6 +369,9 @@ h2 {
 }
 .meal .side { display: block; color: var(--muted); font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .meal .dish.none { color: var(--faint); font-size: 0.9rem; }
+/* no lunch today = more breakfast in the bag – make it stand out */
+.meal.today .dish.none { color: var(--warn); font-weight: 600; }
+.meal.today:has(.dish.none) .when { color: var(--warn); }
 .meal.missing .when, .meal.missing .dish { color: var(--warn); font-weight: 600; }
 
 /* ---------- calendar columns */

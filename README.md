@@ -112,8 +112,8 @@ A section with nothing to show (no photos, no news configured …) hands its spa
 For a child without beste.schule, keep their school dates in a Google calendar and set `CALENDAR_n_PANEL=school`.
 
 **One card per child** (afternoon): a `CALENDAR_n_PANEL=school` calendar and a `VIELFALT_n_*` lunch account whose name matches a child's card
-(beste.schule or fixed timetable) move into that card, ordered *school → To-dos → Termine → Essen*. Morning and evening show only
-the timetables, stacked in one card (evening: plus the next lunch). Names match case-insensitively, and a
+(beste.schule or fixed timetable) move into that card, ordered *school → To-dos → Termine → Essen*. Morning and evening show the
+timetables stacked in one card, each with the next lunch (morning: today's, evening: tomorrow's). Names match case-insensitively, and a
 single first name also matches a full name (`Lukas` ↔ `Meister Lukas`). Anything without a matching child keeps a card of its own.
 
 ### Waste collection
@@ -216,7 +216,7 @@ The board changes its layout with the time of day:
 
 | Scene | Default (school day) | Shows (besides clock, weather and calendars) |
 |---|---|---|
-| `morning` | 06:45 | Timetables of all children in one card, Bring!, news. Weather tips for the way to school („Regenjacke mitnehmen") on school days |
+| `morning` | 06:45 | Timetables of all children in one card with today's lunch (nothing ordered = highlighted: pack more breakfast), Bring!, news. Weather tips for the way to school („Regenjacke mitnehmen") on school days |
 | `day` | 09:00 | Bring!, photo slideshow, news |
 | `afternoon` | 14:00 | Bring!, one complete card per child (school, to-dos, Termine, lunch) |
 | `evening` | 19:00 | Photo slideshow, tomorrow's timetables + lunch in one card |

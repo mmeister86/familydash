@@ -315,8 +315,9 @@ function schoolCalendarCard(cal, events) {
   </div>`;
 }
 
-// Morning/evening: all children in ONE card, stacked – just the timetable,
-// in the evening plus tomorrow's lunch. The server already switches each
+// Morning/evening: all children in ONE card, stacked – timetable plus the
+// next lunch (morning: today's, so you know whether to pack more breakfast;
+// evening: tomorrow's). The server already switches each
 // timetable to the next school day once today's lessons are over.
 function kidPlan(st, opts, withMeal) {
   const day = st.day || {};
@@ -336,7 +337,7 @@ function kidPlan(st, opts, withMeal) {
 // account (VIELFALT_n_*) with the child's name move into that child's card;
 // a timetable's "calendar" field picks the calendar explicitly.
 // mode: "full" (afternoon: everything, one card per child side by side),
-// "plan" (morning: timetables stacked in one card), "plan-meal" (evening: + lunch).
+// "plan" (timetables stacked in one card), "plan-meal" (the same + the next lunch).
 function renderSchoolRow(d, mode) {
   const cals = d.calendar?.calendars || [];
   const events = d.calendar?.events || [];
@@ -402,7 +403,7 @@ function mealRow(day) {
   if (ordered.length) {
     what = ordered.map((m) => `<span class="dish">${esc(m.name)}</span>${m.side ? `<span class="side">${esc(m.side)}</span>` : ""}`).join("");
   } else if (isToday) {
-    what = `<span class="dish none">nichts bestellt</span>`;
+    what = `<span class="dish none">nichts bestellt · mehr Frühstück einpacken 🥪</span>`;
   } else {
     what = `<span class="dish">Noch nichts bestellt!</span>`;
   }
@@ -485,8 +486,9 @@ function renderCalendars(d) {
 // (and what fills in when a section is empty) lives in style.css.
 //   wide:   clock left, weather picture right, across the full width
 //   school: "full" = one card per child, "plan"/"plan-meal" = stacked timetables
+//           (+ the next lunch: today's in the morning, tomorrow's in the evening)
 const SCENES = {
-  morning:   { label: "Morgen",     wide: true,  show: ["shopping", "news", "school"], school: "plan", hints: true },
+  morning:   { label: "Morgen",     wide: true,  show: ["shopping", "news", "school"], school: "plan-meal", hints: true },
   day:       { label: "Tag",        wide: false, show: ["shopping", "photos", "news"] },
   afternoon: { label: "Nachmittag", wide: false, show: ["shopping", "school"], school: "full" },
   evening:   { label: "Abend",      wide: true,  show: ["photos", "school"], school: "plan-meal" },
