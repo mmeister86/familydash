@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"familydash/internal/besteschule"
+	"familydash/internal/briefing"
 	"familydash/internal/bring"
 	"familydash/internal/calendar"
 	"familydash/internal/config"
@@ -37,6 +38,7 @@ type Server struct {
 	todos    *things.Service      // nil if not configured
 	uptime   *uptime.Service      // nil if not configured
 	news     *news.Service        // nil if not configured
+	briefing *briefing.Service    // nil if not configured
 	static   fs.FS
 }
 
@@ -52,11 +54,13 @@ type Sources struct {
 	Todos   *things.Service
 	Uptime  *uptime.Service
 	News    *news.Service
+	// AI card (morning briefing / evening outlook)
+	Briefing *briefing.Service
 }
 
 func New(cfg *config.Config, version string, cal *calendar.Service, src Sources, static fs.FS) *Server {
 	return &Server{cfg: cfg, version: version, calendar: cal, weather: src.Weather, bring: src.Bring, school: src.School,
-		plan: src.Plan, meals: src.Meals, waste: src.Waste, photos: src.Photos, todos: src.Todos, uptime: src.Uptime, news: src.News, static: static}
+		plan: src.Plan, meals: src.Meals, waste: src.Waste, photos: src.Photos, todos: src.Todos, uptime: src.Uptime, news: src.News, briefing: src.Briefing, static: static}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -106,6 +110,8 @@ type dashboard struct {
 	WeatherBG *weatherBG `json:"weatherBg,omitempty"`
 	// Headlines (NEWS_*), grouped: region first, then Germany
 	News *news.Snapshot `json:"news,omitempty"`
+	// AI card: briefing for today (morning) or outlook on tomorrow (evening)
+	Briefing *briefing.Briefing `json:"briefing,omitempty"`
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, _ *http.Request) {
@@ -152,6 +158,9 @@ func (s *Server) handleDashboard(w http.ResponseWriter, _ *http.Request) {
 	}
 	if s.news != nil {
 		d.News = s.news.Snapshot()
+	}
+	if s.briefing != nil {
+		d.Briefing = s.briefing.Snapshot()
 	}
 	if _, info := findNightBG(s.cfg.NightBGCandidates()); info != nil {
 		d.NightBG = &nightBG{V: info.ModTime().Unix()}

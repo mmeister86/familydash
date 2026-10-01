@@ -9,6 +9,8 @@
 - [x] Time-of-day scenes (`SCENE_*`) with focus zone, night = dimmed clock only
 - [x] Photo slideshow (`PHOTOS_DIR`)
 - [x] One layout per scene (sketches of 2026-10-01), weather pictures, news card
+- [x] AI card: morning briefing (instead of Bring!) and evening outlook above the photos (Gemini, `GEMINI_*`)
+- [x] Footer lists every Uptime Kuma monitor on its own („🟢 Unraid / 🟢 Internet / …")
 - [ ] Morning checklist per child (focus widget `checklist`), "Sportbeutel" from the timetable
 - [ ] Countdown to the next appointment, pushed into every scene
 - [ ] Scenes: treat public holidays / school vacations as weekend

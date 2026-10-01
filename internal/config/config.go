@@ -101,6 +101,15 @@ type Config struct {
 	UptimeAPIKey   string // optional: /metrics for certificate expiry
 	UptimeCertWarn int    // warn at or below this many days
 	UptimeRefresh  time.Duration
+
+	// AI card: morning briefing / evening outlook (BRIEFING_*, GEMINI_*)
+	Briefing       string // auto (on when GEMINI_API_KEY is set), on (rule-based without a key), off
+	BriefingLead   time.Duration
+	BriefingMinGap time.Duration
+	GeminiKey      string
+	GeminiModel    string
+	GeminiThinking string // low | medium | high, "default" = model default
+	GeminiBackend  string // auto | gemini (AI Studio) | vertex (Vertex AI express mode)
 }
 
 type MealAccount struct {
@@ -156,6 +165,22 @@ func Load() (*Config, error) {
 		UptimeAPIKey:   env("UPTIME_API_KEY", ""),
 		UptimeCertWarn: envInt("UPTIME_CERT_WARN_DAYS", 14),
 		UptimeRefresh:  envDuration("UPTIME_REFRESH", time.Minute),
+
+		Briefing:       strings.ToLower(env("BRIEFING", "auto")),
+		BriefingLead:   envDuration("BRIEFING_LEAD", 20*time.Minute),
+		BriefingMinGap: envDuration("BRIEFING_MIN_GAP", 20*time.Minute),
+		GeminiKey:      env("GEMINI_API_KEY", ""),
+		GeminiModel:    env("GEMINI_MODEL", "gemini-3.8-flash"),
+		GeminiThinking: strings.ToLower(env("GEMINI_THINKING", "low")),
+		GeminiBackend:  strings.ToLower(env("GEMINI_BACKEND", "auto")),
+	}
+	switch c.GeminiBackend {
+	case "auto", "gemini", "vertex":
+	default:
+		return nil, fmt.Errorf("GEMINI_BACKEND %q: want auto, gemini or vertex", c.GeminiBackend)
+	}
+	if c.GeminiThinking == "default" || c.GeminiThinking == "off" {
+		c.GeminiThinking = ""
 	}
 	if raw := env("UPTIME_URL", ""); raw != "" {
 		base, slug, err := uptime.ParsePageURL(raw)
@@ -362,6 +387,11 @@ func (c *Config) MealsEnabled() bool   { return len(c.Meals) > 0 }
 func (c *Config) ThingsEnabled() bool  { return c.ThingsEmail != "" && c.ThingsPassword != "" }
 func (c *Config) UptimeEnabled() bool  { return c.UptimeBase != "" }
 func (c *Config) NewsEnabled() bool    { return len(c.NewsFeeds) > 0 }
+
+// BriefingEnabled: with a Gemini key (or BRIEFING=on for the rule-based card).
+func (c *Config) BriefingEnabled() bool {
+	return c.Briefing != "off" && (c.GeminiKey != "" || c.Briefing == "on")
+}
 
 // env reads a variable, trims whitespace and one pair of surrounding quotes.
 // docker --env-file passes quotes through literally, so KEY="value" would

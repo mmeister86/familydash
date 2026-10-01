@@ -49,6 +49,9 @@ html, body {
 .photo-frame { grid-area: photo; }
 .school-row  { grid-area: school; }
 .calendars   { grid-area: cals; }
+.briefing    { grid-area: brief; }
+/* morning: the AI card takes Bring!'s place (Bring! comes back without it) */
+.board.scene-morning .briefing { grid-area: shop; }
 
 /* morning: clock | weather across the top, timetables left, Bring! + news right */
 .board.scene-morning {
@@ -75,14 +78,20 @@ html, body {
 }
 .board.scene-afternoon.no-school { grid-template-areas: "top shop" "cals cals" "cals cals"; }
 
-/* evening: clock | weather across the top, photos | tomorrow's timetable + lunch */
+/* evening: clock | weather across the top; left the AI outlook on tomorrow
+   above the (halved) photos, right tomorrow's timetable + lunch */
 .board.scene-evening {
-  grid-template-rows: minmax(min-content, 0.9fr) minmax(0, 1.7fr) minmax(0, 1fr);
-  grid-template-areas: "top top" "photo school" "cals cals";
+  grid-template-rows: minmax(min-content, 0.9fr) minmax(0, 0.95fr) minmax(0, 0.75fr) minmax(0, 1fr);
+  grid-template-areas: "top top" "brief school" "photo school" "cals cals";
 }
-.board.scene-evening.no-photos { grid-template-areas: "top top" "school school" "cals cals"; }
-.board.scene-evening.no-school { grid-template-areas: "top top" "photo photo" "cals cals"; }
-.board.scene-evening.no-photos.no-school { grid-template-areas: "top top" "cals cals" "cals cals"; }
+.board.scene-evening.no-photos { grid-template-areas: "top top" "brief school" "brief school" "cals cals"; }
+.board.scene-evening.no-school { grid-template-areas: "top top" "brief brief" "photo photo" "cals cals"; }
+.board.scene-evening.no-photos.no-school { grid-template-areas: "top top" "brief brief" "brief brief" "cals cals"; }
+/* without an AI card: photos | school as before */
+.board.scene-evening.no-brief { grid-template-areas: "top top" "photo school" "photo school" "cals cals"; }
+.board.scene-evening.no-brief.no-photos { grid-template-areas: "top top" "school school" "school school" "cals cals"; }
+.board.scene-evening.no-brief.no-school { grid-template-areas: "top top" "photo photo" "photo photo" "cals cals"; }
+.board.scene-evening.no-brief.no-photos.no-school { grid-template-areas: "top top" "cals cals" "cals cals" "cals cals"; }
 
 /* ---------- night scene: dimmed clock + weather, on black or on a picture (NIGHT_BG) */
 .night-clock { display: none; }
@@ -279,6 +288,36 @@ h2 {
   border: 1px solid var(--line);
 }
 .chips .item small { color: var(--muted); font-size: 0.75rem; margin-left: 0.35rem; }
+
+/* ---------- AI card (briefing / outlook) */
+.panel.briefing { display: flex; flex-direction: column; }
+/* a soft accent glow marks what the model wrote; the rule-based fallback stays plain */
+.panel.briefing.ai {
+  background:
+    radial-gradient(120% 80% at 0% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%),
+    radial-gradient(90% 70% at 100% 100%, color-mix(in srgb, #A77BF3 12%, transparent), transparent 65%),
+    var(--panel);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+}
+.briefing .spark { color: var(--accent); font-size: 1.05rem; line-height: 1; }
+.panel.briefing:not(.ai) .spark { color: var(--muted); }
+.brief-headline { font-size: 1.4rem; font-weight: 600; line-height: 1.25; margin: -0.15rem 0 0.5rem; }
+.brief-items { min-height: 0; }
+.brief-items .sub-h:first-child { margin-top: 0.2rem; padding-top: 0; border-top: 0; }
+.bi { display: grid; grid-template-columns: 1.7rem 1fr; gap: 0.5rem; align-items: start; padding: 0.26rem 0; }
+.bi + .bi { border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+.bi-ic { font-size: 1.15rem; line-height: 1.3; text-align: center; }
+.bi-t { font-size: 1.02rem; line-height: 1.32; }
+.bi .who {
+  display: inline-block;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 16%, transparent);
+  border-radius: 5px;
+  padding: 0.08rem 0.4rem;
+  margin-right: 0.45rem;
+  vertical-align: 0.12em;
+}
 
 /* ---------- school row (beste.schule + school calendars) */
 .school-row {
@@ -509,10 +548,14 @@ body.status-alert { --status-h: 2.8rem; }
 
 /* Uptime Kuma: left side of the footer, the rest stays right-aligned */
 .status .kuma { margin-right: auto; display: flex; gap: 1.2rem; overflow: hidden; }
-.status .k-ok { color: var(--good); opacity: 0.8; }
+.status .k-ok { color: var(--muted); } /* the 🟢 carries the status, the name stays calm */
 .status .k-pending { color: var(--warn); }
 .status .k-maint { color: var(--accent); }
 .status .k-down { color: var(--danger); font-weight: 600; }
+.status .k-unknown { color: var(--faint); }
+/* one entry per service: "🟢 Unraid / 🟢 Internet / 🟢 Jellyfin" */
+.status .svc { display: flex; align-items: center; gap: 0.55rem; overflow: hidden; }
+.status .svc .sep { color: var(--faint); opacity: 0.6; }
 body.status-alert .status {
   font-size: 1.05rem;
   color: var(--muted);

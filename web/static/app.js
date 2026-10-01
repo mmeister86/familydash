@@ -487,14 +487,16 @@ function renderCalendars(d) {
 //   wide:   clock left, weather picture right, across the full width
 //   school: "full" = one card per child, "plan"/"plan-meal" = stacked timetables
 //           (+ the next lunch: today's in the morning, tomorrow's in the evening)
+//   briefing: the AI card. "replaces" = the section it takes the place of
+//           (morning: Bring!); without a briefing that section shows instead.
 const SCENES = {
-  morning:   { label: "Morgen",     wide: true,  show: ["shopping", "news", "school"], school: "plan-meal", hints: true },
+  morning:   { label: "Morgen",     wide: true,  show: ["briefing", "news", "school"], school: "plan-meal", hints: true, briefing: { replaces: "shopping" } },
   day:       { label: "Tag",        wide: false, show: ["shopping", "photos", "news"] },
   afternoon: { label: "Nachmittag", wide: false, show: ["shopping", "school"], school: "full" },
-  evening:   { label: "Abend",      wide: true,  show: ["photos", "school"], school: "plan-meal" },
+  evening:   { label: "Abend",      wide: true,  show: ["briefing", "photos", "school"], school: "plan-meal", briefing: {} },
   night:     { label: "Nacht",      wide: false, show: [] },
 };
-const SECTIONS = { shopping: "shopping", news: "news", photos: "photo-frame", school: "school" };
+const SECTIONS = { shopping: "shopping", briefing: "briefing", news: "news", photos: "photo-frame", school: "school" };
 
 const urlScene = new URLSearchParams(location.search).get("scene");
 
@@ -505,7 +507,9 @@ function currentScene(d) {
   return sc;
 }
 
-function applyScene(sc) {
+// hasBrief: whether the AI card has something for this scene; if not, the
+// section it replaces comes back (morning: Bring!)
+function applyScene(sc, hasBrief) {
   const board = $("board");
   for (const n of Object.keys(SCENES)) {
     board.classList.toggle("scene-" + n, n === sc.name);
@@ -513,7 +517,59 @@ function applyScene(sc) {
   }
   const conf = SCENES[sc.name];
   board.classList.toggle("wide-top", !!conf.wide);
-  for (const [key, id] of Object.entries(SECTIONS)) $(id).hidden = !conf.show.includes(key);
+  const show = new Set(conf.show);
+  if (!hasBrief) {
+    show.delete("briefing");
+    if (conf.briefing?.replaces) show.add(conf.briefing.replaces);
+  }
+  board.classList.toggle("no-brief", !show.has("briefing"));
+  for (const [key, id] of Object.entries(SECTIONS)) $(id).hidden = !show.has(key);
+}
+
+// ------------------------------------------------------------------ AI card (briefing / outlook)
+
+// The server writes it with Gemini from facts it worked out itself (see
+// internal/briefing): morning = today, evening = tomorrow. Items in the
+// evening come in two groups: what to get ready tonight, what's up tomorrow.
+const BRIEF_ICONS = {
+  schule: "🎒", frei: "🎉", ausfall: "⏰", test: "📝", hausaufgabe: "📚", termin: "📅", fahrt: "🚗",
+  essen: "🍽️", brotbox: "🥪", muell: "🗑️", regen: "☔", kalt: "🧣", warm: "☀️", schnee: "⛄",
+  sport: "👟", todo: "✅", geburtstag: "🎂", hinweis: "💡",
+};
+
+// the briefing that belongs to this scene, or null
+function sceneBriefing(d, sc) {
+  const b = d.briefing;
+  if (!b || !SCENES[sc.name]?.briefing || b.kind !== sc.name) return null;
+  const want = sc.name === "evening" ? ymd(addDays(new Date(), 1)) : ymd(new Date());
+  return b.date === want ? b : null;
+}
+
+function briefRow(it) {
+  const who = it.who && it.who.toLowerCase() !== "familie"
+    ? `<span class="who" style="--c:${esc(it.color || "var(--muted)")}">${esc(it.who)}</span>` : "";
+  return `<div class="bi"><span class="bi-ic">${BRIEF_ICONS[it.icon] || "💡"}</span><span class="bi-t">${who}${esc(it.text)}</span></div>`;
+}
+
+function renderBriefing(b) {
+  const el = $("briefing");
+  if (!b) { el.innerHTML = ""; return; }
+  const items = b.items || [];
+  const evening = b.kind === "evening";
+  const tonight = items.filter((it) => it.section === "tonight");
+  const day = items.filter((it) => it.section !== "tonight");
+  const meta = b.ai ? `KI · ${fmt.time.format(new Date(b.createdAt))}` : "automatisch";
+  let body;
+  if (!items.length) body = `<div class="empty">Nichts Besonderes – ein entspannter Tag ✨</div>`;
+  else if (evening && tonight.length) {
+    body = `<div class="sub-h">Heute Abend noch</div>${tonight.map(briefRow).join("")}`
+      + (day.length ? `<div class="sub-h">Morgen</div>${day.map(briefRow).join("")}` : "");
+  } else body = day.map(briefRow).join("");
+  el.className = "panel briefing fade" + (b.ai ? " ai" : "");
+  el.innerHTML = `
+    <div class="head"><span class="spark">✦</span><span class="name">${evening ? "Morgen im Blick" : "Heute im Blick"}</span><span class="meta">${esc(meta)}</span></div>
+    ${b.headline ? `<div class="brief-headline">${esc(b.headline)}</div>` : ""}
+    <div class="brief-items">${body}</div>`;
 }
 
 // ------------------------------------------------------------------ news (Google News & co.)
@@ -702,12 +758,19 @@ function uptimeFooter(u, now = new Date()) {
     if (startOfDay(t).getTime() === startOfDay(now).getTime()) return ` seit ${fmt.time.format(t)} Uhr`;
     return ` seit ${fmt.wdShort.format(t)} ${fmt.time.format(t)}`;
   };
-  const parts = [];
-  for (const m of mons) {
-    if (m.state === "down") parts.push(`<span class="k-down">● ${esc(m.name)} ausgefallen${since(m.since)}</span>`);
-    else if (m.state === "pending") parts.push(`<span class="k-pending">● ${esc(m.name)} hakt${since(m.since)}</span>`);
-    else if (m.state === "maintenance") parts.push(`<span class="k-maint">● ${esc(m.name)} Wartung</span>`);
-  }
+  // every monitor of the status page on its own, in the page's order – a
+  // new monitor added to the Kuma status page shows up here by itself
+  const svc = mons.map((m) => {
+    const name = esc(m.name);
+    switch (m.state) {
+      case "up":          return `<span class="k-ok">🟢 ${name}</span>`;
+      case "down":        return `<span class="k-down">🔴 ${name} ausgefallen${since(m.since)}</span>`;
+      case "pending":     return `<span class="k-pending">🟡 ${name} hakt${since(m.since)}</span>`;
+      case "maintenance": return `<span class="k-maint">🔧 ${name} Wartung</span>`;
+      default:            return `<span class="k-unknown">⚪ ${name}</span>`;
+    }
+  });
+  const parts = [`<span class="svc">${svc.join(`<span class="sep">/</span>`)}</span>`];
   const alert = mons.some((m) => m.state === "down");
   for (const m of mons) {
     if (m.certDays == null || m.certDays > (u.certWarn ?? 14)) continue;
@@ -715,11 +778,6 @@ function uptimeFooter(u, now = new Date()) {
     parts.push(`<span class="k-pending">🔒 Zertifikat ${esc(m.name)}: ${txt}</span>`);
   }
   if (u.incident) parts.push(`<span class="k-pending">📢 ${esc(u.incident)}</span>`);
-  if (!parts.length) {
-    const up = mons.filter((m) => m.state === "up").length;
-    const label = mons.length === 1 ? `${esc(mons[0].name)} läuft` : up === mons.length ? `Alle ${up} Dienste laufen` : `${up} von ${mons.length} Diensten laufen`;
-    parts.push(`<span class="k-ok">● ${label}</span>`);
-  }
   if (u.error) parts.push(`<span class="err">Uptime Kuma: Stand ${fmt.time.format(new Date(u.updatedAt))}</span>`);
   return { html: `<span class="kuma">${parts.join("")}</span>`, alert };
 }
@@ -739,6 +797,7 @@ function renderStatus() {
     for (const c of d.meals?.children || []) if (c.error && c.days?.length) parts.push(`<span class="err">Essen ${esc(c.name)}: ${esc(c.error)}</span>`);
     if (d.todos?.error && d.todos.tasks?.length) parts.push(`<span class="err">Things: ${esc(d.todos.error)}</span>`);
     if (d.news?.error && d.news.groups?.some((g) => g.items?.length)) parts.push(`<span class="err">News: ${esc(d.news.error)}</span>`);
+    if (d.briefing?.error) parts.push(`<span class="err">KI: ${esc(d.briefing.error.slice(0, 80))}</span>`);
   }
   if (d) {
     const sc = currentScene(d);
@@ -770,7 +829,9 @@ function render() {
   const d = state.data;
   if (d) {
     const sc = currentScene(d), conf = SCENES[sc.name];
-    applyScene(sc);
+    const brief = sceneBriefing(d, sc);
+    applyScene(sc, !!brief);
+    renderBriefing(brief);
     slideshow.set(d.photos);
     const board = $("board");
     board.classList.toggle("no-school", !renderSchoolRow(d, conf.school || "full"));

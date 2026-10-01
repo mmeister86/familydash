@@ -15,6 +15,7 @@ import (
 	_ "time/tzdata" // embed zoneinfo → works in a scratch image
 
 	"familydash/internal/besteschule"
+	"familydash/internal/briefing"
 	"familydash/internal/bring"
 	"familydash/internal/calendar"
 	"familydash/internal/config"
@@ -40,6 +41,7 @@ func main() {
 	schoolPreview := flag.Bool("besteschule-preview", false, "print what the dashboard would show from beste.schule and exit")
 	mealsPreview := flag.Bool("vielfalt-preview", false, "log in to VielfaltMenü, print the ordered meals and exit")
 	todosPreview := flag.Bool("things-preview", false, "sync with Things Cloud, print today's to-dos of THINGS_AREA and exit")
+	briefPreview := flag.String("briefing-preview", "", "morning|evening: load all sources once, print the facts and the AI card and exit")
 	flag.Parse()
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
@@ -60,6 +62,9 @@ func main() {
 	}
 	if *todosPreview {
 		os.Exit(todos(cfg))
+	}
+	if *briefPreview != "" {
+		os.Exit(brief(cfg, briefing.Kind(*briefPreview)))
 	}
 	if version == "dev" {
 		version = fmt.Sprintf("dev-%d", time.Now().Unix())
@@ -140,6 +145,10 @@ func main() {
 	}
 
 	src := server.Sources{Weather: wx, Bring: br, School: sc, Plan: plan, Meals: ml, Waste: ws, Photos: ph, Todos: td, Uptime: up, News: nw}
+	if cfg.BriefingEnabled() {
+		src.Briefing = newBriefing(cfg, cal, src)
+		go src.Briefing.Run(ctx)
+	}
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
 		Handler:           server.New(cfg, version, cal, src, web.Static()).Handler(),
@@ -155,7 +164,7 @@ func main() {
 	slog.Info("familydash started", "version", version, "addr", cfg.ListenAddr,
 		"calendars", len(cfg.Calendars), "weather", cfg.WeatherEnabled(), "tz", cfg.Location.String(),
 		"bring", cfg.BringEnabled(), "besteschule", cfg.SchoolEnabled(), "timetable", plan != nil, "vielfalt", len(cfg.Meals), "waste", len(cfg.Waste),
-		"photos", cfg.PhotosDir, "things", cfg.ThingsEnabled(), "uptime", cfg.UptimeEnabled(), "news", len(cfg.NewsFeeds), "weatherBg", cfg.WeatherBGDir, "scene", cfg.Scenes.At(time.Now(), cfg.Location).Name)
+		"photos", cfg.PhotosDir, "things", cfg.ThingsEnabled(), "briefing", briefingMode(cfg), "uptime", cfg.UptimeEnabled(), "news", len(cfg.NewsFeeds), "weatherBg", cfg.WeatherBGDir, "scene", cfg.Scenes.At(time.Now(), cfg.Location).Name)
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("server", "err", err)
 		os.Exit(1)
@@ -252,6 +261,99 @@ func todos(cfg *config.Config) int {
 		return 1
 	}
 	if snap == nil || snap.Error != "" {
+		return 1
+	}
+	return 0
+}
+
+// newBriefing wires the AI card to the other sources (nil ones are skipped).
+func newBriefing(cfg *config.Config, cal *calendar.Service, src server.Sources) *briefing.Service {
+	b := &briefing.Service{
+		Sched: &cfg.Scenes, Loc: cfg.Location, Lead: cfg.BriefingLead, MinGap: cfg.BriefingMinGap,
+		Gather: func(now time.Time) briefing.Data {
+			d := briefing.Data{Calendar: cal.Snapshot()}
+			if src.Weather != nil {
+				d.Weather = src.Weather.Snapshot()
+			}
+			if src.School != nil {
+				d.School = src.School.Snapshot()
+			}
+			if src.Plan != nil {
+				d.Timetables = src.Plan.Build(now, cfg.Location)
+			}
+			if src.Meals != nil {
+				d.Meals = src.Meals.Snapshot()
+			}
+			if src.Waste != nil {
+				d.Waste = src.Waste.Snapshot(now, cfg.Location)
+			}
+			if src.Todos != nil {
+				d.Todos = src.Todos.Snapshot()
+			}
+			return d
+		},
+	}
+	if cfg.GeminiKey != "" {
+		b.Model = briefing.NewGemini(cfg.GeminiKey, cfg.GeminiModel, cfg.GeminiThinking, cfg.GeminiBackend)
+	}
+	return b
+}
+
+func briefingMode(cfg *config.Config) string {
+	switch {
+	case !cfg.BriefingEnabled():
+		return "off"
+	case cfg.GeminiKey == "":
+		return "rules"
+	}
+	return cfg.GeminiModel
+}
+
+// brief loads every source once and prints facts + card:
+// `docker exec familydash /familydash -briefing-preview=evening`
+func brief(cfg *config.Config, kind briefing.Kind) int {
+	if kind != briefing.Morning && kind != briefing.Evening {
+		fmt.Fprintln(os.Stderr, "-briefing-preview: want morning or evening")
+		return 1
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	cal := calendar.NewService(cfg)
+	cal.Refresh(ctx)
+	var src server.Sources
+	if cfg.WeatherEnabled() {
+		src.Weather = weather.NewService(cfg.WeatherLat, cfg.WeatherLon, cfg.WeatherName, cfg.Location)
+		src.Weather.Refresh(ctx)
+	}
+	if cfg.SchoolEnabled() {
+		src.School = besteschule.NewService(cfg.SchoolURL, cfg.SchoolToken, cfg.Location, cfg.SchoolStudents)
+		src.School.SetWeekFixes(cfg.SchoolWeekFix)
+		src.School.Refresh(ctx)
+	}
+	if !cfg.TimetableOff {
+		if plan, err := timetable.Load(cfg.TimetableFile); err == nil {
+			src.Plan = plan
+		}
+	}
+	if cfg.MealsEnabled() {
+		src.Meals = newMeals(cfg)
+		src.Meals.Refresh(ctx)
+	}
+	if len(cfg.Waste) > 0 {
+		src.Waste = &waste.Service{Bins: cfg.Waste, Shift: cfg.WasteShift}
+	}
+	if cfg.ThingsEnabled() {
+		src.Todos = newTodos(cfg)
+		src.Todos.Refresh(ctx)
+	}
+	b := newBriefing(cfg, cal, src)
+	card, facts, err := b.Generate(ctx, kind, time.Now())
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	enc.SetEscapeHTML(false)
+	enc.Encode(map[string]any{"facts": facts, "briefing": card})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
 	return 0

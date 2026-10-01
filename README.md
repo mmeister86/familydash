@@ -87,6 +87,13 @@ All settings are environment variables.
 | `UPTIME_API_KEY` | – | Optional Kuma API key (Settings → API Keys): reads `/metrics` for TLS certificate expiry |
 | `UPTIME_CERT_WARN_DAYS` | `14` | Footer warns when a certificate has this many days left or fewer |
 | `UPTIME_REFRESH` | `1m` | |
+| `GEMINI_API_KEY` | – | Turns on the **AI card** (morning briefing / evening outlook), see *AI card* |
+| `GEMINI_MODEL` | `gemini-3.8-flash` | |
+| `GEMINI_THINKING` | `low` | `low`/`medium`/`high`, `default` = the model's own default |
+| `GEMINI_BACKEND` | `auto` | `gemini` (AI Studio key), `vertex` (Vertex AI express-mode key), `auto` tries both and remembers |
+| `BRIEFING` | `auto` | `auto` = on with a Gemini key, `on` = rule-based card even without a key, `off` |
+| `BRIEFING_LEAD` | `20m` | Prepare the card this long before the morning/evening scene starts |
+| `BRIEFING_MIN_GAP` | `20m` | When data changes, ask the model again at most this often |
 | `LISTEN_ADDR` | `:8080` | |
 
 Values may be wrapped in quotes (`KEY="value"`) – they are stripped, since `docker --env-file` would otherwise keep them.
@@ -100,15 +107,16 @@ morning                         day / afternoon                 evening
 ┌─────────────┬─────────────┐   ┌─────────────┬─────────────┐   ┌─────────────┬─────────────┐
 │ clock       │ weather pic │   │ clock+wx pic│ Bring! list │   │ clock       │ weather pic │
 ├─────────────┼─────────────┤   ├─────────────┼─────────────┤   ├─────────────┼─────────────┤
-│ timetable 1 │ Bring! list │   │ day: photos │ day: news   │   │ photos      │ timetable 1 │
-│ ─────────── ├─────────────┤   │ afternoon:  │ afternoon:  │   │             │ + lunch     │
-│ timetable 2 │ news        │   │ child 1     │ child 2     │   │             │ timetable 2 │
+│ timetable 1 │ AI briefing │   │ day: photos │ day: news   │   │ AI outlook  │ timetable 1 │
+│ ─────────── ├─────────────┤   │ afternoon:  │ afternoon:  │   ├─────────────┤ + lunch     │
+│ timetable 2 │ news        │   │ child 1     │ child 2     │   │ photos      │ timetable 2 │
 ├────────┬────┴───┬─────────┤   ├────────┬────┴───┬─────────┤   ├────────┬────┴───┬─────────┤
 │ cal 1  │ cal 2  │ cal 3 … │   │ cal 1  │ cal 2  │ cal 3 … │   │ cal 1  │ cal 2  │ cal 3 … │
 └────────┴────────┴─────────┘   └────────┴────────┴─────────┘   └────────┴────────┴─────────┘
 ```
 
-A section with nothing to show (no photos, no news configured …) hands its space to its neighbour.
+A section with nothing to show (no photos, no news configured …) hands its space to its neighbour. Without the AI card the
+morning shows the Bring! list in its place and the evening gives the photos the full height again.
 
 For a child without beste.schule, keep their school dates in a Google calendar and set `CALENDAR_n_PANEL=school`.
 
@@ -217,10 +225,10 @@ The board changes its layout with the time of day:
 
 | Scene | Default (school day) | Shows (besides clock, weather and calendars) |
 |---|---|---|
-| `morning` | 06:45 | Timetables of all children in one card with today's lunch (nothing ordered = highlighted: pack more breakfast), Bring!, news. Weather tips for the way to school („Regenjacke mitnehmen") on school days |
+| `morning` | 06:45 | Timetables of all children in one card with today's lunch (nothing ordered = highlighted: pack more breakfast), AI briefing for today (Bring! without it), news. Weather tips for the way to school („Regenjacke mitnehmen") on school days |
 | `day` | 09:00 | Bring!, photo slideshow, news |
 | `afternoon` | 14:00 | Bring!, one complete card per child (school, to-dos, Termine, lunch) |
-| `evening` | 19:00 | Photo slideshow, tomorrow's timetables + lunch in one card |
+| `evening` | 19:00 | AI outlook on tomorrow above the photo slideshow, tomorrow's timetables + lunch in one card |
 | `night` | 21:30 | Everything hidden – only a dimmed clock, date and current weather (icon + temperature), on black or on the `NIGHT_BG` picture |
 
 Morning and evening put the clock on the left and the weather (with its picture) on the right, across the full width;
@@ -228,6 +236,30 @@ day and afternoon use a compact card with the picture behind clock and weather.
 
 Try a scene on your laptop with `http://<unraid-ip>:8095/?scene=evening`. Scenes and their sections are defined in `SCENES` in
 `web/static/app.js`, the grid of each scene in `.board.scene-*` in `style.css`.
+
+### AI card (morning briefing / evening outlook)
+
+With `GEMINI_API_KEY` set, the morning scene shows **„Heute im Blick"** instead of the Bring! list, and the evening scene shows
+**„Morgen im Blick"** above the (then half-height) photos: 2–5 short lines, in the evening split into *Heute Abend noch* (bins out,
+pack the sports bag, learn for tomorrow's test, lunch box when no lunch is ordered, clothes for the weather) and *Morgen*.
+
+**Code works out the facts, the model only phrases them.** `internal/briefing` builds a small fact sheet from the other sources –
+lessons that are cancelled or substituted (and the resulting start time), exams in the next days, homework due, lunch ordered or not,
+appointments of all calendars incl. ones that overlap, bins collected, weather for the day and the way to school, Things to-dos –
+and sends only that to Gemini, with a JSON schema for the answer. Times and dates are never calculated by the model.
+
+- Prepared `BRIEFING_LEAD` before the scene starts, then asked again only when the facts change, at most every `BRIEFING_MIN_GAP`
+  → a handful of calls per day (a few cents a month).
+- When the model fails (or there is no key and `BRIEFING=on`), the same facts are turned into plain rule-based lines („automatisch").
+- A Gemini key from **AI Studio** and one from **Vertex AI express mode** look the same; `GEMINI_BACKEND=auto` tries the AI Studio
+  endpoint first and switches to Vertex when the key is rejected there. With a key from the AI Studio free tier, Google may use the
+  prompts to improve its products – enable billing (or use Vertex) since the facts contain your children's school data.
+
+Check what the model gets and answers:
+
+```sh
+docker exec familydash /familydash -briefing-preview=evening   # or morning
+```
 
 ### Weather pictures
 
@@ -279,8 +311,10 @@ curl http://192.168.188.127:3001/api/status-page/dashboard            # monitors
 curl http://192.168.188.127:3001/api/status-page/heartbeat/dashboard  # heartbeats + 24 h uptime
 ```
 
-The footer stays quiet while everything is up (a green „Alle 4 Dienste laufen"). A monitor that is **down** turns the footer red
-and taller: „Jellyfin ausgefallen seit 14 min". Pending (retrying) monitors, maintenance and a pinned incident show up in yellow/blue.
+The footer lists every monitor of the page on its own, in the page's order: „🟢 Unraid / 🟢 Internet / 🟢 Jellyfin".
+To show another service, just add its monitor to the status page in Kuma – the footer picks it up on the next poll (`UPTIME_REFRESH`), no config change.
+A monitor that is **down** turns red and the whole footer red and taller: „🔴 Jellyfin ausgefallen seit 14 min". Pending (retrying) monitors 🟡,
+maintenance 🔧 and a pinned incident show up in yellow/blue.
 With `UPTIME_API_KEY` set, certificates of the monitors on the page that expire within `UPTIME_CERT_WARN_DAYS` show a 🔒 warning.
 
 Tip: add a *Push* monitor in Kuma and let the Pi call its URL every minute (cron + `curl`) – then Kuma tells you when the wall display itself hangs.
@@ -305,7 +339,7 @@ At night (`SCENE_NIGHT`) the page shows only a dimmed clock. Portrait and landsc
 
 | | |
 |---|---|
-| `GET /api/dashboard` | Everything the frontend needs (JSON), incl. `uptime` |
+| `GET /api/dashboard` | Everything the frontend needs (JSON), incl. `uptime` and `briefing` |
 | `GET /photos/<path>` | Slideshow files (only those listed in `/api/dashboard`) |
 | `GET /healthz` | Liveness |
 

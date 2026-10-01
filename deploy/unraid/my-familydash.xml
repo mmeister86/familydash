@@ -88,6 +88,11 @@
   <Config Name="Uptime Kuma – Zertifikat warnen ab (Tage)" Target="UPTIME_CERT_WARN_DAYS" Default="14" Type="Variable" Display="advanced" Required="false">14</Config>
   <Config Name="Things – Cache" Target="/data/things" Default="/mnt/user/appdata/familydash/things" Mode="rw" Description="Sync-Cache der things3-CLI (muss nobody:users gehören)" Type="Path" Display="advanced" Required="false">/mnt/user/appdata/familydash/things</Config>
 
+  <Config Name="KI – Gemini API-Key" Target="GEMINI_API_KEY" Default="" Description="KI-Karte: morgens Briefing statt Bring!, abends Ausblick auf morgen über den Fotos. Leer = aus" Type="Variable" Display="always" Required="false" Mask="true"></Config>
+  <Config Name="KI – Modell" Target="GEMINI_MODEL" Default="gemini-3.8-flash" Type="Variable" Display="advanced" Required="false">gemini-3.8-flash</Config>
+  <Config Name="KI – Backend" Target="GEMINI_BACKEND" Default="auto" Description="auto, gemini (AI Studio) oder vertex (Vertex AI Express)" Type="Variable" Display="advanced" Required="false">auto</Config>
+  <Config Name="KI – Denktiefe" Target="GEMINI_THINKING" Default="low" Description="low, medium, high" Type="Variable" Display="advanced" Required="false">low</Config>
+
   <Config Name="Szene Morgen" Target="SCENE_MORNING" Default="06:45" Description="Schultage Mo–Fr; off = Szene auslassen" Type="Variable" Display="advanced" Required="false">06:45</Config>
   <Config Name="Szene Tag" Target="SCENE_DAY" Default="09:00" Type="Variable" Display="advanced" Required="false">09:00</Config>
   <Config Name="Szene Nachmittag" Target="SCENE_AFTERNOON" Default="14:00" Type="Variable" Display="advanced" Required="false">14:00</Config>
