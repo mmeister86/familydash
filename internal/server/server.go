@@ -112,6 +112,8 @@ type dashboard struct {
 	News *news.Snapshot `json:"news,omitempty"`
 	// AI card: briefing for today (morning) or outlook on tomorrow (evening)
 	Briefing *briefing.Briefing `json:"briefing,omitempty"`
+	// Non-fatal configuration problems, shown in the footer
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
@@ -121,6 +123,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		Timezone: s.cfg.Location.String(),
 		Days:     s.cfg.CalendarDays,
 		Calendar: s.calendar.Snapshot(),
+		Warnings: s.cfg.Warnings,
 	}
 	d.Scene = s.cfg.Scenes.At(d.Now, s.cfg.Location)
 	if d.Calendar.Events == nil {
