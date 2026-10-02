@@ -96,7 +96,6 @@ type Todo struct {
 	Titel   string `json:"titel"`
 	Wer     string `json:"wer,omitempty"`
 	Faellig string `json:"faellig,omitempty"`
-	Abends  bool   `json:"heute_abend,omitempty"`
 }
 
 const ymdLayout = "2006-01-02"

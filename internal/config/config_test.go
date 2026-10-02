@@ -166,9 +166,10 @@ func TestFamilyApp(t *testing.T) {
 
 func TestFamilyAppErrors(t *testing.T) {
 	for name, env := range map[string]map[string]string{
-		"token no url": {"FAMILY_APP_INGEST_TOKEN": "w"},
-		"bad url":      {"FAMILY_APP_SITE_URL": "familybackend-http.matthias.lol"},
-		"calendar":     {"FAMILY_APP_SITE_URL": "https://x.y", "FAMILY_APP_HANNAH_CALENDARS": "7"},
+		"token no url":     {"FAMILY_APP_INGEST_TOKEN": "w"},
+		"dashboard no url": {"FAMILY_APP_DASHBOARD_TOKEN": "r"},
+		"bad url":          {"FAMILY_APP_SITE_URL": "familybackend-http.matthias.lol"},
+		"calendar":         {"FAMILY_APP_SITE_URL": "https://x.y", "FAMILY_APP_HANNAH_CALENDARS": "7"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			for k, v := range env {
