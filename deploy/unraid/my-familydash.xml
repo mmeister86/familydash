@@ -10,7 +10,7 @@
   <Network>bridge</Network>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
-  <Overview>Leichtgewichtiges Familiendashboard fürs Wanddisplay: Google Kalender (iCal), Wetter (Open-Meteo), Stundenplan/Vertretungen/Hausaufgaben (beste.schule), Einkaufsliste (Bring!), Schulessen (VielfaltMenü), To-dos (Things 3), Dienst-Status (Uptime Kuma). Statische Binaries, ~20 MB Image.</Overview>
+  <Overview>Leichtgewichtiges Familiendashboard fürs Wanddisplay: Google Kalender (iCal), Wetter (Open-Meteo), Stundenplan/Vertretungen/Hausaufgaben (beste.schule), Einkaufsliste (Bring!), Schulessen (VielfaltMenü), To-dos (Familienapp), Dienst-Status (Uptime Kuma). Statisches Binary, ~20 MB Image.</Overview>
   <Category>Productivity: HomeAutomation:</Category>
   <WebUI>http://[IP]:[PORT:8080]/</WebUI>
   <ExtraParams>--restart unless-stopped</ExtraParams>
@@ -79,18 +79,13 @@
 
   <Config Name="Familienapp – URL" Target="FAMILY_APP_SITE_URL" Default="" Description="HTTP-Actions-URL des Convex-Backends der Familienapp, z. B. https://familybackend-http.matthias.lol. Leer = keine Anbindung" Type="Variable" Display="always" Required="false"></Config>
   <Config Name="Familienapp – Ingest-Token" Target="FAMILY_APP_INGEST_TOKEN" Default="" Description="Token für POST /ingest/* (Convex: INGEST_TOKEN). Schickt Woche jedes Kindes und KI-Briefings an die App" Type="Variable" Display="always" Required="false" Mask="true"></Config>
-  <Config Name="Familienapp – Dashboard-Token" Target="FAMILY_APP_DASHBOARD_TOKEN" Default="" Description="Token für GET /todos (Convex: DASHBOARD_TOKEN). Mit TODOS_SOURCE=auto kommen die To-dos dann aus der App statt aus Things" Type="Variable" Display="always" Required="false" Mask="true"></Config>
-  <Config Name="To-do-Quelle" Target="TODOS_SOURCE" Default="auto" Description="auto (App, sobald Dashboard-Token gesetzt, sonst Things), things oder familyapp" Type="Variable" Display="advanced" Required="false">auto</Config>
-  <Config Name="Things – E-Mail" Target="THINGS_EMAIL" Default="" Description="Things-Cloud-Login (inoffiziell, nur lesend). Leer = keine To-do-Karte" Type="Variable" Display="always" Required="false"></Config>
-  <Config Name="Things – Passwort" Target="THINGS_PASSWORD" Default="" Type="Variable" Display="always" Required="false" Mask="true"></Config>
-  <Config Name="Things – Bereich" Target="THINGS_AREA" Default="Familie" Description="Things-Bereich, dessen Heute-Aufgaben angezeigt werden" Type="Variable" Display="always" Required="false">Familie</Config>
+  <Config Name="Familienapp – Dashboard-Token" Target="FAMILY_APP_DASHBOARD_TOKEN" Default="" Description="Token für GET /todos (Convex: DASHBOARD_TOKEN). Ohne Token bleibt die To-do-Karte aus" Type="Variable" Display="always" Required="false" Mask="true"></Config>
 
   <Config Name="Uptime Kuma – Status-Page-URL" Target="UPTIME_URL" Default="" Description="z. B. http://192.168.188.127:3001/status/dashboard. Leer = kein Dienst-Status im Footer" Type="Variable" Display="always" Required="false"></Config>
   <Config Name="News – Orte/Suchbegriffe" Target="NEWS_LOCAL" Default="" Description="Google-News-Suchen, kommagetrennt, z. B. Crimmitschau,Landkreis Zwickau. Leer = nur Deutschland-Schlagzeilen" Type="Variable" Display="always" Required="false"></Config>
   <Config Name="Wetterbilder-Ordner" Target="WEATHER_BG_DIR" Default="/data/wetter" Description="klar.jpg, heiter.jpg, bewoelkt.jpg, nebel.jpg, regen.jpg, schnee.jpg, gewitter.jpg, nacht.jpg, standard.jpg (+ optional -nacht). off = nur Farbverläufe" Type="Variable" Display="advanced" Required="false">/data/wetter</Config>
   <Config Name="Uptime Kuma – API-Key" Target="UPTIME_API_KEY" Default="" Description="Optional: für Zertifikats-Warnungen (/metrics)" Type="Variable" Display="always" Required="false" Mask="true"></Config>
   <Config Name="Uptime Kuma – Zertifikat warnen ab (Tage)" Target="UPTIME_CERT_WARN_DAYS" Default="14" Type="Variable" Display="advanced" Required="false">14</Config>
-  <Config Name="Things – Cache" Target="/data/things" Default="/mnt/user/appdata/familydash/things" Mode="rw" Description="Sync-Cache der things3-CLI (muss nobody:users gehören)" Type="Path" Display="advanced" Required="false">/mnt/user/appdata/familydash/things</Config>
 
   <Config Name="KI – Gemini API-Key" Target="GEMINI_API_KEY" Default="" Description="KI-Karte: morgens Briefing statt Bring!, abends Ausblick auf morgen über den Fotos. Leer = aus" Type="Variable" Display="always" Required="false" Mask="true"></Config>
   <Config Name="KI – Modell" Target="GEMINI_MODEL" Default="gemini-3.8-flash" Type="Variable" Display="advanced" Required="false">gemini-3.8-flash</Config>

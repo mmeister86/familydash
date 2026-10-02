@@ -144,8 +144,6 @@ func TestFamilyApp(t *testing.T) {
 	t.Setenv("FAMILY_APP_SITE_URL", "https://familybackend-http.matthias.lol/")
 	t.Setenv("FAMILY_APP_INGEST_TOKEN", "w")
 	t.Setenv("FAMILY_APP_LUKAS_CALENDARS", "1, 3")
-	t.Setenv("THINGS_EMAIL", "a@b.c")
-	t.Setenv("THINGS_PASSWORD", "x")
 	c, err := Load()
 	if err != nil {
 		t.Fatal(err)
@@ -156,24 +154,18 @@ func TestFamilyApp(t *testing.T) {
 	if got := c.FamilyAppCalendars["lukas"]; len(got) != 2 || got[0] != 0 || got[1] != 1 {
 		t.Errorf("calendars: %v", c.FamilyAppCalendars)
 	}
-	// auto without a read token: Things stays
-	if c.FamilyAppTodos() || !c.UseThings() {
-		t.Error("auto without FAMILY_APP_DASHBOARD_TOKEN should keep Things")
+	// without a read token there are no to-dos
+	if c.TodosEnabled() {
+		t.Error("no FAMILY_APP_DASHBOARD_TOKEN should mean no to-dos")
 	}
 	t.Setenv("FAMILY_APP_DASHBOARD_TOKEN", "r")
-	if c, _ = Load(); !c.FamilyAppTodos() || c.UseThings() {
-		t.Error("auto with a read token should switch to the app")
-	}
-	t.Setenv("TODOS_SOURCE", "things")
-	if c, _ = Load(); c.FamilyAppTodos() || !c.UseThings() {
-		t.Error("TODOS_SOURCE=things should keep Things")
+	if c, _ = Load(); !c.TodosEnabled() {
+		t.Error("URL + FAMILY_APP_DASHBOARD_TOKEN should enable the to-dos")
 	}
 }
 
 func TestFamilyAppErrors(t *testing.T) {
 	for name, env := range map[string]map[string]string{
-		"source":       {"TODOS_SOURCE": "nope"},
-		"no url":       {"TODOS_SOURCE": "familyapp"},
 		"token no url": {"FAMILY_APP_INGEST_TOKEN": "w"},
 		"bad url":      {"FAMILY_APP_SITE_URL": "familybackend-http.matthias.lol"},
 		"calendar":     {"FAMILY_APP_SITE_URL": "https://x.y", "FAMILY_APP_HANNAH_CALENDARS": "7"},

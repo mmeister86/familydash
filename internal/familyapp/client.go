@@ -5,8 +5,7 @@
 //   - push: each child's week (timetable, homework, exams, appointments,
 //     lunch) and the AI briefings go to POST /ingest/child and
 //     POST /ingest/briefing (FAMILY_APP_INGEST_TOKEN)
-//   - pull: the to-dos come from GET /todos (FAMILY_APP_DASHBOARD_TOKEN) and
-//     replace Things 3 (TODOS_SOURCE)
+//   - pull: the to-dos come from GET /todos (FAMILY_APP_DASHBOARD_TOKEN)
 //
 // Failures only ever log and retry; they never touch the wall display.
 package familyapp

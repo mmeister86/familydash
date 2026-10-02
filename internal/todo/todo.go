@@ -1,23 +1,14 @@
-// Package todo is the to-do list the wall shows, whatever it comes from:
-// Things 3 (THINGS_*) or the family app (FAMILY_APP_*, TODOS_SOURCE).
+// Package todo is the to-do list the wall shows; it comes from the family app
+// (FAMILY_APP_*).
 package todo
 
 import "time"
 
-type Checklist struct {
-	Done  int `json:"done"`
-	Total int `json:"total"`
-}
-
 type Task struct {
-	ID        string     `json:"id"`
-	Title     string     `json:"title"`
-	Project   string     `json:"project,omitempty"`
-	Evening   bool       `json:"evening,omitempty"`
-	Deadline  string     `json:"deadline,omitempty"` // YYYY-MM-DD
-	Done      bool       `json:"done,omitempty"`     // completed today
-	Checklist *Checklist `json:"checklist,omitempty"`
-	Tags      []string   `json:"tags,omitempty"`
+	ID       string `json:"id"`
+	Title    string `json:"title"`
+	Deadline string `json:"deadline,omitempty"` // YYYY-MM-DD
+	Done     bool   `json:"done,omitempty"`     // completed today
 
 	// family app only
 	Who     string `json:"who,omitempty"`     // name of the person it's for, "" = whole family
@@ -36,7 +27,7 @@ type Person struct {
 
 type List struct {
 	Name   string `json:"name"`
-	Source string `json:"source"` // things | familyapp
+	Source string `json:"source"` // familyapp
 	// today: open first (overdue first), then waiting for confirmation, then done
 	Tasks []Task `json:"tasks"`
 	// family app only: tomorrow's tasks (evening outlook), people and how many
@@ -53,7 +44,4 @@ type Source interface {
 	Snapshot() *List
 }
 
-const (
-	SourceThings    = "things"
-	SourceFamilyApp = "familyapp"
-)
+const SourceFamilyApp = "familyapp"

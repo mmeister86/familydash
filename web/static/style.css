@@ -491,15 +491,13 @@ h2 {
 .headline .t { font-size: 1rem; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .headline .src { color: var(--muted); font-size: 0.75rem; margin-top: 0.12rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* ---------- to-dos (Things 3) */
+/* ---------- to-dos (family app) */
 .todo { display: grid; grid-template-columns: 1.5rem 1fr; gap: 0.55rem; align-items: start; padding: 0.24rem 0; }
 .todo .box svg { width: 1.3rem; height: 1.3rem; display: block; margin-top: 0.05rem; }
 .todo .box circle { fill: none; stroke: var(--muted); stroke-width: 1.6; }
 .todo .box .tick { fill: none; stroke: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .todo .what { min-width: 0; font-size: 1.05rem; line-height: 1.3; }
 .todo .t { overflow-wrap: anywhere; }
-.todo .eve { margin-left: 0.35rem; font-size: 0.85rem; }
-.todo .sub { display: block; color: var(--muted); font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .todo.done { opacity: 0.45; }
 .todo.done .t { text-decoration: line-through; }
 .todo.done .box circle { fill: var(--good); stroke: var(--good); }

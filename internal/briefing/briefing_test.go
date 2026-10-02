@@ -14,7 +14,6 @@ import (
 	"familydash/internal/besteschule"
 	"familydash/internal/calendar"
 	"familydash/internal/scene"
-	"familydash/internal/things"
 	"familydash/internal/todo"
 	"familydash/internal/vielfalt"
 	"familydash/internal/waste"
@@ -68,12 +67,10 @@ func sample() Data {
 				{Time: at("2026-10-02 13:00"), Temp: 13, PrecipProb: 64, Icon: "rain"},
 			},
 		},
-		Todos: &things.List{Tasks: []things.Task{
-			{ID: "1", Title: "Turnbeutel waschen", Evening: true},
-			{ID: "2", Title: "Steuer", Deadline: "2026-10-20"},
-			{ID: "3", Title: "Brief einwerfen", Deadline: "2026-10-02"},
-			{ID: "4", Title: "Erledigt", Evening: true, Done: true},
-		}},
+		Todos: &todo.List{Source: todo.SourceFamilyApp,
+			Tasks:    []todo.Task{{ID: "1", Title: "Turnbeutel waschen", Who: "Lukas"}},
+			Tomorrow: []todo.Task{{ID: "3", Title: "Brief einwerfen", Deadline: "2026-10-02"}},
+		},
 	}
 }
 

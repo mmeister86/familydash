@@ -253,30 +253,10 @@ func BuildFacts(kind Kind, now, target time.Time, loc *time.Location, d Data) Fa
 
 	f.Wetter = weatherFacts(d.Weather, key, loc)
 
-	// to-dos: Things (morning all of today's open ones, evening the "this
-	// evening" ones and tomorrow's deadlines) or the family app (per person,
-	// morning today's, evening what's still open today plus tomorrow's)
+	// to-dos from the family app, per person: morning today's, evening what's
+	// still open today plus tomorrow's
 	if d.Todos != nil {
-		if d.Todos.Source == todo.SourceFamilyApp {
-			appTodos(&f, kind, today, loc, d.Todos)
-		} else {
-			for _, t := range d.Todos.Tasks {
-				if t.Done {
-					continue
-				}
-				due := ""
-				if t.Deadline != "" {
-					due = relDay(t.Deadline, today, loc)
-				}
-				if kind == Evening && !t.Evening && t.Deadline != key {
-					continue
-				}
-				f.Todos = append(f.Todos, Todo{Titel: t.Title, Faellig: due, Abends: t.Evening})
-				if len(f.Todos) == maxTodos {
-					break
-				}
-			}
-		}
+		appTodos(&f, kind, today, loc, d.Todos)
 	}
 	return f
 }
