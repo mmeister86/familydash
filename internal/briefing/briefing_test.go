@@ -69,7 +69,7 @@ func sample() Data {
 		},
 		Todos: &todo.List{Source: todo.SourceFamilyApp,
 			Tasks:    []todo.Task{{ID: "1", Title: "Turnbeutel waschen", Who: "Lukas"}},
-			Tomorrow: []todo.Task{{ID: "3", Title: "Brief einwerfen", Deadline: "2026-10-03"}},
+			Tomorrow: []todo.Task{{ID: "3", Title: "Brief einwerfen", Deadline: "2026-10-02"}},
 		},
 	}
 }
