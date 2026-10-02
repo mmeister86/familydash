@@ -164,3 +164,31 @@ func TestNoSchoolAtAll(t *testing.T) {
 		t.Errorf("expected noSchool: %+v", d)
 	}
 }
+
+func TestBuildDaysWeek(t *testing.T) {
+	raw := load(t, fixture)
+	days := BuildDays(raw, time.Date(2026, 9, 30, 18, 0, 0, 0, berlin), 7, berlin, nil)["Lukas"]
+	if len(days) != 7 {
+		t.Fatalf("days = %d", len(days))
+	}
+	want := []struct {
+		date    string
+		lessons int
+	}{
+		{"2026-09-30", 4}, // Wed, after school still today (no jump to the next day)
+		{"2026-10-01", 3}, // Thu + extra Informatik
+		{"2026-10-02", 1}, // Fri
+		{"2026-10-03", 0}, // Sat
+		{"2026-10-04", 0}, // Sun
+		{"2026-10-05", 0}, // no_school_dates
+		{"2026-10-06", 1}, // Tue
+	}
+	for i, w := range want {
+		if days[i].Date != w.date || len(days[i].Lessons) != w.lessons {
+			t.Errorf("day %d: %s with %d lessons, want %s with %d:\n%s", i, days[i].Date, len(days[i].Lessons), w.date, w.lessons, lessons(days[i]))
+		}
+	}
+	if days[0].Lessons[1].Status != "cancelled" {
+		t.Errorf("substitution lost: %+v", days[0].Lessons[1])
+	}
+}

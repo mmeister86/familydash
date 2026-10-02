@@ -7,8 +7,8 @@ import (
 
 	"familydash/internal/besteschule"
 	"familydash/internal/calendar"
-	"familydash/internal/things"
 	"familydash/internal/timetable"
+	"familydash/internal/todo"
 	"familydash/internal/vielfalt"
 	"familydash/internal/waste"
 	"familydash/internal/weather"
@@ -30,7 +30,7 @@ type Data struct {
 	Timetables []timetable.Card
 	Meals      *vielfalt.Meals
 	Waste      []waste.Pickup
-	Todos      *things.List
+	Todos      *todo.List
 }
 
 // Facts is everything the model gets – already computed and worded by code,
@@ -48,6 +48,9 @@ type Facts struct {
 	Muell        []string `json:"muell,omitempty"`
 	Wetter       *Wx      `json:"wetter,omitempty"`
 	Todos        []Todo   `json:"todos,omitempty"`
+	// family app only
+	Bestaetigungen int      `json:"bestaetigungen_offen,omitempty"`
+	Punkte         []string `json:"punkte,omitempty"`
 }
 
 type Kid struct {
@@ -91,6 +94,7 @@ type Wx struct {
 
 type Todo struct {
 	Titel   string `json:"titel"`
+	Wer     string `json:"wer,omitempty"`
 	Faellig string `json:"faellig,omitempty"`
 	Abends  bool   `json:"heute_abend,omitempty"`
 }
@@ -249,26 +253,87 @@ func BuildFacts(kind Kind, now, target time.Time, loc *time.Location, d Data) Fa
 
 	f.Wetter = weatherFacts(d.Weather, key, loc)
 
-	// to-dos: morning all of today's open ones, evening the "this evening" ones and tomorrow's deadlines
+	// to-dos: Things (morning all of today's open ones, evening the "this
+	// evening" ones and tomorrow's deadlines) or the family app (per person,
+	// morning today's, evening what's still open today plus tomorrow's)
 	if d.Todos != nil {
-		for _, t := range d.Todos.Tasks {
-			if t.Done {
-				continue
-			}
-			due := ""
-			if t.Deadline != "" {
-				due = relDay(t.Deadline, today, loc)
-			}
-			if kind == Evening && !t.Evening && t.Deadline != key {
-				continue
-			}
-			f.Todos = append(f.Todos, Todo{Titel: t.Title, Faellig: due, Abends: t.Evening})
-			if len(f.Todos) == 8 {
-				break
+		if d.Todos.Source == todo.SourceFamilyApp {
+			appTodos(&f, kind, today, loc, d.Todos)
+		} else {
+			for _, t := range d.Todos.Tasks {
+				if t.Done {
+					continue
+				}
+				due := ""
+				if t.Deadline != "" {
+					due = relDay(t.Deadline, today, loc)
+				}
+				if kind == Evening && !t.Evening && t.Deadline != key {
+					continue
+				}
+				f.Todos = append(f.Todos, Todo{Titel: t.Title, Faellig: due, Abends: t.Evening})
+				if len(f.Todos) == maxTodos {
+					break
+				}
 			}
 		}
 	}
 	return f
+}
+
+const maxTodos = 8
+
+// appTodos adds the family app's tasks: overdue first, then the target
+// day's open ones; in the evening also what's still open today. Tasks a
+// child ticked off and that only wait for a parent count as done here and
+// show up as bestaetigungen_offen instead.
+func appTodos(f *Facts, kind Kind, today time.Time, loc *time.Location, l *todo.List) {
+	f.Bestaetigungen = l.Pending
+	for _, p := range l.People {
+		if p.Role == "child" {
+			f.Punkte = append(f.Punkte, fmt.Sprintf("%s: %d Punkte", p.Name, p.Points))
+		}
+	}
+	todayKey := today.Format(ymdLayout)
+	add := func(t todo.Task, due string) bool {
+		f.Todos = append(f.Todos, Todo{Titel: t.Title, Wer: t.Who, Faellig: due})
+		return len(f.Todos) < maxTodos
+	}
+	var overdue, open []todo.Task
+	for _, t := range l.Tasks {
+		if t.Done || t.Pending {
+			continue
+		}
+		if t.Deadline != "" && t.Deadline < todayKey {
+			overdue = append(overdue, t)
+		} else {
+			open = append(open, t)
+		}
+	}
+	for _, t := range overdue {
+		if !add(t, "überfällig seit "+relDay(t.Deadline, today, loc)) {
+			return
+		}
+	}
+	due := "heute"
+	if kind == Evening {
+		due = "heute noch offen"
+	}
+	for _, t := range open {
+		if !add(t, due) {
+			return
+		}
+	}
+	if kind == Evening {
+		for _, t := range l.Tomorrow {
+			if t.Pending {
+				continue
+			}
+			if !add(t, "morgen") {
+				return
+			}
+		}
+	}
 }
 
 func schoolDay(day besteschule.Day, key string) *SchoolDay {

@@ -158,3 +158,17 @@ func TestSlotJSON(t *testing.T) {
 		t.Fatalf("slots = %+v", s)
 	}
 }
+
+func TestDaysWeek(t *testing.T) {
+	days := plan(t).Days(at("2026-09-29 18:00"), 7, berlin)["Hannah"]
+	if len(days) != 7 || days[0].Date != "2026-09-29" || days[6].Date != "2026-10-05" {
+		t.Fatalf("days = %+v", days)
+	}
+	if len(days[0].Lessons) != 7 {
+		t.Errorf("tuesday: %d lessons", len(days[0].Lessons))
+	}
+	sat := days[4] // 2026-10-03
+	if sat.Date != "2026-10-03" || sat.Lessons == nil || len(sat.Lessons) != 0 {
+		t.Errorf("saturday = %+v", sat)
+	}
+}

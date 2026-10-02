@@ -77,6 +77,10 @@
   <Config Name="Fotos – Anzeigedauer" Target="PHOTOS_INTERVAL" Default="45s" Type="Variable" Display="advanced" Required="false">45s</Config>
   <Config Name="Nacht-Hintergrund" Target="/data/bg.jpeg" Default="/mnt/user/appdata/familydash/bg.jpeg" Mode="ro" Description="Bild hinter der Nachtuhr (Datei muss existieren, sonst legt Docker einen Ordner an – dann Eintrag leeren)" Type="Path" Display="advanced" Required="false"></Config>
 
+  <Config Name="Familienapp – URL" Target="FAMILY_APP_SITE_URL" Default="" Description="HTTP-Actions-URL des Convex-Backends der Familienapp, z. B. https://familybackend-http.matthias.lol. Leer = keine Anbindung" Type="Variable" Display="always" Required="false"></Config>
+  <Config Name="Familienapp – Ingest-Token" Target="FAMILY_APP_INGEST_TOKEN" Default="" Description="Token für POST /ingest/* (Convex: INGEST_TOKEN). Schickt Woche jedes Kindes und KI-Briefings an die App" Type="Variable" Display="always" Required="false" Mask="true"></Config>
+  <Config Name="Familienapp – Dashboard-Token" Target="FAMILY_APP_DASHBOARD_TOKEN" Default="" Description="Token für GET /todos (Convex: DASHBOARD_TOKEN). Mit TODOS_SOURCE=auto kommen die To-dos dann aus der App statt aus Things" Type="Variable" Display="always" Required="false" Mask="true"></Config>
+  <Config Name="To-do-Quelle" Target="TODOS_SOURCE" Default="auto" Description="auto (App, sobald Dashboard-Token gesetzt, sonst Things), things oder familyapp" Type="Variable" Display="advanced" Required="false">auto</Config>
   <Config Name="Things – E-Mail" Target="THINGS_EMAIL" Default="" Description="Things-Cloud-Login (inoffiziell, nur lesend). Leer = keine To-do-Karte" Type="Variable" Display="always" Required="false"></Config>
   <Config Name="Things – Passwort" Target="THINGS_PASSWORD" Default="" Type="Variable" Display="always" Required="false" Mask="true"></Config>
   <Config Name="Things – Bereich" Target="THINGS_AREA" Default="Familie" Description="Things-Bereich, dessen Heute-Aufgaben angezeigt werden" Type="Variable" Display="always" Required="false">Familie</Config>

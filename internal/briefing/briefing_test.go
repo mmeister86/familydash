@@ -15,6 +15,7 @@ import (
 	"familydash/internal/calendar"
 	"familydash/internal/scene"
 	"familydash/internal/things"
+	"familydash/internal/todo"
 	"familydash/internal/vielfalt"
 	"familydash/internal/waste"
 	"familydash/internal/weather"
@@ -381,5 +382,60 @@ func TestServiceForOnRequest(t *testing.T) {
 	}
 	if s.snapshotAt(now) != nil {
 		t.Error("afternoon wall should stay without a card")
+	}
+}
+
+func appList() *todo.List {
+	return &todo.List{Source: todo.SourceFamilyApp,
+		Tasks: []todo.Task{
+			{ID: "c", Title: "Bibliotheksbuch", Who: "Lukas", Deadline: "2026-09-30"},
+			{ID: "b", Title: "Müll", Who: ""},
+			{ID: "d", Title: "Hund füttern", Who: "Lukas", Pending: true},
+			{ID: "a", Title: "Zimmer", Who: "Lukas", Done: true},
+		},
+		Tomorrow: []todo.Task{{ID: "f", Title: "Steuer", Who: "Matthias", Deadline: "2026-10-02"}},
+		People:   []todo.Person{{Slug: "matthias", Name: "Matthias", Role: "parent"}, {Slug: "lukas", Name: "Lukas", Role: "child", Points: 120}},
+		Pending:  1,
+	}
+}
+
+func TestFamilyAppTodosMorning(t *testing.T) {
+	d := sample()
+	d.Todos = appList()
+	now := at("2026-10-02 06:40")
+	f := BuildFacts(Morning, now, Target(Morning, now, berlin), berlin, d)
+	if len(f.Todos) != 2 || f.Todos[0].Titel != "Bibliotheksbuch" || f.Todos[0].Wer != "Lukas" ||
+		!strings.HasPrefix(f.Todos[0].Faellig, "überfällig seit") || f.Todos[1].Faellig != "heute" {
+		t.Errorf("todos: %+v", f.Todos)
+	}
+	if f.Bestaetigungen != 1 || len(f.Punkte) != 1 || f.Punkte[0] != "Lukas: 120 Punkte" {
+		t.Errorf("confirmations/points: %d %v", f.Bestaetigungen, f.Punkte)
+	}
+}
+
+func TestFamilyAppTodosEvening(t *testing.T) {
+	d := sample()
+	d.Todos = appList()
+	now := at("2026-10-01 19:05")
+	f := BuildFacts(Evening, now, Target(Evening, now, berlin), berlin, d)
+	var got []string
+	for _, x := range f.Todos {
+		got = append(got, x.Titel+"/"+x.Faellig)
+	}
+	if len(got) != 3 || got[1] != "Müll/heute noch offen" || got[2] != "Steuer/morgen" {
+		t.Errorf("todos: %v", got)
+	}
+	// on a quiet evening the rule-based card shows the to-dos (a busy one fills up with more important lines first)
+	quiet := Data{Todos: appList()}
+	qf := BuildFacts(Evening, now, Target(Evening, now, berlin), berlin, quiet)
+	b := Fallback(Evening, Target(Evening, now, berlin), qf, Colors(quiet))
+	var todoItems []Item
+	for _, it := range b.Items {
+		if it.Icon == "todo" {
+			todoItems = append(todoItems, it)
+		}
+	}
+	if len(todoItems) != 2 || todoItems[0].Who != "Lukas" || todoItems[0].Section != "tonight" || todoItems[1].Section != "tonight" || todoItems[1].Who != "Familie" {
+		t.Errorf("fallback to-dos: %+v", b.Items)
 	}
 }

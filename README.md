@@ -1,6 +1,7 @@
 # familydash
 
-A lightweight family wall dashboard: **Google Calendar**, **weather**, the **school timetable** from beste.schule and the **Bring! shopping list**, the **school lunch** ordered at VielfaltMenü and today's **Things 3 to-dos** on one screen.
+A lightweight family wall dashboard: **Google Calendar**, **weather**, the **school timetable** from beste.schule and the **Bring! shopping list**, the **school lunch** ordered at VielfaltMenü and today's **to-dos** (from the family app or Things 3) on one screen.
+It also feeds the **family app** (React PWA + Convex): each child's week and the AI briefings go there, the to-dos come back.
 Runs as a static Go binary in a ~20 MB container on Unraid; a Raspberry Pi only runs a browser in kiosk mode.
 
 <img src="docs/screenshot.png" alt="Wall display (portrait)" width="420">
@@ -17,7 +18,9 @@ Runs as a static Go binary in a ~20 MB container on Unraid; a Raspberry Pi only 
  beste.schule    ──(API token, 15 min)───────┼──▶ familydash (Unraid, :8080) ◀── Chromium kiosk (Raspberry Pi)
  Bring!          ──(login, 2 min)────────────┤
  VielfaltMenü    ──(login per child, 30 min)─┤
- Things Cloud    ──(things3 CLI, 5 min)──────┘
+ Things Cloud    ──(things3 CLI, 5 min)──────┤   (or the family app's to-dos, see TODOS_SOURCE)
+                                             │
+ family app (Convex) ◀──(POST week + briefing / GET to-dos)──┘   outbound only, Unraid stays private
 ```
 
 ## Quick start (Unraid)
@@ -79,7 +82,13 @@ All settings are environment variables.
 | `NEWS_REFRESH` / `NEWS_MAX_AGE` / `NEWS_PER_GROUP` | `20m` / `48h` / `12` | Polling (stay ≥ 15 min, Google rate-limits), oldest headline, headlines per group |
 | `VIELFALT_n_COLOR` | palette | Dot color of the card |
 | `VIELFALT_REFRESH` | `30m` | |
-| `THINGS_EMAIL` / `THINGS_PASSWORD` | – | Things Cloud account; children's to-dos are off until set |
+| `TODOS_SOURCE` | `auto` | Where the children's to-dos come from: `auto` = the family app once `FAMILY_APP_DASHBOARD_TOKEN` is set, else Things; `things`; `familyapp` |
+| `FAMILY_APP_SITE_URL` | – | HTTP-actions URL of the family app's Convex backend, e.g. `https://familybackend-http.matthias.lol`; family app is off until set |
+| `FAMILY_APP_INGEST_TOKEN` | – | Bearer token for `POST /ingest/*` (= `INGEST_TOKEN` in Convex); turns on the push of each child's week and the briefings |
+| `FAMILY_APP_DASHBOARD_TOKEN` | – | Bearer token for `GET /todos` (= `DASHBOARD_TOKEN` in Convex); with `TODOS_SOURCE=auto` this replaces Things |
+| `FAMILY_APP_<SLUG>_CALENDARS` | – | Extra calendar numbers whose entries count as that child's appointments in the app, e.g. `FAMILY_APP_LUKAS_CALENDARS=1` (the child's school calendar is always included) |
+| `FAMILY_APP_REFRESH` / `FAMILY_APP_HEARTBEAT` | `1m` / `15m` | How often the to-dos are read / unchanged child data is sent again (so the app can tell a dead dashboard) |
+| `THINGS_EMAIL` / `THINGS_PASSWORD` | – | Things Cloud account; children's to-dos are off until set (ignored while the to-dos come from the family app) |
 | `THINGS_AREA` | `Familie` | Things area whose **Today** to-dos are shown (title, case-insensitive substring) |
 | `THINGS_REFRESH` | `5m` | |
 | `THINGS_STATE_DIR` | `/data/things` | Sync cache of the CLI; falls back to `/tmp` when not writable (then it syncs from scratch after a restart) |
@@ -198,7 +207,36 @@ button has `data-quantity-ordered` ≥ 1. It may break when the portal changes; 
 docker exec familydash /familydash -vielfalt-preview
 ```
 
+### Family app
+
+The family app (React PWA + Convex on Coolify) is where the family's tasks, points and rewards live – and where parents (and each
+child, only their own) see the wall's school data on the phone or laptop. familydash stays the **only** place that logs in to
+beste.schule, VielfaltMenü and Google Calendar; it hands the results over. All traffic goes **out** from Unraid, nothing comes in:
+
+- **Push** (`FAMILY_APP_INGEST_TOKEN`): every minute familydash builds one week per child – timetable with cancellations and
+  substitutions, homework, exams, appointments, ordered lunch – and posts it to `POST /ingest/child` **when it changed**, plus every
+  `FAMILY_APP_HEARTBEAT` so the app can warn when the dashboard is offline. The morning briefing and the evening outlook go to
+  `POST /ingest/briefing` whenever the card changes. Children are matched by first name like the cards (`Lukas Meister` → slug
+  `lukas`); their school calendar comes along automatically, more calendars via `FAMILY_APP_<SLUG>_CALENDARS`. Nothing is sent in
+  the first 2 minutes after a start, so half-loaded data never overwrites good data in the app.
+- **Pull** (`FAMILY_APP_DASHBOARD_TOKEN`): `GET /todos?days=2` every `FAMILY_APP_REFRESH`. Tasks assigned to a child show up in that
+  child's card (⭐ points, ⏳ = ticked off, waiting for a parent); the briefing gets every person's tasks (overdue first, in the
+  evening what's still open plus tomorrow's), how many wait for confirmation and the children's points.
+
+Failures only log and retry; the wall keeps the last good data. The exact payloads are in [docs/FAMILY_APP.md](docs/FAMILY_APP.md).
+See what would be sent (nothing is posted) and what the app returns:
+
+```sh
+docker exec familydash /familydash -familyapp-preview
+```
+
+**Switching from Things:** set `FAMILY_APP_DASHBOARD_TOKEN` – with `TODOS_SOURCE=auto` the to-dos then come from the app.
+`TODOS_SOURCE=things` switches back without removing anything. Once the app has proven itself, the Things code and the bundled
+CLI get removed from the image.
+
 ### Things 3 (to-dos)
+
+> Being replaced by the family app (see above). Only used when the to-dos don't come from the app (`TODOS_SOURCE`).
 
 Put the family's to-dos into one Things area (default `Familie`) and set `THINGS_EMAIL` / `THINGS_PASSWORD`
 (your Things Cloud login). **To-dos for a child** show up in that child's card in the afternoon (school → To-dos → Termine → Essen):
@@ -245,7 +283,8 @@ pack the sports bag, learn for tomorrow's test, lunch box when no lunch is order
 
 **Code works out the facts, the model only phrases them.** `internal/briefing` builds a small fact sheet from the other sources –
 lessons that are cancelled or substituted (and the resulting start time), exams in the next days, homework due, lunch ordered or not,
-appointments of all calendars incl. ones that overlap, bins collected, weather for the day and the way to school, Things to-dos –
+appointments of all calendars incl. ones that overlap, bins collected, weather for the day and the way to school, to-dos (from the
+family app per person, with pending confirmations and the children's points – or from Things) –
 and sends only that to Gemini, with a JSON schema for the answer. Times and dates are never calculated by the model.
 
 - Prepared `BRIEFING_LEAD` before the scene starts, then asked again only when the facts change, at most every `BRIEFING_MIN_GAP`

@@ -16,8 +16,8 @@ import (
 	"familydash/internal/news"
 	"familydash/internal/photos"
 	"familydash/internal/scene"
-	"familydash/internal/things"
 	"familydash/internal/timetable"
+	"familydash/internal/todo"
 	"familydash/internal/uptime"
 	"familydash/internal/vielfalt"
 	"familydash/internal/waste"
@@ -35,7 +35,7 @@ type Server struct {
 	meals    *vielfalt.Service    // nil if not configured
 	waste    *waste.Service       // nil if not configured
 	photos   *photos.Service      // nil if not configured
-	todos    *things.Service      // nil if not configured
+	todos    todo.Source          // nil if not configured (Things or the family app)
 	uptime   *uptime.Service      // nil if not configured
 	news     *news.Service        // nil if not configured
 	briefing *briefing.Service    // nil if not configured
@@ -51,7 +51,7 @@ type Sources struct {
 	Meals   *vielfalt.Service
 	Waste   *waste.Service
 	Photos  *photos.Service
-	Todos   *things.Service
+	Todos   todo.Source // Things 3 or the family app, see TODOS_SOURCE
 	Uptime  *uptime.Service
 	News    *news.Service
 	// AI card (morning briefing / evening outlook)
@@ -100,8 +100,8 @@ type dashboard struct {
 	Scene scene.Current `json:"scene"`
 	// Slideshow (PHOTOS_DIR); files at /photos/<path>?v=<v>
 	Photos *photos.Snapshot `json:"photos,omitempty"`
-	// Today's to-dos of one Things area (THINGS_*)
-	Todos *things.List `json:"todos,omitempty"`
+	// Today's to-dos: one Things area (THINGS_*) or the family app (FAMILY_APP_*)
+	Todos *todo.List `json:"todos,omitempty"`
 	// Background of the night scene (NIGHT_BG); file at /night-bg?v=<v>
 	NightBG *nightBG `json:"nightBg,omitempty"`
 	// Monitors of one Uptime Kuma status page, shown in the footer (UPTIME_*)

@@ -292,3 +292,30 @@ func clock(d time.Time, hm string) time.Time {
 	}
 	return time.Date(d.Year(), d.Month(), d.Day(), h, m, 0, 0, d.Location())
 }
+
+// Days returns each child's timetable for n days from the day of from on,
+// one entry per day (empty lessons on weekends and holidays, with the
+// holiday as notice). Keyed by child name. Used for the family app, which
+// shows a whole week instead of "today or the next school day".
+func (f *File) Days(from time.Time, n int, loc *time.Location) map[string][]besteschule.Day {
+	from = from.In(loc)
+	start := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, loc)
+	out := make(map[string][]besteschule.Day, len(f.Children))
+	for i := range f.Children {
+		c := &f.Children[i]
+		days := make([]besteschule.Day, 0, n)
+		for j := 0; j < n; j++ {
+			d := start.AddDate(0, 0, j)
+			day := besteschule.Day{Date: d.Format("2006-01-02"), Lessons: c.lessonsOn(d)}
+			if day.Lessons == nil {
+				day.Lessons = []besteschule.Lesson{}
+			}
+			if r := c.holiday(d); r != nil {
+				day.Notices = []string{holidayNotice(r)}
+			}
+			days = append(days, day)
+		}
+		out[c.Name] = days
+	}
+	return out
+}
