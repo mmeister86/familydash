@@ -25,32 +25,18 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"familydash/internal/todo"
 )
 
 const DefaultBin = "/things3"
 
-type Checklist struct {
-	Done  int `json:"done"`
-	Total int `json:"total"`
-}
-
-type Task struct {
-	ID        string     `json:"id"`
-	Title     string     `json:"title"`
-	Project   string     `json:"project,omitempty"`
-	Evening   bool       `json:"evening,omitempty"`
-	Deadline  string     `json:"deadline,omitempty"` // YYYY-MM-DD
-	Done      bool       `json:"done,omitempty"`     // completed today
-	Checklist *Checklist `json:"checklist,omitempty"`
-	Tags      []string   `json:"tags,omitempty"`
-}
-
-type List struct {
-	Name      string    `json:"name"`
-	Tasks     []Task    `json:"tasks"` // open first (Things' Today order, evening last), then done today
-	UpdatedAt time.Time `json:"updatedAt"`
-	Error     string    `json:"error,omitempty"`
-}
+// The list types live in package todo, shared with the family app source.
+type (
+	Checklist = todo.Checklist
+	Task      = todo.Task
+	List      = todo.List
+)
 
 // Runner executes the CLI with the given arguments and returns stdout.
 type Runner func(ctx context.Context, args ...string) ([]byte, error)
@@ -163,7 +149,7 @@ func (s *Service) Snapshot() *List {
 		if s.err == "" {
 			return nil
 		}
-		return &List{Name: s.Area, Tasks: []Task{}, Error: s.err}
+		return &List{Name: s.Area, Source: todo.SourceThings, Tasks: []Task{}, Error: s.err}
 	}
 	l := *s.last
 	l.Error = s.err
@@ -192,7 +178,7 @@ func (s *Service) fetch(ctx context.Context) (*List, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &List{Name: s.Area, Tasks: build(open, done), UpdatedAt: time.Now()}, nil
+	return &List{Name: s.Area, Source: todo.SourceThings, Tasks: build(open, done), UpdatedAt: time.Now()}, nil
 }
 
 // wire format of `things3 find --json` (only the fields we use)

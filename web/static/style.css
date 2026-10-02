@@ -504,6 +504,8 @@ h2 {
 .todo.done .t { text-decoration: line-through; }
 .todo.done .box circle { fill: var(--good); stroke: var(--good); }
 .todo.done .box .tick { stroke: var(--bg); }
+.todo.pending { opacity: 0.7; }
+.todo.pending .box circle { stroke: var(--warn); stroke-dasharray: 3 2.4; }
 
 /* slideshow: two stacked images crossfading. Opacity only – cheap on the Pi. */
 .photo-frame {

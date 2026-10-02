@@ -110,6 +110,19 @@ type Config struct {
 	GeminiModel    string
 	GeminiThinking string // low | medium | high, "default" = model default
 	GeminiBackend  string // auto | gemini (AI Studio) | vertex (Vertex AI express mode)
+
+	// Family app (FAMILY_APP_*): push children's weeks + briefings, read to-dos
+	FamilyAppURL         string // HTTP actions ("site") URL of the Convex backend
+	FamilyAppIngestToken string // POST /ingest/*; "" = no push
+	FamilyAppReadToken   string // GET /todos; "" = no to-dos from the app
+	FamilyAppRefresh     time.Duration
+	FamilyAppHeartbeat   time.Duration
+	// FAMILY_APP_<SLUG>_CALENDARS=2,3 → slug → indexes into Calendars whose
+	// entries count as that child's appointments (besides its school calendar)
+	FamilyAppCalendars map[string][]int
+	// Where the to-dos come from: auto (the app when FAMILY_APP_DASHBOARD_TOKEN
+	// is set, else Things), things, familyapp
+	TodosSource string
 }
 
 type MealAccount struct {
@@ -173,6 +186,13 @@ func Load() (*Config, error) {
 		GeminiModel:    env("GEMINI_MODEL", "gemini-3.8-flash"),
 		GeminiThinking: strings.ToLower(env("GEMINI_THINKING", "low")),
 		GeminiBackend:  strings.ToLower(env("GEMINI_BACKEND", "auto")),
+
+		FamilyAppURL:         strings.TrimRight(env("FAMILY_APP_SITE_URL", ""), "/"),
+		FamilyAppIngestToken: env("FAMILY_APP_INGEST_TOKEN", ""),
+		FamilyAppReadToken:   env("FAMILY_APP_DASHBOARD_TOKEN", ""),
+		FamilyAppRefresh:     envDuration("FAMILY_APP_REFRESH", time.Minute),
+		FamilyAppHeartbeat:   envDuration("FAMILY_APP_HEARTBEAT", 15*time.Minute),
+		TodosSource:          strings.ToLower(env("TODOS_SOURCE", "auto")),
 	}
 	switch c.GeminiBackend {
 	case "auto", "gemini", "vertex":
@@ -251,6 +271,9 @@ func Load() (*Config, error) {
 		}
 	}
 	c.resolveColumns(intoNum)
+	if err := c.loadFamilyApp(); err != nil {
+		return nil, err
+	}
 
 	// WASTE_1_NAME=Restabfall, WASTE_1_DAY=Mi, WASTE_1_WEEKS=gerade … (up to 10)
 	wasteColors := []string{"#8A8F98", "#F2C94C", "#4F8EF7", "#8B5E3C", "#46C28E"}
@@ -291,6 +314,55 @@ func Load() (*Config, error) {
 		})
 	}
 	return c, nil
+}
+
+// loadFamilyApp checks FAMILY_APP_* / TODOS_SOURCE and resolves
+// FAMILY_APP_<SLUG>_CALENDARS (calendar numbers n of CALENDAR_n_*).
+func (c *Config) loadFamilyApp() error {
+	switch c.TodosSource {
+	case "auto", "things", "familyapp":
+	default:
+		return fmt.Errorf("TODOS_SOURCE %q: want auto, things or familyapp", c.TodosSource)
+	}
+	if c.FamilyAppURL != "" && !strings.HasPrefix(c.FamilyAppURL, "https://") && !strings.HasPrefix(c.FamilyAppURL, "http://") {
+		return fmt.Errorf("FAMILY_APP_SITE_URL %q: want an http(s) URL", c.FamilyAppURL)
+	}
+	if c.TodosSource == "familyapp" && (c.FamilyAppURL == "" || c.FamilyAppReadToken == "") {
+		return fmt.Errorf("TODOS_SOURCE=familyapp needs FAMILY_APP_SITE_URL and FAMILY_APP_DASHBOARD_TOKEN")
+	}
+	if c.FamilyAppURL == "" && (c.FamilyAppIngestToken != "" || c.FamilyAppReadToken != "") {
+		return fmt.Errorf("FAMILY_APP_*_TOKEN is set but FAMILY_APP_SITE_URL is missing")
+	}
+	byNum := map[int]int{}
+	for i, cal := range c.Calendars {
+		byNum[cal.Num] = i
+	}
+	c.FamilyAppCalendars = map[string][]int{}
+	for _, kv := range os.Environ() {
+		k, _, _ := strings.Cut(kv, "=")
+		if !strings.HasPrefix(k, "FAMILY_APP_") || !strings.HasSuffix(k, "_CALENDARS") {
+			continue
+		}
+		slug := strings.ToLower(strings.TrimSuffix(strings.TrimPrefix(k, "FAMILY_APP_"), "_CALENDARS"))
+		if slug == "" {
+			continue
+		}
+		for _, f := range strings.Split(env(k, ""), ",") {
+			if f = strings.TrimSpace(f); f == "" {
+				continue
+			}
+			n, err := strconv.Atoi(f)
+			if err != nil {
+				return fmt.Errorf("%s: %q is no calendar number", k, f)
+			}
+			i, ok := byNum[n]
+			if !ok {
+				return fmt.Errorf("%s: CALENDAR_%d_URL is not set", k, n)
+			}
+			c.FamilyAppCalendars[slug] = append(c.FamilyAppCalendars[slug], i)
+		}
+	}
+	return nil
 }
 
 // resolveColumns turns CALENDAR_n_COLUMN=<m> into an index. The target must
@@ -385,8 +457,27 @@ func (c *Config) BringEnabled() bool   { return c.BringEmail != "" && c.BringPas
 func (c *Config) SchoolEnabled() bool  { return c.SchoolToken != "" }
 func (c *Config) MealsEnabled() bool   { return len(c.Meals) > 0 }
 func (c *Config) ThingsEnabled() bool  { return c.ThingsEmail != "" && c.ThingsPassword != "" }
-func (c *Config) UptimeEnabled() bool  { return c.UptimeBase != "" }
-func (c *Config) NewsEnabled() bool    { return len(c.NewsFeeds) > 0 }
+
+// FamilyAppPushEnabled: children's weeks and briefings go to the app.
+func (c *Config) FamilyAppPushEnabled() bool {
+	return c.FamilyAppURL != "" && c.FamilyAppIngestToken != ""
+}
+
+// FamilyAppTodos: the to-dos come from the app instead of Things.
+func (c *Config) FamilyAppTodos() bool {
+	switch c.TodosSource {
+	case "things":
+		return false
+	case "familyapp":
+		return true
+	}
+	return c.FamilyAppURL != "" && c.FamilyAppReadToken != ""
+}
+
+// UseThings: Things is configured and not replaced by the app.
+func (c *Config) UseThings() bool     { return c.ThingsEnabled() && !c.FamilyAppTodos() }
+func (c *Config) UptimeEnabled() bool { return c.UptimeBase != "" }
+func (c *Config) NewsEnabled() bool   { return len(c.NewsFeeds) > 0 }
 
 // BriefingEnabled: with a Gemini key (or BRIEFING=on for the rule-based card).
 func (c *Config) BriefingEnabled() bool {

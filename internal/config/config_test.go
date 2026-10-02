@@ -137,3 +137,54 @@ func TestNewsFeeds(t *testing.T) {
 		t.Error("NEWS=off still has feeds")
 	}
 }
+
+func TestFamilyApp(t *testing.T) {
+	t.Setenv("CALENDAR_1_URL", "https://example.com/familie.ics")
+	t.Setenv("CALENDAR_3_URL", "https://example.com/sport.ics")
+	t.Setenv("FAMILY_APP_SITE_URL", "https://familybackend-http.matthias.lol/")
+	t.Setenv("FAMILY_APP_INGEST_TOKEN", "w")
+	t.Setenv("FAMILY_APP_LUKAS_CALENDARS", "1, 3")
+	t.Setenv("THINGS_EMAIL", "a@b.c")
+	t.Setenv("THINGS_PASSWORD", "x")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.FamilyAppURL != "https://familybackend-http.matthias.lol" || !c.FamilyAppPushEnabled() {
+		t.Errorf("url/push: %q %v", c.FamilyAppURL, c.FamilyAppPushEnabled())
+	}
+	if got := c.FamilyAppCalendars["lukas"]; len(got) != 2 || got[0] != 0 || got[1] != 1 {
+		t.Errorf("calendars: %v", c.FamilyAppCalendars)
+	}
+	// auto without a read token: Things stays
+	if c.FamilyAppTodos() || !c.UseThings() {
+		t.Error("auto without FAMILY_APP_DASHBOARD_TOKEN should keep Things")
+	}
+	t.Setenv("FAMILY_APP_DASHBOARD_TOKEN", "r")
+	if c, _ = Load(); !c.FamilyAppTodos() || c.UseThings() {
+		t.Error("auto with a read token should switch to the app")
+	}
+	t.Setenv("TODOS_SOURCE", "things")
+	if c, _ = Load(); c.FamilyAppTodos() || !c.UseThings() {
+		t.Error("TODOS_SOURCE=things should keep Things")
+	}
+}
+
+func TestFamilyAppErrors(t *testing.T) {
+	for name, env := range map[string]map[string]string{
+		"source":       {"TODOS_SOURCE": "nope"},
+		"no url":       {"TODOS_SOURCE": "familyapp"},
+		"token no url": {"FAMILY_APP_INGEST_TOKEN": "w"},
+		"bad url":      {"FAMILY_APP_SITE_URL": "familybackend-http.matthias.lol"},
+		"calendar":     {"FAMILY_APP_SITE_URL": "https://x.y", "FAMILY_APP_HANNAH_CALENDARS": "7"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			for k, v := range env {
+				t.Setenv(k, v)
+			}
+			if _, err := Load(); err == nil {
+				t.Errorf("%v: no error", env)
+			}
+		})
+	}
+}

@@ -741,3 +741,39 @@ func subjectOf(m obj) string {
 	}
 	return ""
 }
+
+// BuildDays returns each student's timetable (with substitutions) for n days
+// from the day of from on, keyed by student name. Unlike Build it doesn't
+// jump to the next school day: weekends and holidays come back as days
+// without lessons. Used for the family app's week view.
+func BuildDays(raw *Raw, from time.Time, n int, loc *time.Location, only []string, fixes ...WeekFix) map[string][]Day {
+	from = from.In(loc)
+	start := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, loc)
+
+	students := studentList(raw.Students)
+	multi := len(students) > 1
+	if len(students) == 0 {
+		students = []obj{{}}
+	}
+	tt := timetableOf(raw.Timetable)
+	for i, l := range tt.lessons {
+		tt.lessons[i] = applyWeekFixes(l, fixes)
+	}
+	out := map[string][]Day{}
+	for _, st := range students {
+		s := Student{ID: idOf(st), Name: studentName(st)}
+		if !selected(s, only) {
+			continue
+		}
+		var ctx *studentCtx
+		if multi {
+			ctx = newStudentCtx(st, raw.Groups[s.ID])
+		}
+		days := make([]Day, 0, n)
+		for i := 0; i < n; i++ {
+			days = append(days, buildDay(tt, raw.Substitutions, ctx, start.AddDate(0, 0, i)))
+		}
+		out[s.Name] = days
+	}
+	return out
+}

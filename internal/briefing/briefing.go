@@ -55,6 +55,10 @@ Regeln:
 - Wichtig ist, was etwas verändert: Ausfall/Vertretung (späterer Beginn, früheres Ende), Arbeiten/Tests,
   Termine mit Abholen oder Fahren, Müll, kein bestelltes Mittagessen, Wetter nur wenn es etwas ändert
   (Regen, Kälte, Frost, Schnee, Hitze), offene To-dos. Normale Stundenpläne nicht nacherzählen.
+- To-dos: "wer" ist die zuständige Person (fehlt = ganze Familie) und gehört dann in "who".
+  Überfälliges zuerst. Abends: "heute noch offen" in section "tonight", "morgen" in section "day".
+- "bestaetigungen_offen" > 0: kurz daran erinnern, dass Eltern abgehakte Aufgaben bestätigen sollen.
+- "punkte": höchstens gelegentlich und nur als Ansporn erwähnen, Kinder nie miteinander vergleichen.
 - "zeitgleich" nur erwähnen, wenn daraus plausibel ein Problem entsteht (z. B. wer fährt/holt ab).
 - Jeder Eintrag: ein kurzer Satz, höchstens 70 Zeichen, ohne Emojis, ohne Namen am Satzanfang,
   wenn "who" schon die Person nennt. Ton: warm, knapp, alltagstauglich, keine Floskeln.
@@ -276,6 +280,20 @@ func (s *Service) For(kind Kind, now time.Time) *Briefing {
 	return nil
 }
 
+// Cards returns the current card of every kind (morning and evening), for
+// the family app. Empty slots are left out.
+func (s *Service) Cards() []*Briefing {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []*Briefing
+	for _, k := range []Kind{Morning, Evening} {
+		if sl := s.slots[k]; sl != nil && sl.cur != nil {
+			out = append(out, copyOf(sl.cur))
+		}
+	}
+	return out
+}
+
 func copyOf(b *Briefing) *Briefing {
 	if b == nil {
 		return nil
@@ -474,6 +492,20 @@ func Fallback(kind Kind, target time.Time, f Facts, colors map[string]string) *B
 			break
 		}
 		add("day", "termin", a.Kalender, a.Zeit+" "+a.Titel)
+	}
+	for i, t := range f.Todos {
+		if i == 2 {
+			break
+		}
+		section := "day"
+		if kind == Evening && (t.Faellig == "heute noch offen" || strings.HasPrefix(t.Faellig, "überfällig")) {
+			section = "tonight"
+		}
+		who := t.Wer
+		if who == "" {
+			who = "Familie"
+		}
+		add(section, "todo", who, t.Titel)
 	}
 	return &Briefing{Kind: kind, Date: target.Format(ymdLayout), Items: normalize(kind, items, colors), CreatedAt: time.Now()}
 }

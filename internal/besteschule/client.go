@@ -77,6 +77,18 @@ func (s *Service) Snapshot() *School {
 	return &sc
 }
 
+// Days returns n days of timetable per student name from the cached
+// responses (nil until the first successful fetch), see BuildDays.
+func (s *Service) Days(from time.Time, n int) map[string][]Day {
+	s.mu.RLock()
+	raw := s.raw
+	s.mu.RUnlock()
+	if raw == nil {
+		return nil
+	}
+	return BuildDays(raw, from, n, s.loc, s.only, s.fixes...)
+}
+
 type authError struct{}
 
 func (authError) Error() string {

@@ -633,11 +633,13 @@ function weatherHints(w, dateStr, fromH, toH) {
   return out;
 }
 
-// ------------------------------------------------------------------ to-dos (Things 3)
+// ------------------------------------------------------------------ to-dos (Things 3 or the family app)
 
-// Today's to-dos of one Things area (THINGS_AREA) that belong to a child,
-// shown in that child's card (afternoon). Open ones in Things' order
+// Today's to-dos that belong to a child, shown in that child's card
+// (afternoon). Things: one area (THINGS_AREA), open ones in Things' order
 // ("This Evening" last, with a moon), then what was ticked off today.
+// Family app (TODOS_SOURCE): open (overdue first), then ticked off but not
+// yet confirmed by a parent (⏳), then done – with the task's points.
 
 const CHECK_SVG = `<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.2"/><path class="tick" d="M6.2 10.4l2.5 2.5 5.1-5.6"/></svg>`;
 
@@ -646,22 +648,26 @@ function todoRow(t) {
   const due = diff === null ? "" : diff < 0 ? `<span class="tag danger">überfällig</span>`
     : diff === 0 ? `<span class="tag danger">heute fällig</span>`
     : diff === 1 ? `<span class="tag warn">morgen fällig</span>` : "";
+  const pending = t.pending && !t.done ? `<span class="tag">⏳ wartet</span>` : "";
+  const points = t.points ? `<span class="tag pts">⭐ ${esc(t.points)}</span>` : "";
   const meta = [
     t.project ? esc(t.project) : "",
     t.checklist ? `${t.checklist.done}/${t.checklist.total} erledigt` : "",
   ].filter(Boolean).join(" · ");
-  return `<div class="todo${t.done ? " done" : ""}">
+  return `<div class="todo${t.done ? " done" : ""}${t.pending ? " pending" : ""}">
     <span class="box">${CHECK_SVG}</span>
-    <span class="what"><span class="t">${esc(t.title)}</span>${t.done ? "" : due}${t.evening && !t.done ? `<span class="eve" title="Heute Abend">🌙</span>` : ""}${meta ? `<span class="sub">${meta}</span>` : ""}</span>
+    <span class="what"><span class="t">${esc(t.title)}</span>${t.done || t.pending ? "" : due}${pending}${points}${t.evening && !t.done ? `<span class="eve" title="Heute Abend">🌙</span>` : ""}${meta ? `<span class="sub">${meta}</span>` : ""}</span>
   </div>`;
 }
 
-// A to-do belongs to a child when it has the child's name as a Things tag
-// ("Lukas") or starts with it ("Lukas: Zimmer aufräumen" – the prefix is
-// dropped in the child's card). Returns the task as shown there, or null.
+// A to-do belongs to a child when the family app assigns it to them, when it
+// has the child's name as a Things tag ("Lukas") or starts with it
+// ("Lukas: Zimmer aufräumen" – the prefix is dropped in the child's card).
+// Returns the task as shown there, or null.
 const TODO_PREFIX = /^\s*([^:]{1,40}):\s*(\S.*)$/;
 
 function todoFor(t, kid) {
+  if (t.who) return sameKid(t.who, kid) ? t : null;
   if ((t.tags || []).some((tag) => sameKid(tag, kid))) return t;
   const m = TODO_PREFIX.exec(t.title || "");
   if (m && sameKid(m[1], kid)) return { ...t, title: m[2] };
@@ -672,7 +678,7 @@ const MAX_KID_TODOS = 4;
 const KID_DONE_SHOWN = 2;
 
 function kidTodoRows(tasks) {
-  const open = tasks.filter((t) => !t.done), done = tasks.filter((t) => t.done);
+  const open = tasks.filter((t) => !t.done && !t.pending), done = tasks.filter((t) => t.done || t.pending);
   const shownOpen = open.slice(0, MAX_KID_TODOS);
   const shownDone = done.slice(0, Math.max(0, Math.min(KID_DONE_SHOWN, MAX_KID_TODOS + 1 - shownOpen.length)));
   return shownOpen.map(todoRow).join("")
@@ -795,7 +801,7 @@ function renderStatus() {
     if (d.school?.error && d.school.students?.length) parts.push(`<span class="err">Schule: ${esc(d.school.error)}</span>`);
     if (d.shopping?.error && d.shopping.items?.length) parts.push(`<span class="err">Bring!: ${esc(d.shopping.error)}</span>`);
     for (const c of d.meals?.children || []) if (c.error && c.days?.length) parts.push(`<span class="err">Essen ${esc(c.name)}: ${esc(c.error)}</span>`);
-    if (d.todos?.error && d.todos.tasks?.length) parts.push(`<span class="err">Things: ${esc(d.todos.error)}</span>`);
+    if (d.todos?.error && d.todos.tasks?.length) parts.push(`<span class="err">${d.todos.source === "familyapp" ? "Familienapp" : "Things"}: ${esc(d.todos.error)}</span>`);
     if (d.news?.error && d.news.groups?.some((g) => g.items?.length)) parts.push(`<span class="err">News: ${esc(d.news.error)}</span>`);
     if (d.briefing?.error) parts.push(`<span class="err">KI: ${esc(d.briefing.error.slice(0, 80))}</span>`);
   }

@@ -19,11 +19,13 @@ import (
 	"familydash/internal/bring"
 	"familydash/internal/calendar"
 	"familydash/internal/config"
+	"familydash/internal/familyapp"
 	"familydash/internal/news"
 	"familydash/internal/photos"
 	"familydash/internal/server"
 	"familydash/internal/things"
 	"familydash/internal/timetable"
+	"familydash/internal/todo"
 	"familydash/internal/uptime"
 	"familydash/internal/vielfalt"
 	"familydash/internal/waste"
@@ -42,6 +44,7 @@ func main() {
 	mealsPreview := flag.Bool("vielfalt-preview", false, "log in to VielfaltMenü, print the ordered meals and exit")
 	todosPreview := flag.Bool("things-preview", false, "sync with Things Cloud, print today's to-dos of THINGS_AREA and exit")
 	briefPreview := flag.String("briefing-preview", "", "morning|evening: load all sources once, print the facts and the AI card and exit")
+	appPreview := flag.Bool("familyapp-preview", false, "load all sources once, print what would be pushed to the family app (nothing is sent) and its to-dos, and exit")
 	flag.Parse()
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
@@ -65,6 +68,9 @@ func main() {
 	}
 	if *briefPreview != "" {
 		os.Exit(brief(cfg, briefing.Kind(*briefPreview)))
+	}
+	if *appPreview {
+		os.Exit(appPreviewRun(cfg))
 	}
 	if version == "dev" {
 		version = fmt.Sprintf("dev-%d", time.Now().Unix())
@@ -126,10 +132,16 @@ func main() {
 		go ph.Run(ctx, cfg.PhotosRefresh)
 	}
 
-	var td *things.Service
-	if cfg.ThingsEnabled() {
-		td = newTodos(cfg)
+	// to-dos: Things 3 or the family app (TODOS_SOURCE); never both
+	var todos todo.Source
+	if cfg.FamilyAppTodos() {
+		fa := familyapp.NewTodoService(newAppClient(cfg), cfg.Location)
+		go fa.Run(ctx, cfg.FamilyAppRefresh)
+		todos = fa
+	} else if cfg.UseThings() {
+		td := newTodos(cfg)
 		go td.Run(ctx, cfg.ThingsRefresh)
+		todos = td
 	}
 
 	var up *uptime.Service
@@ -144,10 +156,13 @@ func main() {
 		go nw.Run(ctx, cfg.NewsRefresh)
 	}
 
-	src := server.Sources{Weather: wx, Bring: br, School: sc, Plan: plan, Meals: ml, Waste: ws, Photos: ph, Todos: td, Uptime: up, News: nw}
+	src := server.Sources{Weather: wx, Bring: br, School: sc, Plan: plan, Meals: ml, Waste: ws, Photos: ph, Todos: todos, Uptime: up, News: nw}
 	if cfg.BriefingEnabled() {
 		src.Briefing = newBriefing(cfg, cal, src)
 		go src.Briefing.Run(ctx)
+	}
+	if cfg.FamilyAppPushEnabled() {
+		go newPusher(cfg, cal, src).Run(ctx, time.Minute)
 	}
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
@@ -164,7 +179,7 @@ func main() {
 	slog.Info("familydash started", "version", version, "addr", cfg.ListenAddr,
 		"calendars", len(cfg.Calendars), "weather", cfg.WeatherEnabled(), "tz", cfg.Location.String(),
 		"bring", cfg.BringEnabled(), "besteschule", cfg.SchoolEnabled(), "timetable", plan != nil, "vielfalt", len(cfg.Meals), "waste", len(cfg.Waste),
-		"photos", cfg.PhotosDir, "things", cfg.ThingsEnabled(), "briefing", briefingMode(cfg), "uptime", cfg.UptimeEnabled(), "news", len(cfg.NewsFeeds), "weatherBg", cfg.WeatherBGDir, "scene", cfg.Scenes.At(time.Now(), cfg.Location).Name)
+		"photos", cfg.PhotosDir, "todos", todoMode(cfg), "familyappPush", cfg.FamilyAppPushEnabled(), "briefing", briefingMode(cfg), "uptime", cfg.UptimeEnabled(), "news", len(cfg.NewsFeeds), "weatherBg", cfg.WeatherBGDir, "scene", cfg.Scenes.At(time.Now(), cfg.Location).Name)
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("server", "err", err)
 		os.Exit(1)
@@ -342,10 +357,7 @@ func brief(cfg *config.Config, kind briefing.Kind) int {
 	if len(cfg.Waste) > 0 {
 		src.Waste = &waste.Service{Bins: cfg.Waste, Shift: cfg.WasteShift}
 	}
-	if cfg.ThingsEnabled() {
-		src.Todos = newTodos(cfg)
-		src.Todos.Refresh(ctx)
-	}
+	src.Todos = loadTodosOnce(ctx, cfg)
 	b := newBriefing(cfg, cal, src)
 	card, facts, err := b.Generate(ctx, kind, time.Now())
 	enc := json.NewEncoder(os.Stdout)
@@ -353,6 +365,104 @@ func brief(cfg *config.Config, kind briefing.Kind) int {
 	enc.SetEscapeHTML(false)
 	enc.Encode(map[string]any{"facts": facts, "briefing": card})
 	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	return 0
+}
+
+func newAppClient(cfg *config.Config) *familyapp.Client {
+	return familyapp.NewClient(cfg.FamilyAppURL, cfg.FamilyAppIngestToken, cfg.FamilyAppReadToken)
+}
+
+func todoMode(cfg *config.Config) string {
+	switch {
+	case cfg.FamilyAppTodos():
+		return todo.SourceFamilyApp
+	case cfg.UseThings():
+		return todo.SourceThings
+	}
+	return "off"
+}
+
+// loadTodosOnce fetches the configured to-do source once (previews).
+func loadTodosOnce(ctx context.Context, cfg *config.Config) todo.Source {
+	switch {
+	case cfg.FamilyAppTodos():
+		s := familyapp.NewTodoService(newAppClient(cfg), cfg.Location)
+		s.Refresh(ctx)
+		return s
+	case cfg.UseThings():
+		s := newTodos(cfg)
+		s.Refresh(ctx)
+		return s
+	}
+	return nil
+}
+
+// newPusher sends each child's week and the briefings to the family app.
+func newPusher(cfg *config.Config, cal *calendar.Service, src server.Sources) *familyapp.Pusher {
+	p := &familyapp.Pusher{
+		Client: newAppClient(cfg), Loc: cfg.Location, Heartbeat: cfg.FamilyAppHeartbeat, ExtraCals: cfg.FamilyAppCalendars,
+		Gather: func(now time.Time) familyapp.Inputs {
+			in := familyapp.Inputs{Calendar: cal.Snapshot()}
+			if src.School != nil {
+				in.School = src.School.Snapshot()
+				in.SchoolDays = src.School.Days(now, familyapp.Days)
+			}
+			if src.Plan != nil {
+				in.Timetables = src.Plan.Build(now, cfg.Location)
+				in.PlanDays = src.Plan.Days(now, familyapp.Days, cfg.Location)
+			}
+			if src.Meals != nil {
+				in.Meals = src.Meals.Snapshot()
+			}
+			return in
+		},
+	}
+	if src.Briefing != nil {
+		p.Briefings = src.Briefing.Cards
+	}
+	return p
+}
+
+// appPreviewRun loads every source once and prints the payloads the wall
+// would push to the family app – nothing is sent – plus the to-dos it reads:
+// `docker exec familydash /familydash -familyapp-preview`
+func appPreviewRun(cfg *config.Config) int {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	cal := calendar.NewService(cfg)
+	cal.Refresh(ctx)
+	var src server.Sources
+	if cfg.SchoolEnabled() {
+		src.School = besteschule.NewService(cfg.SchoolURL, cfg.SchoolToken, cfg.Location, cfg.SchoolStudents)
+		src.School.SetWeekFixes(cfg.SchoolWeekFix)
+		src.School.Refresh(ctx)
+	}
+	if !cfg.TimetableOff {
+		if plan, err := timetable.Load(cfg.TimetableFile); err == nil {
+			src.Plan = plan
+		}
+	}
+	if cfg.MealsEnabled() {
+		src.Meals = newMeals(cfg)
+		src.Meals.Refresh(ctx)
+	}
+	now := time.Now()
+	p := newPusher(cfg, cal, src)
+	out := map[string]any{
+		"children": familyapp.BuildChildren(p.Gather(now), now, cfg.Location, cfg.FamilyAppCalendars),
+		"push":     cfg.FamilyAppPushEnabled(),
+		"todos":    todoMode(cfg),
+	}
+	if cfg.FamilyAppTodos() {
+		out["todoList"] = loadTodosOnce(ctx, cfg).Snapshot()
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(out); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
