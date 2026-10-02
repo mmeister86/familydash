@@ -55,6 +55,9 @@ func main() {
 	if *healthcheck {
 		os.Exit(probe(cfg.ListenAddr))
 	}
+	for _, w := range cfg.Warnings {
+		slog.Warn("config", "problem", w)
+	}
 	if *schoolDump || *schoolPreview {
 		os.Exit(school(cfg, *schoolDump))
 	}

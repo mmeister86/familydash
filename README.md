@@ -216,7 +216,8 @@ beste.schule, VielfaltMenü and Google Calendar; it hands the results over. All 
   child's card (⭐ points, ⏳ = ticked off, waiting for a parent); the briefing gets every person's tasks (overdue first, in the
   evening what's still open plus tomorrow's), how many wait for confirmation and the children's points.
 
-Failures only log and retry; the wall keeps the last good data. The exact payloads are in [docs/FAMILY_APP.md](docs/FAMILY_APP.md).
+Failures only log and retry; the wall keeps the last good data. A mistake in these settings never stops the container: a URL
+without `https://` is fixed, anything else switches the family app off with a ⚙️ warning in the footer and the log. The exact payloads are in [docs/FAMILY_APP.md](docs/FAMILY_APP.md).
 See what would be sent (nothing is posted) and what the app returns:
 
 ```sh

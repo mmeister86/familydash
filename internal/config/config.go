@@ -4,6 +4,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -113,6 +114,8 @@ type Config struct {
 	// FAMILY_APP_<SLUG>_CALENDARS=2,3 → slug → indexes into Calendars whose
 	// entries count as that child's appointments (besides its school calendar)
 	FamilyAppCalendars map[string][]int
+	// Non-fatal configuration problems (logged at start, shown in the footer)
+	Warnings []string
 }
 
 type MealAccount struct {
@@ -253,9 +256,7 @@ func Load() (*Config, error) {
 		}
 	}
 	c.resolveColumns(intoNum)
-	if err := c.loadFamilyApp(); err != nil {
-		return nil, err
-	}
+	c.loadFamilyApp()
 
 	// WASTE_1_NAME=Restabfall, WASTE_1_DAY=Mi, WASTE_1_WEEKS=gerade … (up to 10)
 	wasteColors := []string{"#8A8F98", "#F2C94C", "#4F8EF7", "#8B5E3C", "#46C28E"}
@@ -300,13 +301,32 @@ func Load() (*Config, error) {
 
 // loadFamilyApp checks FAMILY_APP_* and resolves
 // FAMILY_APP_<SLUG>_CALENDARS (calendar numbers n of CALENDAR_n_*).
-func (c *Config) loadFamilyApp() error {
-	if c.FamilyAppURL != "" && !strings.HasPrefix(c.FamilyAppURL, "https://") && !strings.HasPrefix(c.FamilyAppURL, "http://") {
-		return fmt.Errorf("FAMILY_APP_SITE_URL %q: want an http(s) URL", c.FamilyAppURL)
+//
+// The family app is optional: a mistake here must never stop the wall. So
+// nothing in this function fails – it fixes what it safely can (a URL
+// without https://), switches off what it can't and records a warning,
+// which is logged and shown in the footer.
+func (c *Config) loadFamilyApp() {
+	warn := func(format string, a ...any) { c.Warnings = append(c.Warnings, fmt.Sprintf(format, a...)) }
+
+	badURL := false
+	if u := c.FamilyAppURL; u != "" {
+		if !strings.Contains(u, "://") {
+			u = "https://" + u // "familybackend-http.matthias.lol" is what people paste
+		}
+		if p, err := url.Parse(u); err != nil || (p.Scheme != "https" && p.Scheme != "http") || p.Host == "" || strings.ContainsAny(u, " \t") {
+			warn("FAMILY_APP_SITE_URL %q ist keine gültige Adresse – Familienapp aus", c.FamilyAppURL)
+			u, badURL = "", true
+		}
+		c.FamilyAppURL = u
 	}
-	if c.FamilyAppURL == "" && (c.FamilyAppIngestToken != "" || c.FamilyAppReadToken != "") {
-		return fmt.Errorf("FAMILY_APP_*_TOKEN is set but FAMILY_APP_SITE_URL is missing")
+	if c.FamilyAppURL == "" {
+		if !badURL && (c.FamilyAppIngestToken != "" || c.FamilyAppReadToken != "") {
+			warn("FAMILY_APP_*_TOKEN gesetzt, aber FAMILY_APP_SITE_URL fehlt – Familienapp aus")
+		}
+		c.FamilyAppIngestToken, c.FamilyAppReadToken = "", ""
 	}
+
 	byNum := map[int]int{}
 	for i, cal := range c.Calendars {
 		byNum[cal.Num] = i
@@ -327,16 +347,17 @@ func (c *Config) loadFamilyApp() error {
 			}
 			n, err := strconv.Atoi(f)
 			if err != nil {
-				return fmt.Errorf("%s: %q is no calendar number", k, f)
+				warn("%s: %q ist keine Kalendernummer – übersprungen", k, f)
+				continue
 			}
 			i, ok := byNum[n]
 			if !ok {
-				return fmt.Errorf("%s: CALENDAR_%d_URL is not set", k, n)
+				warn("%s: CALENDAR_%d_URL ist nicht gesetzt – übersprungen", k, n)
+				continue
 			}
 			c.FamilyAppCalendars[slug] = append(c.FamilyAppCalendars[slug], i)
 		}
 	}
-	return nil
 }
 
 // resolveColumns turns CALENDAR_n_COLUMN=<m> into an index. The target must

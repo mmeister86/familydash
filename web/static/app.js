@@ -795,6 +795,7 @@ function renderStatus() {
     for (const c of d.meals?.children || []) if (c.error && c.days?.length) parts.push(`<span class="err">Essen ${esc(c.name)}: ${esc(c.error)}</span>`);
     if (d.todos?.error && d.todos.tasks?.length) parts.push(`<span class="err">Familienapp: ${esc(d.todos.error)}</span>`);
     if (d.news?.error && d.news.groups?.some((g) => g.items?.length)) parts.push(`<span class="err">News: ${esc(d.news.error)}</span>`);
+    for (const w of d.warnings || []) parts.push(`<span class="err">⚙️ ${esc(w)}</span>`);
     if (d.briefing?.error) parts.push(`<span class="err">KI: ${esc(d.briefing.error.slice(0, 80))}</span>`);
   }
   if (d) {
