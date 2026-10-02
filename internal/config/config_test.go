@@ -170,20 +170,38 @@ func TestFamilyApp(t *testing.T) {
 	}
 }
 
-func TestFamilyAppErrors(t *testing.T) {
-	for name, env := range map[string]map[string]string{
-		"source":       {"TODOS_SOURCE": "nope"},
-		"no url":       {"TODOS_SOURCE": "familyapp"},
-		"token no url": {"FAMILY_APP_INGEST_TOKEN": "w"},
-		"bad url":      {"FAMILY_APP_SITE_URL": "familybackend-http.matthias.lol"},
-		"calendar":     {"FAMILY_APP_SITE_URL": "https://x.y", "FAMILY_APP_HANNAH_CALENDARS": "7"},
-	} {
+// A mistake in the optional family app settings must never stop the wall:
+// Load succeeds, the feature is fixed or switched off, and there's a warning.
+func TestFamilyAppMistakesAreNotFatal(t *testing.T) {
+	cases := map[string]struct {
+		env      map[string]string
+		url      string
+		push     bool
+		appTodos bool
+		warnings int
+	}{
+		"no scheme is fixed": {env: map[string]string{"FAMILY_APP_SITE_URL": "familybackend-http.matthias.lol", "FAMILY_APP_INGEST_TOKEN": "w"},
+			url: "https://familybackend-http.matthias.lol", push: true},
+		"garbage url":  {env: map[string]string{"FAMILY_APP_SITE_URL": "ftp://x", "FAMILY_APP_INGEST_TOKEN": "w"}, warnings: 1},
+		"spaces":       {env: map[string]string{"FAMILY_APP_SITE_URL": "https://a b.de", "FAMILY_APP_DASHBOARD_TOKEN": "r"}, warnings: 1},
+		"token no url": {env: map[string]string{"FAMILY_APP_INGEST_TOKEN": "w"}, warnings: 1},
+		"bad source":   {env: map[string]string{"TODOS_SOURCE": "nope"}, warnings: 1},
+		"familyapp without token": {env: map[string]string{"TODOS_SOURCE": "familyapp", "FAMILY_APP_SITE_URL": "https://x.y"},
+			url: "https://x.y", warnings: 1},
+		"calendars": {env: map[string]string{"FAMILY_APP_SITE_URL": "https://x.y", "FAMILY_APP_DASHBOARD_TOKEN": "r", "FAMILY_APP_HANNAH_CALENDARS": "7,abc"},
+			url: "https://x.y", appTodos: true, warnings: 2},
+	}
+	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			for k, v := range env {
+			for k, v := range tc.env {
 				t.Setenv(k, v)
 			}
-			if _, err := Load(); err == nil {
-				t.Errorf("%v: no error", env)
+			c, err := Load()
+			if err != nil {
+				t.Fatalf("Load failed: %v", err)
+			}
+			if c.FamilyAppURL != tc.url || c.FamilyAppPushEnabled() != tc.push || c.FamilyAppTodos() != tc.appTodos || len(c.Warnings) != tc.warnings {
+				t.Errorf("url=%q push=%v appTodos=%v warnings=%q", c.FamilyAppURL, c.FamilyAppPushEnabled(), c.FamilyAppTodos(), c.Warnings)
 			}
 		})
 	}
