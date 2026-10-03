@@ -134,7 +134,7 @@ func Convert(r TodosResponse, now time.Time, loc *time.Location) *todo.List {
 		t := todo.Task{ID: w.ID, Title: title, Who: names[w.Assignee], Points: w.Points,
 			Done: w.Status == "done", Pending: w.Status == "pending"}
 		if !w.Recurring {
-			t.Deadline = w.Date // one-offs show "heute fällig" / "überfällig" like Things deadlines
+			t.Deadline = w.Date // one-offs get "heute fällig" / "überfällig" from the deadline
 		}
 		switch {
 		case w.Date < today:

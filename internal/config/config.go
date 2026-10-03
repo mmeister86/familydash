@@ -88,14 +88,6 @@ type Config struct {
 	NewsMaxAge   time.Duration
 	NewsPerGroup int
 
-	// Things 3 to-dos of one area (THINGS_*), read via the things3 CLI
-	ThingsEmail    string
-	ThingsPassword string
-	ThingsArea     string
-	ThingsBin      string
-	ThingsStateDir string // sync cache of the CLI
-	ThingsRefresh  time.Duration
-
 	// Uptime Kuma status page in the footer (UPTIME_*)
 	UptimeBase     string // http://host:3001, "" = off
 	UptimeSlug     string // from UPTIME_URL …/status/<slug>
@@ -112,7 +104,8 @@ type Config struct {
 	GeminiThinking string // low | medium | high, "default" = model default
 	GeminiBackend  string // auto | gemini (AI Studio) | vertex (Vertex AI express mode)
 
-	// Family app (FAMILY_APP_*): push children's weeks + briefings, read to-dos
+	// Family app (FAMILY_APP_*): push children's weeks + briefings and read the
+	// to-dos; it is the only to-do source.
 	FamilyAppURL         string // HTTP actions ("site") URL of the Convex backend
 	FamilyAppIngestToken string // POST /ingest/*; "" = no push
 	FamilyAppReadToken   string // GET /todos; "" = no to-dos from the app
@@ -123,9 +116,6 @@ type Config struct {
 	FamilyAppCalendars map[string][]int
 	// Non-fatal configuration problems (logged at start, shown in the footer)
 	Warnings []string
-	// Where the to-dos come from: auto (the app when FAMILY_APP_DASHBOARD_TOKEN
-	// is set, else Things), things, familyapp
-	TodosSource string
 }
 
 type MealAccount struct {
@@ -171,13 +161,6 @@ func Load() (*Config, error) {
 		NewsMaxAge:   envDuration("NEWS_MAX_AGE", 48*time.Hour),
 		NewsPerGroup: envInt("NEWS_PER_GROUP", 12),
 
-		ThingsEmail:    env("THINGS_EMAIL", ""),
-		ThingsPassword: env("THINGS_PASSWORD", ""),
-		ThingsArea:     env("THINGS_AREA", "Familie"),
-		ThingsBin:      env("THINGS_BIN", "/things3"),
-		ThingsStateDir: env("THINGS_STATE_DIR", "/data/things"),
-		ThingsRefresh:  envDuration("THINGS_REFRESH", 5*time.Minute),
-
 		UptimeAPIKey:   env("UPTIME_API_KEY", ""),
 		UptimeCertWarn: envInt("UPTIME_CERT_WARN_DAYS", 14),
 		UptimeRefresh:  envDuration("UPTIME_REFRESH", time.Minute),
@@ -195,7 +178,6 @@ func Load() (*Config, error) {
 		FamilyAppReadToken:   env("FAMILY_APP_DASHBOARD_TOKEN", ""),
 		FamilyAppRefresh:     envDuration("FAMILY_APP_REFRESH", time.Minute),
 		FamilyAppHeartbeat:   envDuration("FAMILY_APP_HEARTBEAT", 15*time.Minute),
-		TodosSource:          strings.ToLower(env("TODOS_SOURCE", "auto")),
 	}
 	switch c.GeminiBackend {
 	case "auto", "gemini", "vertex":
@@ -317,7 +299,7 @@ func Load() (*Config, error) {
 	return c, nil
 }
 
-// loadFamilyApp checks FAMILY_APP_* / TODOS_SOURCE and resolves
+// loadFamilyApp checks FAMILY_APP_* and resolves
 // FAMILY_APP_<SLUG>_CALENDARS (calendar numbers n of CALENDAR_n_*).
 //
 // The family app is optional: a mistake here must never stop the wall. So
@@ -327,12 +309,6 @@ func Load() (*Config, error) {
 func (c *Config) loadFamilyApp() {
 	warn := func(format string, a ...any) { c.Warnings = append(c.Warnings, fmt.Sprintf(format, a...)) }
 
-	switch c.TodosSource {
-	case "auto", "things", "familyapp":
-	default:
-		warn("TODOS_SOURCE %q unbekannt (auto, things oder familyapp) – nehme auto", c.TodosSource)
-		c.TodosSource = "auto"
-	}
 	badURL := false
 	if u := c.FamilyAppURL; u != "" {
 		if !strings.Contains(u, "://") {
@@ -349,10 +325,6 @@ func (c *Config) loadFamilyApp() {
 			warn("FAMILY_APP_*_TOKEN gesetzt, aber FAMILY_APP_SITE_URL fehlt – Familienapp aus")
 		}
 		c.FamilyAppIngestToken, c.FamilyAppReadToken = "", ""
-	}
-	if c.TodosSource == "familyapp" && c.FamilyAppReadToken == "" {
-		warn("TODOS_SOURCE=familyapp braucht FAMILY_APP_SITE_URL und FAMILY_APP_DASHBOARD_TOKEN – nehme auto")
-		c.TodosSource = "auto"
 	}
 
 	byNum := map[int]int{}
@@ -479,26 +451,18 @@ func (c *Config) WeatherEnabled() bool { return c.WeatherLat != 0 || c.WeatherLo
 func (c *Config) BringEnabled() bool   { return c.BringEmail != "" && c.BringPassword != "" }
 func (c *Config) SchoolEnabled() bool  { return c.SchoolToken != "" }
 func (c *Config) MealsEnabled() bool   { return len(c.Meals) > 0 }
-func (c *Config) ThingsEnabled() bool  { return c.ThingsEmail != "" && c.ThingsPassword != "" }
 
 // FamilyAppPushEnabled: children's weeks and briefings go to the app.
 func (c *Config) FamilyAppPushEnabled() bool {
 	return c.FamilyAppURL != "" && c.FamilyAppIngestToken != ""
 }
 
-// FamilyAppTodos: the to-dos come from the app instead of Things.
-func (c *Config) FamilyAppTodos() bool {
-	switch c.TodosSource {
-	case "things":
-		return false
-	case "familyapp":
-		return true
-	}
+// TodosEnabled: the family app is the to-do source once its URL and the read
+// token are set; otherwise the wall shows no to-do card.
+func (c *Config) TodosEnabled() bool {
 	return c.FamilyAppURL != "" && c.FamilyAppReadToken != ""
 }
 
-// UseThings: Things is configured and not replaced by the app.
-func (c *Config) UseThings() bool     { return c.ThingsEnabled() && !c.FamilyAppTodos() }
 func (c *Config) UptimeEnabled() bool { return c.UptimeBase != "" }
 func (c *Config) NewsEnabled() bool   { return len(c.NewsFeeds) > 0 }
 

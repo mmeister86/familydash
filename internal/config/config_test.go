@@ -144,8 +144,6 @@ func TestFamilyApp(t *testing.T) {
 	t.Setenv("FAMILY_APP_SITE_URL", "https://familybackend-http.matthias.lol/")
 	t.Setenv("FAMILY_APP_INGEST_TOKEN", "w")
 	t.Setenv("FAMILY_APP_LUKAS_CALENDARS", "1, 3")
-	t.Setenv("THINGS_EMAIL", "a@b.c")
-	t.Setenv("THINGS_PASSWORD", "x")
 	c, err := Load()
 	if err != nil {
 		t.Fatal(err)
@@ -156,17 +154,13 @@ func TestFamilyApp(t *testing.T) {
 	if got := c.FamilyAppCalendars["lukas"]; len(got) != 2 || got[0] != 0 || got[1] != 1 {
 		t.Errorf("calendars: %v", c.FamilyAppCalendars)
 	}
-	// auto without a read token: Things stays
-	if c.FamilyAppTodos() || !c.UseThings() {
-		t.Error("auto without FAMILY_APP_DASHBOARD_TOKEN should keep Things")
+	// without a read token there are no to-dos
+	if c.TodosEnabled() {
+		t.Error("no FAMILY_APP_DASHBOARD_TOKEN should mean no to-dos")
 	}
 	t.Setenv("FAMILY_APP_DASHBOARD_TOKEN", "r")
-	if c, _ = Load(); !c.FamilyAppTodos() || c.UseThings() {
-		t.Error("auto with a read token should switch to the app")
-	}
-	t.Setenv("TODOS_SOURCE", "things")
-	if c, _ = Load(); c.FamilyAppTodos() || !c.UseThings() {
-		t.Error("TODOS_SOURCE=things should keep Things")
+	if c, _ = Load(); !c.TodosEnabled() {
+		t.Error("URL + FAMILY_APP_DASHBOARD_TOKEN should enable the to-dos")
 	}
 }
 
@@ -177,19 +171,17 @@ func TestFamilyAppMistakesAreNotFatal(t *testing.T) {
 		env      map[string]string
 		url      string
 		push     bool
-		appTodos bool
+		todos    bool
 		warnings int
 	}{
 		"no scheme is fixed": {env: map[string]string{"FAMILY_APP_SITE_URL": "familybackend-http.matthias.lol", "FAMILY_APP_INGEST_TOKEN": "w"},
 			url: "https://familybackend-http.matthias.lol", push: true},
-		"garbage url":  {env: map[string]string{"FAMILY_APP_SITE_URL": "ftp://x", "FAMILY_APP_INGEST_TOKEN": "w"}, warnings: 1},
-		"spaces":       {env: map[string]string{"FAMILY_APP_SITE_URL": "https://a b.de", "FAMILY_APP_DASHBOARD_TOKEN": "r"}, warnings: 1},
-		"token no url": {env: map[string]string{"FAMILY_APP_INGEST_TOKEN": "w"}, warnings: 1},
-		"bad source":   {env: map[string]string{"TODOS_SOURCE": "nope"}, warnings: 1},
-		"familyapp without token": {env: map[string]string{"TODOS_SOURCE": "familyapp", "FAMILY_APP_SITE_URL": "https://x.y"},
-			url: "https://x.y", warnings: 1},
+		"garbage url":            {env: map[string]string{"FAMILY_APP_SITE_URL": "ftp://x", "FAMILY_APP_INGEST_TOKEN": "w"}, warnings: 1},
+		"spaces":                 {env: map[string]string{"FAMILY_APP_SITE_URL": "https://a b.de", "FAMILY_APP_DASHBOARD_TOKEN": "r"}, warnings: 1},
+		"token no url":           {env: map[string]string{"FAMILY_APP_INGEST_TOKEN": "w"}, warnings: 1},
+		"dashboard token no url": {env: map[string]string{"FAMILY_APP_DASHBOARD_TOKEN": "r"}, warnings: 1},
 		"calendars": {env: map[string]string{"FAMILY_APP_SITE_URL": "https://x.y", "FAMILY_APP_DASHBOARD_TOKEN": "r", "FAMILY_APP_HANNAH_CALENDARS": "7,abc"},
-			url: "https://x.y", appTodos: true, warnings: 2},
+			url: "https://x.y", todos: true, warnings: 2},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -200,8 +192,8 @@ func TestFamilyAppMistakesAreNotFatal(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Load failed: %v", err)
 			}
-			if c.FamilyAppURL != tc.url || c.FamilyAppPushEnabled() != tc.push || c.FamilyAppTodos() != tc.appTodos || len(c.Warnings) != tc.warnings {
-				t.Errorf("url=%q push=%v appTodos=%v warnings=%q", c.FamilyAppURL, c.FamilyAppPushEnabled(), c.FamilyAppTodos(), c.Warnings)
+			if c.FamilyAppURL != tc.url || c.FamilyAppPushEnabled() != tc.push || c.TodosEnabled() != tc.todos || len(c.Warnings) != tc.warnings {
+				t.Errorf("url=%q push=%v todos=%v warnings=%q", c.FamilyAppURL, c.FamilyAppPushEnabled(), c.TodosEnabled(), c.Warnings)
 			}
 		})
 	}

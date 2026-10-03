@@ -23,7 +23,6 @@ import (
 	"familydash/internal/news"
 	"familydash/internal/photos"
 	"familydash/internal/server"
-	"familydash/internal/things"
 	"familydash/internal/timetable"
 	"familydash/internal/todo"
 	"familydash/internal/uptime"
@@ -42,7 +41,6 @@ func main() {
 	schoolDump := flag.Bool("besteschule-dump", false, "print the raw beste.schule API responses as JSON and exit")
 	schoolPreview := flag.Bool("besteschule-preview", false, "print what the dashboard would show from beste.schule and exit")
 	mealsPreview := flag.Bool("vielfalt-preview", false, "log in to VielfaltMenü, print the ordered meals and exit")
-	todosPreview := flag.Bool("things-preview", false, "sync with Things Cloud, print today's to-dos of THINGS_AREA and exit")
 	briefPreview := flag.String("briefing-preview", "", "morning|evening: load all sources once, print the facts and the AI card and exit")
 	appPreview := flag.Bool("familyapp-preview", false, "load all sources once, print what would be pushed to the family app (nothing is sent) and its to-dos, and exit")
 	flag.Parse()
@@ -65,9 +63,6 @@ func main() {
 	}
 	if *mealsPreview {
 		os.Exit(meals(cfg))
-	}
-	if *todosPreview {
-		os.Exit(todos(cfg))
 	}
 	if *briefPreview != "" {
 		os.Exit(brief(cfg, briefing.Kind(*briefPreview)))
@@ -135,16 +130,12 @@ func main() {
 		go ph.Run(ctx, cfg.PhotosRefresh)
 	}
 
-	// to-dos: Things 3 or the family app (TODOS_SOURCE); never both
+	// to-dos come from the family app (GET /todos); unset tokens = no card
 	var todos todo.Source
-	if cfg.FamilyAppTodos() {
+	if cfg.TodosEnabled() {
 		fa := familyapp.NewTodoService(newAppClient(cfg), cfg.Location)
 		go fa.Run(ctx, cfg.FamilyAppRefresh)
 		todos = fa
-	} else if cfg.UseThings() {
-		td := newTodos(cfg)
-		go td.Run(ctx, cfg.ThingsRefresh)
-		todos = td
 	}
 
 	var up *uptime.Service
@@ -256,34 +247,6 @@ func meals(cfg *config.Config) int {
 	return 0
 }
 
-func newTodos(cfg *config.Config) *things.Service {
-	return things.NewService(cfg.ThingsBin, cfg.ThingsEmail, cfg.ThingsPassword, cfg.ThingsArea, cfg.ThingsStateDir)
-}
-
-// todos checks the Things login and area: `docker exec familydash /familydash -things-preview`
-func todos(cfg *config.Config) int {
-	if !cfg.ThingsEnabled() {
-		fmt.Fprintln(os.Stderr, "THINGS_EMAIL / THINGS_PASSWORD are not set")
-		return 1
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	defer cancel()
-	s := newTodos(cfg)
-	s.Refresh(ctx)
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	enc.SetEscapeHTML(false)
-	snap := s.Snapshot()
-	if err := enc.Encode(snap); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
-	}
-	if snap == nil || snap.Error != "" {
-		return 1
-	}
-	return 0
-}
-
 // newBriefing wires the AI card to the other sources (nil ones are skipped).
 func newBriefing(cfg *config.Config, cal *calendar.Service, src server.Sources) *briefing.Service {
 	b := &briefing.Service{
@@ -379,24 +342,16 @@ func newAppClient(cfg *config.Config) *familyapp.Client {
 }
 
 func todoMode(cfg *config.Config) string {
-	switch {
-	case cfg.FamilyAppTodos():
+	if cfg.TodosEnabled() {
 		return todo.SourceFamilyApp
-	case cfg.UseThings():
-		return todo.SourceThings
 	}
 	return "off"
 }
 
-// loadTodosOnce fetches the configured to-do source once (previews).
+// loadTodosOnce fetches the family app's to-dos once (previews).
 func loadTodosOnce(ctx context.Context, cfg *config.Config) todo.Source {
-	switch {
-	case cfg.FamilyAppTodos():
+	if cfg.TodosEnabled() {
 		s := familyapp.NewTodoService(newAppClient(cfg), cfg.Location)
-		s.Refresh(ctx)
-		return s
-	case cfg.UseThings():
-		s := newTodos(cfg)
 		s.Refresh(ctx)
 		return s
 	}
@@ -459,7 +414,7 @@ func appPreviewRun(cfg *config.Config) int {
 		"push":     cfg.FamilyAppPushEnabled(),
 		"todos":    todoMode(cfg),
 	}
-	if cfg.FamilyAppTodos() {
+	if cfg.TodosEnabled() {
 		out["todoList"] = loadTodosOnce(ctx, cfg).Snapshot()
 	}
 	enc := json.NewEncoder(os.Stdout)
