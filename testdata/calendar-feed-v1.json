@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "scope": "family-calendars",
+  "timezone": "Europe/Berlin",
+  "configurationRevision": 3,
+  "generatedAt": 1791028800000,
+  "window": {
+    "fromDate": "2026-10-03",
+    "toDate": "2026-11-14",
+    "fromMs": 1790978400000,
+    "toMs": 1794610800000
+  },
+  "people": [
+    { "id": "user_mama", "slug": "mama", "name": "Mama", "role": "parent" },
+    { "id": "user_lena", "slug": "lena", "name": "Lena", "role": "child" }
+  ],
+  "bindings": [
+    { "personId": "user_lena", "kind": "timetable", "externalId": "lena-7b" }
+  ],
+  "calendars": [
+    {
+      "id": "cal_familie",
+      "sourceKey": "familie",
+      "name": "Familie",
+      "color": "#2563eb",
+      "panel": "column",
+      "order": 0,
+      "personIds": [],
+      "lastAttemptAt": 1791028680000,
+      "lastSuccessAt": 1791028680000,
+      "freshness": "fresh",
+      "lastAttemptStatus": "success",
+      "coverage": {
+        "fromDate": "2026-10-03",
+        "toDate": "2026-11-14",
+        "fromMs": 1790978400000,
+        "toMs": 1794610800000
+      }
+    },
+    {
+      "id": "cal_schule_lena",
+      "sourceKey": "schule-lena",
+      "name": "Schule Lena",
+      "color": "#16a34a",
+      "panel": "school",
+      "order": 1,
+      "intoCalendarId": "cal_familie",
+      "personIds": ["user_lena"],
+      "lastAttemptAt": 1791028680000,
+      "lastSuccessAt": 1791028680000,
+      "freshness": "fresh",
+      "lastAttemptStatus": "success",
+      "coverage": {
+        "fromDate": "2026-10-03",
+        "toDate": "2026-11-14",
+        "fromMs": 1790978400000,
+        "toMs": 1794610800000
+      }
+    }
+  ],
+  "events": [
+    {
+      "key": "[\"fruehstueck-1\",null]",
+      "uid": "fruehstueck-1",
+      "identityQuality": "provider",
+      "title": "Familienfrühstück",
+      "startMs": 1791097200000,
+      "endMs": 1791100800000,
+      "allDay": false,
+      "timezone": "Europe/Berlin",
+      "calendarId": "cal_familie"
+    },
+    {
+      "key": "[\"herbstferien\",null]",
+      "uid": "herbstferien",
+      "identityQuality": "provider",
+      "title": "Herbstferien",
+      "startMs": 1791756000000,
+      "endMs": 1792188000000,
+      "allDay": true,
+      "timezone": "Europe/Berlin",
+      "startDate": "2026-10-12",
+      "endDate": "2026-10-17",
+      "calendarId": "cal_familie"
+    },
+    {
+      "key": "[\"mathe-7\",\"20261006T150000\"]",
+      "uid": "mathe-7",
+      "identityQuality": "provider",
+      "recurrenceId": "20261006T150000",
+      "title": "Mathe (verlegt)",
+      "location": "Raum 204",
+      "startMs": 1791297000000,
+      "endMs": 1791299700000,
+      "allDay": false,
+      "timezone": "Europe/Berlin",
+      "calendarId": "cal_schule_lena"
+    }
+  ]
+}

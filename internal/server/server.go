@@ -27,7 +27,7 @@ import (
 type Server struct {
 	cfg      *config.Config
 	version  string
-	calendar *calendar.Service
+	calendar calendar.Source
 	weather  *weather.Service     // nil if not configured
 	bring    *bring.Service       // nil if not configured
 	school   *besteschule.Service // nil if not configured
@@ -58,7 +58,7 @@ type Sources struct {
 	Briefing *briefing.Service
 }
 
-func New(cfg *config.Config, version string, cal *calendar.Service, src Sources, static fs.FS) *Server {
+func New(cfg *config.Config, version string, cal calendar.Source, src Sources, static fs.FS) *Server {
 	return &Server{cfg: cfg, version: version, calendar: cal, weather: src.Weather, bring: src.Bring, school: src.School,
 		plan: src.Plan, meals: src.Meals, waste: src.Waste, photos: src.Photos, todos: src.Todos, uptime: src.Uptime, news: src.News, briefing: src.Briefing, static: static}
 }
