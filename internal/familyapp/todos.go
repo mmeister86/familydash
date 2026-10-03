@@ -98,9 +98,9 @@ func (s *TodoService) Snapshot() *todo.List {
 const listName = "Familienapp"
 
 // Convert turns the backend's answer into the wall's list: today's tasks
-// (plus overdue one-offs and what was done today), tomorrow's tasks for the
-// evening outlook, and the people with their points. Undated tasks and
-// missed recurring ones are left out – the wall shows the day.
+// (plus overdue one-offs, open undated "anytime" tasks and what was done
+// today), tomorrow's tasks for the evening outlook, and the people with
+// their points. Missed recurring tasks and finished undated ones are left out.
 func Convert(r TodosResponse, now time.Time, loc *time.Location) *todo.List {
 	today := r.Date
 	if today == "" {
@@ -128,11 +128,19 @@ func Convert(r TodosResponse, now time.Time, loc *time.Location) *todo.List {
 			l.Pending++
 		}
 		title := strings.TrimSpace(w.Title)
-		if title == "" || w.Date == "" || w.Status == "missed" {
+		if title == "" || w.Status == "missed" {
 			continue
 		}
 		t := todo.Task{ID: w.ID, Title: title, Who: names[w.Assignee], Points: w.Points,
 			Done: w.Status == "done", Pending: w.Status == "pending"}
+		if w.Date == "" {
+			// Undated ("anytime") tasks stay on the wall until they are done.
+			// Done ones are dropped: without a date we can't tell "done today".
+			if w.Status == "open" || w.Status == "pending" {
+				day = append(day, ranked{t, rankOf(t, false)})
+			}
+			continue
+		}
 		if !w.Recurring {
 			t.Deadline = w.Date // one-offs get "heute fällig" / "überfällig" from the deadline
 		}
