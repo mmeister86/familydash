@@ -4,7 +4,7 @@ Datum: 2026-10-03
 
 Backlog: TASK-1 – Definiere Convex als gemeinsames Familienbackend
 
-Status: Ausgearbeitete Spezifikation zur Nutzerreview; keine Produktimplementierung.
+Status: Vom Nutzer am 2026-10-03 bestätigt. Ausführungsmethode: Subagent-driven Development. Die Spezifikation beschreibt das Ziel; Produktimplementierung folgt anhand eigener Abschnittspläne.
 
 ## 1. Ziel und bestätigter Rahmen
 
