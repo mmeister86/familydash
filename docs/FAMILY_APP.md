@@ -138,7 +138,7 @@ open tasks, the number of `pending` ones (parents should confirm) and the childr
 
 Read-only central calendar feed (`CalendarFeedV1`, `version: 1`, `scope: "family-calendars"`, `timezone: "Europe/Berlin"`).
 Used only with `CALENDAR_SOURCE=convex`; `Cache-Control: no-store`. Answers `401` on a wrong token, `503` while
-unconfigured (no scheinbar erfolgreiches empty document — an explicitly empty setup returns full v1 with empty arrays)
+unconfigured (503 while unconfigured — never a seemingly-successful empty document; an explicitly empty setup returns full v1 with empty arrays)
 or when the response would exceed 4 MiB (the Go cache is kept then).
 
 ```jsonc
