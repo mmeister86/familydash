@@ -12,6 +12,8 @@ import (
 	"familydash/internal/calendar"
 	"familydash/internal/config"
 	"familydash/internal/familyapp"
+	"familydash/internal/server"
+	"familydash/internal/timetable"
 )
 
 func testConfig(t *testing.T, env map[string]string) *config.Config {
@@ -85,6 +87,22 @@ func TestNewCalendarSourceConvex(t *testing.T) {
 	}
 	if snap := cs.Snapshot(); len(snap.Events) != 3 {
 		t.Errorf("outage replaced last-good: %d events", len(snap.Events))
+	}
+}
+
+// The pusher feeds the family app from every source snapshot: timetable days
+// go in keyed by child name (compat) and by stable child id (central mode
+// resolves bindings through DaysByID, so a rename cannot move a week).
+func TestNewPusherFillsPlanDaysAndPlanDaysByID(t *testing.T) {
+	cfg := testConfig(t, nil)
+	plan := &timetable.File{Children: []timetable.Child{{ID: "plan-42", Name: "Lukas"}}}
+	p := newPusher(cfg, calendar.NewService(cfg), server.Sources{Plan: plan})
+	in := p.Gather(time.Now())
+	if got := in.PlanDays["Lukas"]; len(got) != familyapp.Days {
+		t.Errorf("PlanDays[Lukas] has %d days, want %d", len(got), familyapp.Days)
+	}
+	if got := in.PlanDaysByID["plan-42"]; len(got) != familyapp.Days {
+		t.Errorf("PlanDaysByID[plan-42] has %d days, want %d", len(got), familyapp.Days)
 	}
 }
 

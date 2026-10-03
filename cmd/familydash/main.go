@@ -387,6 +387,7 @@ func newPusher(cfg *config.Config, cal calendar.Source, src server.Sources) *fam
 			if src.Plan != nil {
 				in.Timetables = src.Plan.Build(now, cfg.Location)
 				in.PlanDays = src.Plan.Days(now, familyapp.Days, cfg.Location)
+				in.PlanDaysByID = src.Plan.DaysByID(now, familyapp.Days, cfg.Location)
 			}
 			if src.Meals != nil {
 				in.Meals = src.Meals.Snapshot()

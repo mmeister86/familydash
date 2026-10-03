@@ -42,3 +42,84 @@ test("missing binding yields no guessed match", () => {
   assert.equal(M.personForSource([], "timetable", "plan-01"), null);
   assert.deepEqual(M.calendarIdsForPerson(calendars, "u-unknown"), []);
 });
+
+// ---- renderSchoolRow central branch (the real wall script, stubbed DOM) ----
+// A school calendar named exactly like the child must not merge into the
+// child's card through name matching when the central snapshot has no
+// binding for the child — especially when the mapping helper itself failed
+// to load (FamilyCalendarMapping missing).
+
+const appSrc = readFileSync(new URL("../web/static/app.js", import.meta.url), "utf8");
+const mappingSrc = readFileSync(new URL("../web/static/calendar-mapping.js", import.meta.url), "utf8");
+
+function loadWall({ withMapping }) {
+  const elements = new Map();
+  const element = () => ({ innerHTML: "", textContent: "", classList: { toggle() {} } });
+  const sandbox = {
+    console,
+    URLSearchParams,
+    document: {
+      body: element(),
+      getElementById: (id) => {
+        if (!elements.has(id)) elements.set(id, element());
+        return elements.get(id);
+      },
+    },
+    location: { search: "" },
+    fetch: () => Promise.reject(new Error("offline")),
+    setInterval: () => 0,
+    clearInterval: () => {},
+    setTimeout: () => 0,
+    clearTimeout: () => {},
+  };
+  vm.createContext(sandbox);
+  if (withMapping) vm.runInContext(mappingSrc, sandbox, { filename: "calendar-mapping.js" });
+  vm.runInContext(appSrc, sandbox, { filename: "app.js" });
+  return { sandbox, html: (id) => elements.get(id)?.innerHTML ?? "" };
+}
+
+// Same-name school calendar, but the child has no binding to any person.
+function renderData({ central }) {
+  return {
+    calendar: {
+      ...(central ? { central: true } : {}),
+      calendars: [
+        { id: 0, calendarId: "c-schule", name: "Lukas", color: "#123456", panel: "school", personIds: ["u-other"] },
+      ],
+      events: [],
+      bindings: [],
+    },
+    school: { students: [{ name: "Lukas", id: "bs-lukas", day: { date: "2026-10-03", lessons: [] } }] },
+    timetables: [],
+    meals: { children: [] },
+    todos: { tasks: [] },
+  };
+}
+
+test("central mode without mapping helper attaches no calendar (treat as unmapped)", () => {
+  const { sandbox, html } = loadWall({ withMapping: false });
+  assert.equal(vm.runInContext("typeof FamilyCalendarMapping", sandbox), "undefined");
+  sandbox.renderSchoolRow(renderData({ central: true }), "full");
+  const out = html("school");
+  assert.match(out, /panel fade/, "same-name calendar stays a standalone card");
+  assert.doesNotMatch(out, /Termine/, "no name-matched calendar section in the child card");
+});
+
+test("local mode keeps the legacy name match", () => {
+  const { sandbox, html } = loadWall({ withMapping: false });
+  sandbox.renderSchoolRow(renderData({ central: false }), "full");
+  const out = html("school");
+  assert.match(out, /Termine/, "same-name calendar merges into the child card");
+  assert.doesNotMatch(out, /panel fade/, "no standalone card left behind");
+});
+
+test("central mode with mapping helper and binding attaches by stable id", () => {
+  const { sandbox, html } = loadWall({ withMapping: true });
+  const data = renderData({ central: true });
+  data.calendar.calendars[0].personIds = ["u-lukas"];
+  data.calendar.bindings = [{ personId: "u-lukas", kind: "besteschule", externalId: "bs-lukas" }];
+  sandbox.renderSchoolRow(data, "full");
+  const out = html("school");
+  assert.match(out, /Termine/, "bound calendar merges into the child card");
+  assert.doesNotMatch(out, /panel fade/, "no standalone card left behind");
+});

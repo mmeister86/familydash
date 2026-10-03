@@ -338,6 +338,30 @@ function kidPlan(st, opts, withMeal) {
 const calIdOf = (c) => (c && c.calendarId !== undefined && c.calendarId !== "" ? c.calendarId : c?.id);
 const evCalIdOf = (e) => (e && e.calendarId !== undefined && e.calendarId !== "" ? e.calendarId : e?.cal);
 
+// School-calendar selection for one card. Central snapshots resolve only
+// through explicit stable bindings: a rename or reorder cannot move entries
+// between card and standalone list. When the mapping helper failed to load,
+// the child stays unmapped — central mode never falls back to name matching.
+// Local mode keeps the legacy name match.
+function schoolCalsFor(d, name, calName, personId, sourceKind, sourceId, usedCals) {
+  const cals = d.calendar?.calendars || [];
+  const FM = globalThis.FamilyCalendarMapping;
+  if (d.calendar?.central) {
+    if (!FM) return [];
+    // explicit bindings only: events from every school calendar assigned
+    // to the person merge into their card by stable id
+    const pid = personId || (sourceId ? FM.personForSource(d.calendar.bindings, sourceKind, sourceId) : null);
+    if (!pid) return [];
+    const want = new Set(FM.calendarIdsForPerson(d.calendar.calendars, pid));
+    return cals
+      .filter((c) => c.panel === "school" && !usedCals.has(calIdOf(c)) && want.has(calIdOf(c)))
+      .sort((a, b) => (String(calIdOf(a)) < String(calIdOf(b)) ? -1 : 1));
+  }
+  const cal = cals.find((c) => c.panel === "school" && !usedCals.has(calIdOf(c)) &&
+    (calName ? c.name.toLowerCase() === calName.toLowerCase() : sameKid(c.name, name)));
+  return cal ? [cal] : [];
+}
+
 // One card per child. A school calendar (CALENDAR_n_PANEL=school) and a lunch
 // account (VIELFALT_n_*) with the child's name move into that child's card;
 // a timetable's "calendar" field picks the calendar explicitly.
@@ -355,30 +379,11 @@ function renderSchoolRow(d, mode) {
 
   const extras = (name, calName, personId, sourceKind, sourceId) => {
     const opts = {};
-    const FM = globalThis.FamilyCalendarMapping;
-    if (d.calendar?.central && FM) {
-      // explicit bindings only: events from every school calendar assigned
-      // to the person merge into their card by stable id, so a rename or
-      // reorder cannot move entries between card and standalone list
-      const pid = personId || (sourceId ? FM.personForSource(d.calendar.bindings, sourceKind, sourceId) : null);
-      if (pid) {
-        const want = new Set(FM.calendarIdsForPerson(d.calendar.calendars, pid));
-        const mine = cals
-          .filter((c) => c.panel === "school" && !usedCals.has(calIdOf(c)) && want.has(calIdOf(c)))
-          .sort((a, b) => (String(calIdOf(a)) < String(calIdOf(b)) ? -1 : 1));
-        if (mine.length) {
-          const ids = new Set(mine.map(calIdOf));
-          for (const m of mine) usedCals.add(calIdOf(m));
-          Object.assign(opts, { color: mine[0].color, cal: mine[0], events: events.filter((e) => ids.has(evCalIdOf(e))) });
-        }
-      }
-    } else {
-      const cal = cals.find((c) => c.panel === "school" && !usedCals.has(calIdOf(c)) &&
-        (calName ? c.name.toLowerCase() === calName.toLowerCase() : sameKid(c.name, name)));
-      if (cal) {
-        usedCals.add(calIdOf(cal));
-        Object.assign(opts, { color: cal.color, cal, events: events.filter((e) => evCalIdOf(e) === calIdOf(cal)) });
-      }
+    const mine = schoolCalsFor(d, name, calName, personId, sourceKind, sourceId, usedCals);
+    if (mine.length) {
+      const ids = new Set(mine.map(calIdOf));
+      for (const m of mine) usedCals.add(calIdOf(m));
+      Object.assign(opts, { color: mine[0].color, cal: mine[0], events: events.filter((e) => ids.has(evCalIdOf(e))) });
     }
     const mi = meals.findIndex((m, i) => !usedMeals.has(i) && sameKid(m.name, name));
     if (mi >= 0) {
@@ -386,13 +391,13 @@ function renderSchoolRow(d, mode) {
       opts.meal = meals[mi];
       opts.color ||= meals[mi].color;
     }
-    const mine = [];
+    const ownTodos = [];
     for (const t of todos) {
       if (usedTodos.has(t.id)) continue;
       const own = todoFor(t, name);
-      if (own) { usedTodos.add(t.id); mine.push(own); }
+      if (own) { usedTodos.add(t.id); ownTodos.push(own); }
     }
-    if (mine.length) opts.todos = mine;
+    if (ownTodos.length) opts.todos = ownTodos;
     return opts;
   };
 
