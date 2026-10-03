@@ -154,8 +154,9 @@ func TestConvertTodos(t *testing.T) {
 			{ID: "d", Title: "Hund füttern", Assignee: "lukas", Date: "2026-10-02", Status: "pending", Points: 3, Recurring: true},
 			{ID: "e", Title: "Gestern verpasst", Date: "2026-10-01", Status: "missed", Recurring: true},
 			{ID: "f", Title: "Steuer", Assignee: "matthias", Date: "2026-10-03", Status: "open"},
-			{ID: "g", Title: "Irgendwann", Status: "open"},
+			{ID: "g", Title: "Irgendwann", Assignee: "lukas", Status: "open", Points: 50},
 			{ID: "h", Title: "Alt erledigt", Date: "2026-09-29", Status: "done"},
+			{ID: "i", Title: "Irgendwann erledigt", Status: "done"},
 		},
 	}
 	l := Convert(r, at("2026-10-02 07:00"), berlin)
@@ -163,8 +164,11 @@ func TestConvertTodos(t *testing.T) {
 	for _, t := range l.Tasks {
 		got = append(got, t.ID)
 	}
-	if strings.Join(got, ",") != "c,b,d,a" {
-		t.Fatalf("today order = %v (overdue, open, waiting, done)", got)
+	if strings.Join(got, ",") != "c,b,g,d,a" {
+		t.Fatalf("today order = %v (overdue, open incl. undated, waiting, done)", got)
+	}
+	if g := l.Tasks[2]; g.Who != "Lukas" || g.Deadline != "" || g.Points != 50 || g.Done {
+		t.Errorf("undated one-off: %+v", g)
 	}
 	if c := l.Tasks[0]; c.Who != "Lukas" || c.Deadline != "2026-09-30" || c.Points != 5 {
 		t.Errorf("overdue one-off: %+v", c)
@@ -172,8 +176,8 @@ func TestConvertTodos(t *testing.T) {
 	if b := l.Tasks[1]; b.Who != "" || b.Deadline != "" {
 		t.Errorf("recurring family task: %+v", b)
 	}
-	if !l.Tasks[2].Pending || l.Tasks[2].Done || !l.Tasks[3].Done {
-		t.Errorf("states: %+v", l.Tasks[2:])
+	if !l.Tasks[3].Pending || l.Tasks[3].Done || !l.Tasks[4].Done {
+		t.Errorf("states: %+v", l.Tasks[3:])
 	}
 	if len(l.Tomorrow) != 1 || l.Tomorrow[0].Who != "Matthias" {
 		t.Errorf("tomorrow: %+v", l.Tomorrow)

@@ -121,7 +121,9 @@ Read-only. `days` = 1…7, the window starts today. familydash asks for 2 (today
 ```
 
 Which tasks to return: every instance with `date` in the window, **plus** open/pending one-offs with
-`date < today` (overdue), plus instances done today. Undated tasks may be included; the wall ignores them.
+`date < today` (overdue), plus instances done today. Undated ("anytime") tasks should be included
+while open or pending: the wall shows them every day (no due tag) until they're done; done undated tasks
+are ignored.
 
 What the wall does with it: today's tasks of a child go into that child's card (⭐ points, ⏳ for `pending`);
 one-offs get a due tag ("heute fällig" / "überfällig"); `missed` is ignored. The briefing gets every person's
