@@ -9,6 +9,10 @@ All requests go **from familydash to Convex** (HTTP actions on the "site" URL, e
 | `POST /ingest/child` | wall → app | ingest token | `FAMILY_APP_INGEST_TOKEN` | `INGEST_TOKEN` |
 | `POST /ingest/briefing` | wall → app | ingest token | `FAMILY_APP_INGEST_TOKEN` | `INGEST_TOKEN` |
 | `GET /todos?days=2` | app → wall | dashboard token | `FAMILY_APP_DASHBOARD_TOKEN` | `DASHBOARD_TOKEN` |
+| `GET /dashboard/calendars` | app → wall | calendar token | `FAMILY_APP_CALENDAR_TOKEN` | `CALENDAR_DASHBOARD_TOKEN` |
+
+The calendar token authorizes only `GET /dashboard/calendars` (never ingest or parent functions); the ingest/dashboard
+tokens never authorize it. Calendar rollout, comparison and rollback: [docs/CONVEX_CALENDAR_ROLLOUT.md](CONVEX_CALENDAR_ROLLOUT.md).
 
 Answers: `2xx` = ok (body ignored for POSTs), `400` invalid payload (message in the body), `401` wrong token.
 Optional fields are **omitted, never `null`** (fits `v.optional(...)`). Dates are `YYYY-MM-DD` in Europe/Berlin,
@@ -70,7 +74,8 @@ export const childSnapshotPayload = v.object({
 ```
 
 Appointments: the child's school calendar (`CALENDAR_n_PANEL=school` with the child's name, or the fixed
-timetable's `calendar`) plus `FAMILY_APP_<SLUG>_CALENDARS`.
+timetable's `calendar`) plus `FAMILY_APP_<SLUG>_CALENDARS`. In `CALENDAR_SOURCE=convex` mode the same appointments
+resolve through explicit central person bindings instead of names (see below).
 
 ## `POST /ingest/briefing`
 
@@ -128,3 +133,38 @@ are ignored.
 What the wall does with it: today's tasks of a child go into that child's card (⭐ points, ⏳ for `pending`);
 one-offs get a due tag ("heute fällig" / "überfällig"); `missed` is ignored. The briefing gets every person's
 open tasks, the number of `pending` ones (parents should confirm) and the children's points.
+
+## `GET /dashboard/calendars`
+
+Read-only central calendar feed (`CalendarFeedV1`, `version: 1`, `scope: "family-calendars"`, `timezone: "Europe/Berlin"`).
+Used only with `CALENDAR_SOURCE=convex`; `Cache-Control: no-store`. Answers `401` on a wrong token, `503` while
+unconfigured (no scheinbar erfolgreiches empty document — an explicitly empty setup returns full v1 with empty arrays)
+or when the response would exceed 4 MiB (the Go cache is kept then).
+
+```jsonc
+{
+  "version": 1,
+  "scope": "family-calendars",
+  "timezone": "Europe/Berlin",
+  "configurationRevision": 7,       // bumped on every source/mode change; revokes old commit permission
+  "generatedAt": 1728123456789,     // feed build time — NOT source freshness
+  "window": { "fromDate": "2026-10-03", "toDate": "2026-11-14", "fromMs": 0, "toMs": 0 }, // 42 Berlin days, end exclusive
+  "people": [{ "id": "…", "slug": "lukas", "name": "Lukas", "role": "child" }],
+  "bindings": [{ "personId": "…", "kind": "besteschule|timetable", "externalId": "…" }],
+  "calendars": [{
+    "id": "…", "sourceKey": "family", "name": "Familie", "color": "#4F8EF7",
+    "panel": "column|school", "order": 0, "intoCalendarId": "…", // optional
+    "personIds": ["…"],                 // [] = family stand; all-child = personal stand
+    "lastAttemptAt": 0, "lastSuccessAt": 0,
+    "freshness": "neverLoaded|fresh|stale|disabled",
+    "lastAttemptStatus": "success|error", "error": "…", "coverage": { /* window */ },
+  }],
+  "events": [{ "calendarId": "…", "key": "…", "uid": "…", "identityQuality": "provider|fallback", /* … */ }],
+}
+```
+
+Only `mode: "convex"` calendars with their last published stand are included; `shadow` stands and secrets
+(env names, URLs, PINs, tokens, raw responses) never appear. Go validates strictly (presence-aware: `{}` is
+invalid, arrays must be present), converts stable ids to display indexes after sorting by `order`/`sourceKey`,
+and atomically replaces its persistent last-good snapshot only on full success. A byte-identical fixture of this
+contract lives in `testdata/calendar-feed-v1.json` (mirrors the Companion's `tests/fixtures/calendar-feed-v1.json`).

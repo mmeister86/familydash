@@ -5,6 +5,10 @@
 - [ ] Refine the beste.schule parser against real data (`-besteschule-dump`)
 - [ ] Tap-to-check Bring! items on a touch display (Bring! batch update endpoint)
 - [x] Family app (React PWA + Convex): push each child's week + briefings, to-dos from the app (`FAMILY_APP_*`)
+- [x] Convex calendar pilot: central import with shadow comparison, `CALENDAR_SOURCE=convex` read path with persistent
+  last-good cache, explicit person bindings (rollout: `docs/CONVEX_CALENDAR_ROLLOUT.md`; productive switchover still pending,
+  old `CALENDAR_n_URL` path stays as the rollback target)
+- [ ] Central school sources (beste.schule, fixed timetables) + central briefings — later plans; legacy child/briefing push stays active
 - [x] Remove the legacy to-do source (code, env vars, the CLI and its Rust build stage) once the family app has run for a while
 - [ ] Calendar legend / per-person filter
 - [x] Time-of-day scenes (`SCENE_*`) with focus zone, night = dimmed clock only
