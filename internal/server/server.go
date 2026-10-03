@@ -13,6 +13,7 @@ import (
 	"familydash/internal/bring"
 	"familydash/internal/calendar"
 	"familydash/internal/config"
+	"familydash/internal/familyapp"
 	"familydash/internal/news"
 	"familydash/internal/photos"
 	"familydash/internal/scene"
@@ -82,14 +83,14 @@ func (s *Server) Handler() http.Handler {
 }
 
 type dashboard struct {
-	Version  string              `json:"version"`
-	Now      time.Time           `json:"now"`
-	Timezone string              `json:"timezone"`
-	Days     int                 `json:"days"`
-	Calendar calendar.Snapshot   `json:"calendar"`
-	Weather  *weather.Weather    `json:"weather,omitempty"`
-	Shopping *bring.List         `json:"shopping,omitempty"`
-	School   *besteschule.School `json:"school,omitempty"`
+	Version  string            `json:"version"`
+	Now      time.Time         `json:"now"`
+	Timezone string            `json:"timezone"`
+	Days     int               `json:"days"`
+	Calendar calendar.Snapshot `json:"calendar"`
+	Weather  *weather.Weather  `json:"weather,omitempty"`
+	Shopping *bring.List       `json:"shopping,omitempty"`
+	School   *dashboardSchool  `json:"school,omitempty"`
 	// Fixed timetables (TIMETABLE_FILE / built-in) for children without beste.schule
 	Timetables []timetable.Card `json:"timetables,omitempty"`
 	// School lunch ordered via VielfaltMenü, one card per child
@@ -138,11 +139,18 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	if s.bring != nil {
 		d.Shopping = s.bring.Snapshot()
 	}
+	var school *besteschule.School
 	if s.school != nil {
-		d.School = s.school.Snapshot()
+		school = s.school.Snapshot()
+		d.School = enrichSchool(school, d.Calendar)
 	}
+	var planCards []timetable.Card
 	if s.plan != nil {
-		d.Timetables = s.plan.Build(d.Now, s.cfg.Location)
+		planCards = s.plan.Build(d.Now, s.cfg.Location)
+		d.Timetables = enrichPlan(planCards, d.Calendar)
+	}
+	if d.Calendar.Central {
+		d.Warnings = append(d.Warnings, familyapp.CentralWarnings(d.Calendar, school, planCards)...)
 	}
 	if s.meals != nil {
 		d.Meals = s.meals.Snapshot()
@@ -176,6 +184,56 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, d)
+}
+
+// dashboardStudent is one school student plus, in central mode, the
+// explicitly bound person id. The shape stays compatible: personId is
+// additive and omitted when there is no binding.
+type dashboardStudent struct {
+	besteschule.Student
+	PersonID string `json:"personId,omitempty"`
+}
+
+// dashboardSchool mirrors besteschule.School with enriched students.
+type dashboardSchool struct {
+	Students  []dashboardStudent `json:"students"`
+	UpdatedAt time.Time          `json:"updatedAt"`
+	Error     string             `json:"error,omitempty"`
+}
+
+// enrichSchool attaches central person ids to a school snapshot. The input
+// may be a cached provider snapshot, so students are copied — the cache is
+// never mutated. Outside central mode (or without a binding) the student
+// passes through unchanged.
+func enrichSchool(school *besteschule.School, cal calendar.Snapshot) *dashboardSchool {
+	if school == nil {
+		return nil
+	}
+	out := &dashboardSchool{UpdatedAt: school.UpdatedAt, Error: school.Error,
+		Students: make([]dashboardStudent, 0, len(school.Students))}
+	for _, st := range school.Students {
+		ds := dashboardStudent{Student: st}
+		if b, ok := calendar.PersonForSource(cal, "besteschule", st.ID); ok {
+			ds.PersonID = b.PersonID
+		}
+		out.Students = append(out.Students, ds)
+	}
+	return out
+}
+
+// enrichPlan attaches central person ids to timetable cards, on a copy for
+// the same reason as enrichSchool.
+func enrichPlan(cards []timetable.Card, cal calendar.Snapshot) []timetable.Card {
+	if cards == nil {
+		return nil
+	}
+	out := append([]timetable.Card(nil), cards...)
+	for i := range out {
+		if b, ok := calendar.PersonForSource(cal, "timetable", out[i].Student.ID); ok {
+			out[i].PersonID = b.PersonID
+		}
+	}
+	return out
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

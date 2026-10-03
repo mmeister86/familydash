@@ -23,6 +23,10 @@ type File struct {
 }
 
 type Child struct {
+	// ID is the stable identity of this child. Central person bindings
+	// point at it, so a rename keeps every mapping. Empty keeps the old
+	// name-derived local behavior ("plan-"+lower(name)).
+	ID   string `json:"id,omitempty"`
 	Name string `json:"name"`
 	// Calendar is the name of a CALENDAR_n_PANEL=school calendar; its entries
 	// are shown at the bottom of this child's card instead of a card of its own.
@@ -80,6 +84,9 @@ type Range struct {
 type Card struct {
 	besteschule.Student
 	Calendar string `json:"calendar,omitempty"`
+	// PersonID is the central person this card belongs to, set by the
+	// server from explicit timetable bindings. Empty in local mode.
+	PersonID string `json:"personId,omitempty"`
 }
 
 const lookahead = 31 // days to search for the next school day (covers any holiday)
@@ -116,6 +123,15 @@ func Load(path string) (*File, error) {
 	if err := json.Unmarshal(data, &f); err != nil {
 		return nil, fmt.Errorf("stundenplan: %w", err)
 	}
+	seenID := map[string]bool{}
+	for _, c := range f.Children {
+		if c.ID != "" {
+			if seenID[c.ID] {
+				return nil, fmt.Errorf("stundenplan %s: doppelte id %q", c.Name, c.ID)
+			}
+			seenID[c.ID] = true
+		}
+	}
 	for _, c := range f.Children {
 		for k, slots := range c.Days {
 			if _, ok := weekdayOf(k); !ok {
@@ -141,6 +157,15 @@ func Load(path string) (*File, error) {
 	return &f, nil
 }
 
+// stableID is the identity central bindings point at: the explicit id
+// when set, otherwise the legacy name-derived local id.
+func (c *Child) stableID() string {
+	if c.ID != "" {
+		return c.ID
+	}
+	return "plan-" + strings.ToLower(c.Name)
+}
+
 // Build returns one card per child for time now.
 func (f *File) Build(now time.Time, loc *time.Location) []Card {
 	now = now.In(loc)
@@ -149,7 +174,7 @@ func (f *File) Build(now time.Time, loc *time.Location) []Card {
 	for _, c := range f.Children {
 		out = append(out, Card{
 			Student: besteschule.Student{
-				ID:       "plan-" + strings.ToLower(c.Name),
+				ID:       c.stableID(),
 				Name:     c.Name,
 				Day:      c.pickDay(now, today),
 				Homework: []besteschule.Entry{},
@@ -298,6 +323,17 @@ func clock(d time.Time, hm string) time.Time {
 // holiday as notice). Keyed by child name. Used for the family app, which
 // shows a whole week instead of "today or the next school day".
 func (f *File) Days(from time.Time, n int, loc *time.Location) map[string][]besteschule.Day {
+	return f.daysBy(from, n, loc, func(c *Child) string { return c.Name })
+}
+
+// DaysByID is Days keyed by stable child id instead of name. Central mode
+// looks timetable days up through explicit timetable bindings to these ids,
+// so a rename cannot move a week to the wrong child.
+func (f *File) DaysByID(from time.Time, n int, loc *time.Location) map[string][]besteschule.Day {
+	return f.daysBy(from, n, loc, func(c *Child) string { return c.stableID() })
+}
+
+func (f *File) daysBy(from time.Time, n int, loc *time.Location, key func(*Child) string) map[string][]besteschule.Day {
 	from = from.In(loc)
 	start := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, loc)
 	out := make(map[string][]besteschule.Day, len(f.Children))
@@ -315,7 +351,7 @@ func (f *File) Days(from time.Time, n int, loc *time.Location) map[string][]best
 			}
 			days = append(days, day)
 		}
-		out[c.Name] = days
+		out[key(c)] = days
 	}
 	return out
 }

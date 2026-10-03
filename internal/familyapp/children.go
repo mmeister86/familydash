@@ -24,6 +24,11 @@ type ChildSnapshot struct {
 	Homework        []Homework `json:"homework"`
 	Exams           []Exam     `json:"exams"`
 	SourceUpdatedAt int64      `json:"sourceUpdatedAt"` // ms; oldest of the sources behind it
+	// Incomplete is local-only (never transmitted): a required central
+	// calendar source has no valid data yet, so this projection must not
+	// be pushed over the last good one in the app. SourceUpdatedAt is 0
+	// while incomplete — explicitly unknown, never "now".
+	Incomplete bool `json:"-"`
 }
 
 type ChildDay struct {
@@ -84,8 +89,13 @@ type Inputs struct {
 	School     *besteschule.School
 	SchoolDays map[string][]besteschule.Day // by student name, Days days from today
 	Timetables []timetable.Card
-	PlanDays   map[string][]besteschule.Day // by child name
-	Meals      *vielfalt.Meals
+	// PlanDaysByID is PlanDays keyed by stable timetable child id (see
+	// timetable.File.DaysByID). Central mode prefers it so a rename cannot
+	// move a week to the wrong child; producers that only fill PlanDays
+	// keep working through the name fallback.
+	PlanDaysByID map[string][]besteschule.Day // by stable timetable child id
+	PlanDays     map[string][]besteschule.Day // by child name (compat fallback)
+	Meals        *vielfalt.Meals
 }
 
 // BuildChildren makes one snapshot per child, matched by first name the same
@@ -93,7 +103,16 @@ type Inputs struct {
 // school calendar (CALENDAR_n_PANEL=school, or the timetable's "calendar"),
 // extra calendars from FAMILY_APP_<SLUG>_CALENDARS (indexes into the
 // calendar list) and their VielfaltMenü account.
+//
+// In central mode every person and calendar resolves through explicit
+// stable bindings (calendar.PersonForSource): renames and reorders cannot
+// move data, numeric extra calendars and name matching do not override
+// bindings, and same-name source children never merge. Unmapped children
+// keep their school data without guessed calendars; see CentralWarnings.
 func BuildChildren(in Inputs, now time.Time, loc *time.Location, extraCals map[string][]int) []ChildSnapshot {
+	if in.Calendar.Central {
+		return buildChildrenCentral(in, now, loc)
+	}
 	now = now.In(loc)
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 
@@ -190,6 +209,228 @@ func BuildChildren(in Inputs, now time.Time, loc *time.Location, extraCals map[s
 		out = append(out, snap)
 	}
 	return out
+}
+
+// buildChildrenCentral makes one snapshot per bound person plus one per
+// unmapped source child. Identity comes from explicit bindings only:
+// besteschule students resolve through ("besteschule", student id),
+// timetable cards through ("timetable", stable card id). The slug of a
+// bound child is the bound user's slug; numeric extra calendars, calendar
+// names and first-name matching never apply. A bound child sees events
+// from every school calendar assigned to its person. Unmapped children
+// keep their school data with no calendars and a configuration warning.
+//
+// A child's calendar contribution to SourceUpdatedAt is the oldest real
+// success time of its assigned school calendars. When a required assigned
+// calendar never loaded, the projection is incomplete with a zero
+// timestamp — explicitly unknown, never "now" — and the pusher holds it
+// back until first valid data arrives.
+func buildChildrenCentral(in Inputs, now time.Time, loc *time.Location) []ChildSnapshot {
+	now = now.In(loc)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+
+	type kid struct {
+		st       besteschule.Student
+		days     []besteschule.Day
+		personID string // "" when unmapped
+		slug     string
+		fromPlan bool
+	}
+	var kids []kid
+	if in.School != nil {
+		for _, st := range in.School.Students {
+			k := kid{st: st, days: in.SchoolDays[st.Name]}
+			if b, ok := calendar.PersonForSource(in.Calendar, "besteschule", st.ID); ok {
+				k.personID = b.PersonID
+				if p, found := calendar.PersonByID(in.Calendar, b.PersonID); found {
+					k.slug = p.Slug
+				}
+			}
+			if k.slug == "" {
+				k.slug = Slug(st.Name)
+			}
+			kids = append(kids, k)
+		}
+	}
+	for _, c := range in.Timetables {
+		days := in.PlanDaysByID[c.Student.ID]
+		if days == nil {
+			days = in.PlanDays[c.Name] // compat: producers still keying by name
+		}
+		k := kid{st: c.Student, days: days, fromPlan: true}
+		if b, ok := calendar.PersonForSource(in.Calendar, "timetable", c.Student.ID); ok {
+			k.personID = b.PersonID
+			if p, found := calendar.PersonByID(in.Calendar, b.PersonID); found {
+				k.slug = p.Slug
+			}
+		}
+		if k.slug == "" {
+			k.slug = Slug(c.Student.Name)
+		}
+		kids = append(kids, k)
+	}
+
+	// numeric id of every school calendar assigned to the person; never by name
+	calsFor := func(personID string) map[int]bool {
+		cals := map[int]bool{}
+		if personID == "" {
+			return cals
+		}
+		want := map[string]bool{}
+		for _, c := range calendar.CalendarsForPerson(in.Calendar, personID) {
+			if c.Panel == "school" {
+				want[c.CalendarID] = true
+			}
+		}
+		for _, c := range in.Calendar.Calendars {
+			if c.Panel == "school" && want[c.CalendarID] {
+				cals[c.ID] = true
+			}
+		}
+		return cals
+	}
+
+	var meals []vielfalt.Child
+	if in.Meals != nil {
+		meals = in.Meals.Children
+	}
+	usedMeal := map[int]bool{}
+	seen, seenSlug := map[string]bool{}, map[string]bool{}
+	var out []ChildSnapshot
+	for _, k := range kids {
+		dkey := "p:" + k.personID
+		if k.personID == "" {
+			kind, ext := "besteschule", k.st.ID
+			if k.fromPlan {
+				kind = "timetable"
+			}
+			dkey = "u:" + kind + ":" + ext
+		}
+		if k.slug == "" || seen[dkey] {
+			continue // never merge same-name source children; same source twice is one child
+		}
+		seen[dkey] = true
+		if seenSlug[k.slug] {
+			continue // slugs collide: keep the first projection, warn (see CentralWarnings)
+		}
+		seenSlug[k.slug] = true
+
+		cals := calsFor(k.personID)
+
+		var meal *vielfalt.Child
+		for i := range meals {
+			if !usedMeal[i] && briefing.SameKid(meals[i].Name, k.st.Name) {
+				usedMeal[i], meal = true, &meals[i]
+				break
+			}
+		}
+
+		var oldest time.Time
+		older := func(t time.Time) {
+			if !t.IsZero() && (oldest.IsZero() || t.Before(oldest)) {
+				oldest = t
+			}
+		}
+		incomplete := false
+		if !k.fromPlan && in.School != nil {
+			older(in.School.UpdatedAt)
+		}
+		if k.personID != "" {
+			if calOldest, missing := calendar.AssignedCalendarState(in.Calendar, k.personID, "school"); len(missing) > 0 {
+				incomplete = true
+			} else {
+				older(calOldest)
+			}
+		}
+		if meal != nil {
+			older(meal.UpdatedAt)
+		}
+
+		snap := ChildSnapshot{
+			ChildSlug:       k.slug,
+			Days:            make([]ChildDay, 0, Days),
+			Homework:        homework(k.st.Homework),
+			Exams:           exams(k.st.Exams),
+			SourceUpdatedAt: 0,
+			Incomplete:      incomplete,
+		}
+		if !incomplete {
+			if oldest.IsZero() {
+				oldest = now // fixed timetables never go stale
+			}
+			snap.SourceUpdatedAt = oldest.UnixMilli()
+		}
+		byDate := map[string]besteschule.Day{}
+		for _, d := range k.days {
+			byDate[d.Date] = d
+		}
+		for i := 0; i < Days; i++ {
+			d := today.AddDate(0, 0, i)
+			key := d.Format("2006-01-02")
+			sd := byDate[key]
+			cd := ChildDay{Date: key, Notices: sd.Notices, Timetable: lessons(sd.Lessons),
+				Events: events(in.Calendar, cals, d, loc), Meal: mealOn(meal, key)}
+			snap.Days = append(snap.Days, cd)
+		}
+		out = append(out, snap)
+	}
+	return out
+}
+
+// CentralWarnings lists German configuration warnings for central mode:
+// source children without an explicit person binding (they keep their
+// school data but get no calendars), and slug collisions where only the
+// first projection is kept. Empty outside central mode.
+func CentralWarnings(cal calendar.Snapshot, school *besteschule.School, plan []timetable.Card) []string {
+	if !cal.Central {
+		return nil
+	}
+	var warns []string
+	seen := map[string]bool{}
+	warn := func(s string) {
+		if !seen[s] {
+			seen[s] = true
+			warns = append(warns, s)
+		}
+	}
+	slugs := map[string]bool{}
+	noteSlug := func(slug string) {
+		if slug == "" {
+			return
+		}
+		if slugs[slug] {
+			warn("Doppelte Kennung „" + slug + "“ – nur die erste Zuordnung wird übertragen")
+			return
+		}
+		slugs[slug] = true
+	}
+	if school != nil {
+		for _, st := range school.Students {
+			slug := Slug(st.Name)
+			if b, ok := calendar.PersonForSource(cal, "besteschule", st.ID); ok {
+				if p, found := calendar.PersonByID(cal, b.PersonID); found {
+					slug = p.Slug
+				}
+				noteSlug(slug)
+				continue
+			}
+			warn("Schule: „" + st.Name + "“ ist keiner Person zugeordnet – keine Termine")
+			noteSlug(slug)
+		}
+	}
+	for _, c := range plan {
+		slug := Slug(c.Student.Name)
+		if b, ok := calendar.PersonForSource(cal, "timetable", c.Student.ID); ok {
+			if p, found := calendar.PersonByID(cal, b.PersonID); found {
+				slug = p.Slug
+			}
+			noteSlug(slug)
+			continue
+		}
+		warn("Stundenplan: „" + c.Student.Name + "“ ist keiner Person zugeordnet – keine Termine")
+		noteSlug(slug)
+	}
+	return warns
 }
 
 // Slug turns a name into the app's user slug: first word, lower case,

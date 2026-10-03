@@ -182,6 +182,33 @@ func TestFallbackEvening(t *testing.T) {
 	}
 }
 
+func TestBriefingOverlapUsesCalendarIdentity(t *testing.T) {
+	mk := func(cal, calID string) Data {
+		return Data{Calendar: calendar.Snapshot{
+			Central: true,
+			Calendars: []calendar.CalendarInfo{
+				{ID: 0, CalendarID: "c-schule", Name: "Schule", Panel: "school"},
+				{ID: 1, CalendarID: "c-familie", Name: "Familie", Panel: "column"},
+			},
+			Events: []calendar.Event{
+				{Cal: 0, Calendar: "Schule", CalendarID: "c-schule", Title: "Elternabend", Start: at("2026-10-02 16:00"), End: at("2026-10-02 17:00")},
+				{Cal: 0, Calendar: cal, CalendarID: calID, Title: "Nachhilfe", Start: at("2026-10-02 16:30"), End: at("2026-10-02 17:30")},
+			},
+		}}
+	}
+	now := at("2026-10-02 06:40")
+	// same stable calendar under a new name: no overlap, the name is text only
+	f := BuildFacts(Morning, now, Target(Morning, now, berlin), berlin, mk("Schule umbenannt", "c-schule"))
+	if len(f.Gleichzeitig) != 0 {
+		t.Errorf("renamed same calendar overlaps: %v", f.Gleichzeitig)
+	}
+	// same display name, different stable ids: a real overlap
+	f = BuildFacts(Morning, now, Target(Morning, now, berlin), berlin, mk("Schule", "c-schule-2"))
+	if len(f.Gleichzeitig) != 1 || !strings.Contains(f.Gleichzeitig[0], "Schule") {
+		t.Errorf("different calendars overlap: %v", f.Gleichzeitig)
+	}
+}
+
 func TestSameKid(t *testing.T) {
 	for _, c := range []struct {
 		a, b string

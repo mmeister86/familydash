@@ -2,6 +2,7 @@ package timetable
 
 import (
 	"encoding/json"
+	"os"
 	"testing"
 	"time"
 )
@@ -156,6 +157,44 @@ func TestSlotJSON(t *testing.T) {
 	}
 	if s := f.Children[0].Days["Mo"]; s[0].A != "Mathe" || s[0].B != "Mathe" || s[1].A != "Werken" || s[1].B != "" {
 		t.Fatalf("slots = %+v", s)
+	}
+}
+
+func TestStableTimetableBinding(t *testing.T) {
+	f := &File{}
+	if err := json.Unmarshal([]byte(`{"children":[`+
+		`{"name":"Hannah","id":"plan-01","periods":[["08:15","09:00"]],"days":{"Mo":["Mathe"]}},`+
+		`{"name":"Lukas","periods":[["08:15","09:00"]],"days":{"Mo":["Deutsch"]}}]}`), f); err != nil {
+		t.Fatal(err)
+	}
+	monday := at("2026-09-28 07:00")
+	cards := f.Build(monday, berlin)
+	if cards[0].Student.ID != "plan-01" {
+		t.Fatalf("explicit id kept: %+v", cards[0].Student)
+	}
+	if cards[1].Student.ID != "plan-lukas" {
+		t.Fatalf("local compat id: %+v", cards[1].Student)
+	}
+	// a rename keeps the stable id, so central bindings survive it
+	f.Children[0].Name = "Hannah Meister"
+	if got := f.Build(monday, berlin)[0].Student.ID; got != "plan-01" {
+		t.Fatalf("rename kept id: %q", got)
+	}
+	days := f.DaysByID(monday, 2, berlin)
+	if len(days["plan-01"]) != 2 || days["plan-01"][0].Date != "2026-09-28" {
+		t.Fatalf("days by id: %+v", days["plan-01"])
+	}
+	// the built-in plan carries a stable non-name id
+	if got := plan(t).Build(monday, berlin)[0].Student.ID; got != "plan-01" {
+		t.Fatalf("built-in id: %q", got)
+	}
+	// duplicate explicit ids are a configuration error, never a silent merge
+	path := t.TempDir() + "/plan.json"
+	if err := os.WriteFile(path, []byte(`{"children":[{"name":"A","id":"x"},{"name":"B","id":"x"}]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("duplicate ids accepted")
 	}
 }
 
