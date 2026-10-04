@@ -333,9 +333,41 @@ function kidPlan(st, opts, withMeal) {
   </div>`;
 }
 
+// stable identity of a calendar or an event: the central id when present,
+// otherwise the numeric layout index (local mode, layout only)
+const calIdOf = (c) => (c && c.calendarId !== undefined && c.calendarId !== "" ? c.calendarId : c?.id);
+const evCalIdOf = (e) => (e && e.calendarId !== undefined && e.calendarId !== "" ? e.calendarId : e?.cal);
+
+// School-calendar selection for one card. Central snapshots resolve only
+// through explicit stable bindings: a rename or reorder cannot move entries
+// between card and standalone list. When the mapping helper failed to load,
+// the child stays unmapped — central mode never falls back to name matching.
+// Local mode keeps the legacy name match.
+function schoolCalsFor(d, name, calName, personId, sourceKind, sourceId, usedCals) {
+  const cals = d.calendar?.calendars || [];
+  const FM = globalThis.FamilyCalendarMapping;
+  if (d.calendar?.central) {
+    if (!FM) return [];
+    // explicit bindings only: events from every school calendar assigned
+    // to the person merge into their card by stable id
+    const pid = personId || (sourceId ? FM.personForSource(d.calendar.bindings, sourceKind, sourceId) : null);
+    if (!pid) return [];
+    const want = new Set(FM.calendarIdsForPerson(d.calendar.calendars, pid));
+    return cals
+      .filter((c) => c.panel === "school" && !usedCals.has(calIdOf(c)) && want.has(calIdOf(c)))
+      .sort((a, b) => (String(calIdOf(a)) < String(calIdOf(b)) ? -1 : 1));
+  }
+  const cal = cals.find((c) => c.panel === "school" && !usedCals.has(calIdOf(c)) &&
+    (calName ? c.name.toLowerCase() === calName.toLowerCase() : sameKid(c.name, name)));
+  return cal ? [cal] : [];
+}
+
 // One card per child. A school calendar (CALENDAR_n_PANEL=school) and a lunch
 // account (VIELFALT_n_*) with the child's name move into that child's card;
 // a timetable's "calendar" field picks the calendar explicitly.
+// In central mode the person's school calendars resolve through explicit
+// stable bindings (calendar-mapping.js) instead: renames and reorders keep
+// every mapping, and children without a binding get no guessed calendar.
 // mode: "full" (afternoon: everything, one card per child side by side),
 // "plan" (timetables stacked in one card), "plan-meal" (the same + the next lunch).
 function renderSchoolRow(d, mode) {
@@ -345,13 +377,13 @@ function renderSchoolRow(d, mode) {
   const todos = d.todos?.tasks || [];
   const usedCals = new Set(), usedMeals = new Set(), usedTodos = new Set();
 
-  const extras = (name, calName) => {
+  const extras = (name, calName, personId, sourceKind, sourceId) => {
     const opts = {};
-    const cal = cals.find((c) => c.panel === "school" && !usedCals.has(c.id) &&
-      (calName ? c.name.toLowerCase() === calName.toLowerCase() : sameKid(c.name, name)));
-    if (cal) {
-      usedCals.add(cal.id);
-      Object.assign(opts, { color: cal.color, cal, events: events.filter((e) => e.cal === cal.id) });
+    const mine = schoolCalsFor(d, name, calName, personId, sourceKind, sourceId, usedCals);
+    if (mine.length) {
+      const ids = new Set(mine.map(calIdOf));
+      for (const m of mine) usedCals.add(calIdOf(m));
+      Object.assign(opts, { color: mine[0].color, cal: mine[0], events: events.filter((e) => ids.has(evCalIdOf(e))) });
     }
     const mi = meals.findIndex((m, i) => !usedMeals.has(i) && sameKid(m.name, name));
     if (mi >= 0) {
@@ -359,18 +391,18 @@ function renderSchoolRow(d, mode) {
       opts.meal = meals[mi];
       opts.color ||= meals[mi].color;
     }
-    const mine = [];
+    const ownTodos = [];
     for (const t of todos) {
       if (usedTodos.has(t.id)) continue;
       const own = todoFor(t, name);
-      if (own) { usedTodos.add(t.id); mine.push(own); }
+      if (own) { usedTodos.add(t.id); ownTodos.push(own); }
     }
-    if (mine.length) opts.todos = mine;
+    if (ownTodos.length) opts.todos = ownTodos;
     return opts;
   };
 
-  const kids = [...(d.school?.students || []).map((st) => [st, extras(st.name)]),
-                ...(d.timetables || []).map((t) => [t, extras(t.name, t.calendar)])];
+  const kids = [...(d.school?.students || []).map((st) => [st, extras(st.name, undefined, st.personId, "besteschule", st.id)]),
+                ...(d.timetables || []).map((t) => [t, extras(t.name, t.calendar, t.personId, "timetable", t.id)])];
   const lonelyMeals = () => meals.filter((_, i) => !usedMeals.has(i));
 
   let html = "";
@@ -379,8 +411,8 @@ function renderSchoolRow(d, mode) {
     if (d.school && !d.school.students?.length) {
       html = `<div class="panel"><h2>Schule</h2><p class="hint">${esc(d.school.error || "Noch keine Daten von beste.schule.")}</p></div>` + html;
     }
-    for (const cal of cals.filter((c) => c.panel === "school" && !usedCals.has(c.id))) {
-      html += schoolCalendarCard(cal, events.filter((e) => e.cal === cal.id));
+    for (const cal of cals.filter((c) => c.panel === "school" && !usedCals.has(calIdOf(c)))) {
+      html += schoolCalendarCard(cal, events.filter((e) => evCalIdOf(e) === calIdOf(cal)));
     }
     html += lonelyMeals().map(mealCard).join("");
   } else if (kids.length) {
@@ -789,6 +821,16 @@ function renderStatus() {
   if (state.error) parts.push(`<span class="off">● Server nicht erreichbar</span>`);
   if (d) {
     for (const [name, err] of Object.entries(d.calendar?.errors || {})) parts.push(`<span class="err">${esc(name)}: ${esc(err)}</span>`);
+    // central mode: concise German status per unavailable/stale source;
+    // numeric indexes stay layout references only and are never shown
+    if (d.calendar?.central) {
+      for (const c of d.calendar.calendars || []) {
+        const st = c.status || {};
+        const detail = st.error ? ` – ${esc(String(st.error).slice(0, 60))}` : "";
+        if (st.freshness === "neverLoaded") parts.push(`<span class="err">Kalender ${esc(c.name)}: noch nicht geladen${detail}</span>`);
+        else if (st.freshness === "stale") parts.push(`<span class="err">Kalender ${esc(c.name)}: veraltet${detail}</span>`);
+      }
+    }
     if (d.weather?.error) parts.push(`<span class="err">Wetter: ${esc(d.weather.error)}</span>`);
     if (d.school?.error && d.school.students?.length) parts.push(`<span class="err">Schule: ${esc(d.school.error)}</span>`);
     if (d.shopping?.error && d.shopping.items?.length) parts.push(`<span class="err">Bring!: ${esc(d.shopping.error)}</span>`);

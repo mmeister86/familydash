@@ -36,6 +36,14 @@ type Config struct {
 	Calendars       []Calendar
 	CalendarDays    int
 	CalendarRefresh time.Duration
+	// CalendarSource selects the calendar backend: "local" polls the
+	// CALENDAR_n_* ICS feeds, "convex" reads exclusively from the central
+	// Companion backend (FAMILY_APP_SITE_URL + FAMILY_APP_CALENDAR_TOKEN)
+	// with a persistent last-good cache. Convex mode never falls back to
+	// local polling, not even on errors.
+	CalendarSource string
+	// CalendarCacheFile persists the last accepted Convex snapshot.
+	CalendarCacheFile string
 
 	WeatherLat     float64
 	WeatherLon     float64
@@ -109,8 +117,11 @@ type Config struct {
 	FamilyAppURL         string // HTTP actions ("site") URL of the Convex backend
 	FamilyAppIngestToken string // POST /ingest/*; "" = no push
 	FamilyAppReadToken   string // GET /todos; "" = no to-dos from the app
-	FamilyAppRefresh     time.Duration
-	FamilyAppHeartbeat   time.Duration
+	// FAMILY_APP_CALENDAR_TOKEN: GET /dashboard/calendars; "" = no central
+	// calendars. Never authorizes ingest or parent functions.
+	FamilyAppCalendarToken string
+	FamilyAppRefresh       time.Duration
+	FamilyAppHeartbeat     time.Duration
 	// FAMILY_APP_<SLUG>_CALENDARS=2,3 → slug → indexes into Calendars whose
 	// entries count as that child's appointments (besides its school calendar)
 	FamilyAppCalendars map[string][]int
@@ -130,11 +141,13 @@ var palette = []string{"#4F8EF7", "#F76C5E", "#46C28E", "#F2B53A", "#A77BF3", "#
 
 func Load() (*Config, error) {
 	c := &Config{
-		ListenAddr:      env("LISTEN_ADDR", ":8080"),
-		CalendarDays:    envInt("CALENDAR_DAYS", 7),
-		CalendarRefresh: envDuration("CALENDAR_REFRESH", 5*time.Minute),
-		WeatherName:     env("WEATHER_NAME", ""),
-		WeatherRefresh:  envDuration("WEATHER_REFRESH", 15*time.Minute),
+		ListenAddr:        env("LISTEN_ADDR", ":8080"),
+		CalendarDays:      envInt("CALENDAR_DAYS", 7),
+		CalendarRefresh:   envDuration("CALENDAR_REFRESH", 5*time.Minute),
+		CalendarSource:    strings.ToLower(env("CALENDAR_SOURCE", "local")),
+		CalendarCacheFile: env("CALENDAR_CACHE_FILE", "/data/calendar-cache.json"),
+		WeatherName:       env("WEATHER_NAME", ""),
+		WeatherRefresh:    envDuration("WEATHER_REFRESH", 15*time.Minute),
 
 		BringEmail:    env("BRING_EMAIL", ""),
 		BringPassword: env("BRING_PASSWORD", ""),
@@ -173,11 +186,17 @@ func Load() (*Config, error) {
 		GeminiThinking: strings.ToLower(env("GEMINI_THINKING", "low")),
 		GeminiBackend:  strings.ToLower(env("GEMINI_BACKEND", "auto")),
 
-		FamilyAppURL:         strings.TrimRight(env("FAMILY_APP_SITE_URL", ""), "/"),
-		FamilyAppIngestToken: env("FAMILY_APP_INGEST_TOKEN", ""),
-		FamilyAppReadToken:   env("FAMILY_APP_DASHBOARD_TOKEN", ""),
-		FamilyAppRefresh:     envDuration("FAMILY_APP_REFRESH", time.Minute),
-		FamilyAppHeartbeat:   envDuration("FAMILY_APP_HEARTBEAT", 15*time.Minute),
+		FamilyAppURL:           strings.TrimRight(env("FAMILY_APP_SITE_URL", ""), "/"),
+		FamilyAppIngestToken:   env("FAMILY_APP_INGEST_TOKEN", ""),
+		FamilyAppReadToken:     env("FAMILY_APP_DASHBOARD_TOKEN", ""),
+		FamilyAppCalendarToken: env("FAMILY_APP_CALENDAR_TOKEN", ""),
+		FamilyAppRefresh:       envDuration("FAMILY_APP_REFRESH", time.Minute),
+		FamilyAppHeartbeat:     envDuration("FAMILY_APP_HEARTBEAT", 15*time.Minute),
+	}
+	switch c.CalendarSource {
+	case "local", "convex":
+	default:
+		return nil, fmt.Errorf("CALENDAR_SOURCE %q: want local or convex", c.CalendarSource)
 	}
 	switch c.GeminiBackend {
 	case "auto", "gemini", "vertex":
@@ -321,10 +340,18 @@ func (c *Config) loadFamilyApp() {
 		c.FamilyAppURL = u
 	}
 	if c.FamilyAppURL == "" {
-		if !badURL && (c.FamilyAppIngestToken != "" || c.FamilyAppReadToken != "") {
+		if !badURL && (c.FamilyAppIngestToken != "" || c.FamilyAppReadToken != "" || c.FamilyAppCalendarToken != "") {
 			warn("FAMILY_APP_*_TOKEN gesetzt, aber FAMILY_APP_SITE_URL fehlt – Familienapp aus")
 		}
-		c.FamilyAppIngestToken, c.FamilyAppReadToken = "", ""
+		c.FamilyAppIngestToken, c.FamilyAppReadToken, c.FamilyAppCalendarToken = "", "", ""
+	}
+	if c.CalendarSource == "convex" {
+		switch {
+		case c.FamilyAppURL == "":
+			warn("CALENDAR_SOURCE=convex, aber FAMILY_APP_SITE_URL fehlt – Kalender nicht verfügbar")
+		case c.FamilyAppCalendarToken == "":
+			warn("CALENDAR_SOURCE=convex, aber FAMILY_APP_CALENDAR_TOKEN fehlt – Kalender nicht verfügbar")
+		}
 	}
 
 	byNum := map[int]int{}

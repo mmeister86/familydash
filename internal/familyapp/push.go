@@ -122,9 +122,16 @@ func (p *Pusher) Run(ctx context.Context, every time.Duration) {
 	}
 }
 
-// Push sends everything that is due once.
+// Push sends everything that is due once. Incomplete central projections —
+// a required calendar source without first valid data — are held back so
+// the last good snapshot in the app stays intact; only complete data is
+// ever transmitted.
 func (p *Pusher) Push(ctx context.Context, now time.Time) {
 	for _, c := range BuildChildren(p.Gather(now), now, p.Loc, p.ExtraCals) {
+		if c.Incomplete {
+			slog.Info("familyapp: holding back incomplete child projection", "child", c.ChildSlug)
+			continue
+		}
 		p.send(ctx, "child:"+c.ChildSlug, "/ingest/child", c, now, p.Heartbeat)
 	}
 	if p.Briefings == nil {

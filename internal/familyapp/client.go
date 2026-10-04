@@ -79,6 +79,38 @@ func (c *Client) get(ctx context.Context, path string, out any) error {
 	return c.do(req, c.ReadToken, out)
 }
 
+// getCalendarFeed fetches the raw central calendar feed (GET
+// /dashboard/calendars) using the calendar-only token. It returns the raw
+// body for strict validation by ParseCalendarFeed.
+func (c *Client) getCalendarFeed(ctx context.Context, token string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+"/dashboard/calendars", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/json")
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("Familienapp nicht erreichbar: %w", err)
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxCalendarFeedBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > maxCalendarFeedBytes {
+		return nil, fmt.Errorf("Familienapp: Kalenderantwort zu groß (> 4 MiB) – letzter Stand bleibt")
+	}
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		msg := strings.TrimSpace(string(data))
+		if len(msg) > 200 {
+			msg = msg[:200] + "…"
+		}
+		return nil, &StatusError{Status: resp.StatusCode, Body: msg}
+	}
+	return data, nil
+}
+
 func (c *Client) do(req *http.Request, token string, out any) error {
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/json")

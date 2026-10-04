@@ -25,6 +25,13 @@ type Event struct {
 	AllDay    bool      `json:"allDay"`
 	StartDate string    `json:"startDate,omitempty"` // YYYY-MM-DD, all-day only
 	EndDate   string    `json:"endDate,omitempty"`   // exclusive, all-day only
+
+	// Central (Convex) mode additions: stable backend identity of the
+	// occurrence and its calendar. Empty in local mode.
+	CalendarID      string `json:"calendarId"`
+	Key             string `json:"key"`
+	UID             string `json:"uid"`
+	IdentityQuality string `json:"identityQuality"`
 }
 
 // ---------------------------------------------------------------- raw parsing

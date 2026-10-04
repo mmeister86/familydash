@@ -138,6 +138,44 @@ func TestNewsFeeds(t *testing.T) {
 	}
 }
 
+func TestCalendarSource(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.CalendarSource != "local" {
+		t.Errorf("default CALENDAR_SOURCE = %q, want local", c.CalendarSource)
+	}
+	if c.CalendarCacheFile != "/data/calendar-cache.json" {
+		t.Errorf("default CALENDAR_CACHE_FILE = %q", c.CalendarCacheFile)
+	}
+
+	t.Setenv("CALENDAR_SOURCE", "convex")
+	t.Setenv("FAMILY_APP_SITE_URL", "https://familybackend-http.matthias.lol")
+	t.Setenv("FAMILY_APP_CALENDAR_TOKEN", "cal-secret")
+	t.Setenv("CALENDAR_CACHE_FILE", "/tmp/test-calendar-cache.json")
+	if c, err = Load(); err != nil {
+		t.Fatal(err)
+	} else if c.CalendarSource != "convex" || c.FamilyAppCalendarToken != "cal-secret" ||
+		c.CalendarCacheFile != "/tmp/test-calendar-cache.json" || len(c.Warnings) != 0 {
+		t.Errorf("convex config: %+v warnings=%q", c, c.Warnings)
+	}
+
+	// Convex without a calendar token warns but still loads: the wall shows
+	// an unavailable source instead of failing or falling back.
+	t.Setenv("FAMILY_APP_CALENDAR_TOKEN", "")
+	if c, err = Load(); err != nil {
+		t.Fatal(err)
+	} else if c.FamilyAppCalendarToken != "" || len(c.Warnings) != 1 {
+		t.Errorf("convex without token: token=%q warnings=%q", c.FamilyAppCalendarToken, c.Warnings)
+	}
+
+	t.Setenv("CALENDAR_SOURCE", "ical")
+	if _, err := Load(); err == nil {
+		t.Error("CALENDAR_SOURCE=ical: want error")
+	}
+}
+
 func TestFamilyApp(t *testing.T) {
 	t.Setenv("CALENDAR_1_URL", "https://example.com/familie.ics")
 	t.Setenv("CALENDAR_3_URL", "https://example.com/sport.ics")

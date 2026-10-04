@@ -18,8 +18,11 @@ Runs as a static Go binary in a ~20 MB container on Unraid; a Raspberry Pi only 
  Bring!          ──(login, 2 min)────────────┤
  VielfaltMenü    ──(login per child, 30 min)─┤
                                              │
- family app (Convex) ◀──(POST week + briefing / GET to-dos)──┘   outbound only, Unraid stays private
+  family app (Convex) ◀──(POST week + briefing / GET to-dos)──┘   outbound only, Unraid stays private
 ```
+
+With `CALENDAR_SOURCE=convex` the first line moves into the family app: Convex imports the iCal feeds centrally and
+familydash reads them back via `GET /dashboard/calendars` (see [docs/CONVEX_CALENDAR_ROLLOUT.md](docs/CONVEX_CALENDAR_ROLLOUT.md)).
 
 ## Quick start (Unraid)
 
@@ -41,7 +44,10 @@ All settings are environment variables.
 | `CALENDAR_n_PANEL` | `column` | `column` = own column in the calendar row, `school` = card next to beste.schule (next 3 weeks) |
 | `CALENDAR_n_COLUMN` | – | Number `m` of another calendar: show this one **inside calendar m's column** instead of its own (entries keep their own color), e.g. public holidays in the family column |
 | `CALENDAR_DAYS` | `7` | Days shown (today + n-1) |
-| `CALENDAR_REFRESH` | `5m` | Go duration |
+| `CALENDAR_REFRESH` | `5m` | Go duration (local mode) |
+| `CALENDAR_SOURCE` | `local` | `local` = poll the `CALENDAR_n_URL` feeds here; `convex` = read all calendars exclusively from the family app's Convex backend (no local polling, no fallback — see [docs/CONVEX_CALENDAR_ROLLOUT.md](docs/CONVEX_CALENDAR_ROLLOUT.md)) |
+| `FAMILY_APP_CALENDAR_TOKEN` | – | Bearer token for `GET /dashboard/calendars` (= `CALENDAR_DASHBOARD_TOKEN` in Convex); required for `CALENDAR_SOURCE=convex`. Authorizes nothing else |
+| `CALENDAR_CACHE_FILE` | `/data/calendar-cache.json` | Persistent last-good calendar snapshot (calendars only); served with original source age after restarts/outages |
 | `WEATHER_LAT` / `WEATHER_LON` | – | Weather is off until set |
 | `WEATHER_NAME` | – | Label above the weather panel |
 | `WEATHER_REFRESH` | `15m` | |
@@ -126,6 +132,9 @@ For a child without beste.schule, keep their school dates in a Google calendar a
 (beste.schule or fixed timetable) move into that card, ordered *school → To-dos → Termine → Essen*. Morning and evening show the
 timetables stacked in one card, each with the next lunch (morning: today's, evening: tomorrow's). Names match case-insensitively, and a
 single first name also matches a full name (`Lukas` ↔ `Meister Lukas`). Anything without a matching child keeps a card of its own.
+In `CALENDAR_SOURCE=convex` mode names never decide: school calendars resolve through explicit stable person bindings from the
+backend, so renames and reorders keep every mapping; unmapped children keep their school data without a guessed calendar
+(see [docs/CONVEX_CALENDAR_ROLLOUT.md](docs/CONVEX_CALENDAR_ROLLOUT.md)).
 
 ### Waste collection
 
@@ -156,6 +165,11 @@ The parser handles what Google/iCloud/Outlook export in practice: time zones, al
 `EXDATE`, moved/cancelled single instances (`RECURRENCE-ID`) and DST changes. See `internal/calendar/ics_test.go`.
 
 Note: Google refreshes the secret iCal feed itself only every few minutes to hours; that delay is on Google's side.
+
+With `CALENDAR_SOURCE=convex` the wall polls no iCal feeds at all: the family app's Convex backend imports them centrally
+(42-day Berlin window, atomic generations) and the wall reads `GET /dashboard/calendars`, keeping the last-good stand
+persistently. Rollout, comparison and rollback are documented in [docs/CONVEX_CALENDAR_ROLLOUT.md](docs/CONVEX_CALENDAR_ROLLOUT.md);
+only switch after the central stand is accepted, and remove the `CALENDAR_n_URL` values only then.
 
 ### beste.schule
 
@@ -215,6 +229,9 @@ beste.schule, VielfaltMenü and Google Calendar; it hands the results over. All 
 - **Pull** (`FAMILY_APP_DASHBOARD_TOKEN`): `GET /todos?days=2` every `FAMILY_APP_REFRESH`. Tasks assigned to a child show up in that
   child's card (⭐ points, ⏳ = ticked off, waiting for a parent); the briefing gets every person's tasks (overdue first, in the
   evening what's still open plus tomorrow's), how many wait for confirmation and the children's points.
+- **Calendar pull** (`FAMILY_APP_CALENDAR_TOKEN`, only with `CALENDAR_SOURCE=convex`): `GET /dashboard/calendars` every minute.
+  Central events carry stable calendar/person ids; the wall maps them without name matching, keeps the last-good stand
+  persistently (`CALENDAR_CACHE_FILE`) and shows German source status on staleness. Step-by-step: [docs/CONVEX_CALENDAR_ROLLOUT.md](docs/CONVEX_CALENDAR_ROLLOUT.md).
 
 Failures only log and retry; the wall keeps the last good data. A mistake in these settings never stops the container: a URL
 without `https://` is fixed, anything else switches the family app off with a ⚙️ warning in the footer and the log. The exact payloads are in [docs/FAMILY_APP.md](docs/FAMILY_APP.md).

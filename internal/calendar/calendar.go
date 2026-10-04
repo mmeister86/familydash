@@ -119,12 +119,48 @@ func (s *Service) fetch(ctx context.Context, c config.Calendar, from, to time.Ti
 const schoolDays = 21
 
 // CalendarInfo describes a configured calendar, in configuration order.
+//
+// In central (Convex) mode the numeric ID/Into are display-only indexes
+// assigned after sorting by order then source key; CalendarID carries the
+// stable backend identity and Status the per-source import state.
 type CalendarInfo struct {
 	ID    int    `json:"id"`
 	Name  string `json:"name"`
 	Color string `json:"color"`
 	Panel string `json:"panel"`
 	Into  int    `json:"into"` // id of the column this calendar joins, -1 = own column
+
+	CalendarID string       `json:"calendarId"`
+	PersonIDs  []string     `json:"personIds"`
+	Status     SourceStatus `json:"status"`
+}
+
+// Person is one family member from the shared backend user base.
+type Person struct {
+	ID   string `json:"id"`
+	Slug string `json:"slug"`
+	Name string `json:"name"`
+	Role string `json:"role"` // parent | child
+}
+
+// PersonBinding links a person to an external source identity, e.g. a
+// timetable child or a beste.schule student.
+type PersonBinding struct {
+	PersonID   string `json:"personId"`
+	Kind       string `json:"kind"` // besteschule | timetable
+	ExternalID string `json:"externalId"`
+}
+
+// SourceStatus is the central import state of one calendar: attempt,
+// success and freshness are three different timestamps/qualities. A
+// successful unchanged fetch advances freshness without rewriting events,
+// while a missing success is never replaced by "now".
+type SourceStatus struct {
+	LastAttemptAt     time.Time `json:"lastAttemptAt"`
+	LastSuccessAt     time.Time `json:"lastSuccessAt"`
+	Freshness         string    `json:"freshness"`
+	LastAttemptStatus string    `json:"lastAttemptStatus"`
+	Error             string    `json:"error"`
 }
 
 type Snapshot struct {
@@ -132,6 +168,17 @@ type Snapshot struct {
 	Events    []Event           `json:"events"`
 	Errors    map[string]string `json:"errors,omitempty"`
 	UpdatedAt time.Time         `json:"updatedAt"`
+
+	// Central mode (Convex feed) additions. In local mode Central stays
+	// false and the rest stays empty. UpdatedAt in central mode is the
+	// oldest successful active source timestamp and stays zero while any
+	// required source was never loaded.
+	Central               bool            `json:"central"`
+	People                []Person        `json:"people"`
+	Bindings              []PersonBinding `json:"bindings"`
+	ConfigurationRevision int64           `json:"configurationRevision"`
+	WindowStart           time.Time       `json:"windowStart"`
+	WindowEnd             time.Time       `json:"windowEnd"`
 }
 
 func (s *Service) Snapshot() Snapshot {

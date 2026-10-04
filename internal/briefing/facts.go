@@ -199,9 +199,16 @@ func BuildFacts(kind Kind, now, target time.Time, loc *time.Location, d Data) Fa
 	// appointments on the target day (+ tonight's in the evening)
 	ends := target.AddDate(0, 0, 1)
 	type timed struct {
+		key        string // stable calendar identity; the display name is text only
 		cal        string
 		start, end time.Time
 		title      string
+	}
+	calKey := func(e calendar.Event) string {
+		if e.CalendarID != "" {
+			return "\x00" + e.CalendarID
+		}
+		return e.Calendar
 	}
 	var spans []timed
 	for _, e := range d.Calendar.Events {
@@ -221,15 +228,17 @@ func BuildFacts(kind Kind, now, target time.Time, loc *time.Location, d Data) Fa
 			}
 			f.Termine = append(f.Termine, Appt{Kalender: e.Calendar, Titel: e.Title, Zeit: span(s, en), Ort: e.Location})
 			if en.After(s) {
-				spans = append(spans, timed{e.Calendar, s, en, e.Title})
+				spans = append(spans, timed{calKey(e), e.Calendar, s, en, e.Title})
 			}
 		}
 	}
-	// same time, different calendars – maybe a pickup problem; the model decides
+	// same time, different calendars – maybe a pickup problem; the model decides.
+	// Identity is the stable calendar id in central mode (a rename is not a
+	// second calendar); the names stay visible in the text only.
 	for i := 0; i < len(spans); i++ {
 		for j := i + 1; j < len(spans); j++ {
 			a, b := spans[i], spans[j]
-			if a.cal != b.cal && a.start.Before(b.end) && b.start.Before(a.end) {
+			if a.key != b.key && a.start.Before(b.end) && b.start.Before(a.end) {
 				f.Gleichzeitig = append(f.Gleichzeitig, fmt.Sprintf("%s %s (%s) und %s %s (%s)",
 					a.start.Format("15:04"), a.title, a.cal, b.start.Format("15:04"), b.title, b.cal))
 			}

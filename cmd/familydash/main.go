@@ -77,8 +77,12 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	cal := calendar.NewService(cfg)
-	go cal.Run(ctx, cfg.CalendarRefresh)
+	cal := newCalendarSource(cfg)
+	if cfg.CalendarSource == "convex" {
+		go cal.Run(ctx, familyapp.ConvexPollInterval)
+	} else {
+		go cal.Run(ctx, cfg.CalendarRefresh)
+	}
 
 	var wx *weather.Service
 	if cfg.WeatherEnabled() {
@@ -247,8 +251,20 @@ func meals(cfg *config.Config) int {
 	return 0
 }
 
+// newCalendarSource selects the calendar backend once for every consumer
+// (server, briefing, pusher, previews). Convex mode never creates the local
+// ICS poller — not even when credentials, HTTP or validation fail; an
+// invalid chosen convex config yields a visible unavailable-source state,
+// never a silent fallback.
+func newCalendarSource(cfg *config.Config) calendar.Source {
+	if cfg.CalendarSource == "convex" {
+		return familyapp.NewCalendarService(newAppClient(cfg), cfg.FamilyAppCalendarToken, cfg.CalendarCacheFile, cfg.Location)
+	}
+	return calendar.NewService(cfg)
+}
+
 // newBriefing wires the AI card to the other sources (nil ones are skipped).
-func newBriefing(cfg *config.Config, cal *calendar.Service, src server.Sources) *briefing.Service {
+func newBriefing(cfg *config.Config, cal calendar.Source, src server.Sources) *briefing.Service {
 	b := &briefing.Service{
 		Sched: &cfg.Scenes, Loc: cfg.Location, Lead: cfg.BriefingLead, MinGap: cfg.BriefingMinGap,
 		Gather: func(now time.Time) briefing.Data {
@@ -299,7 +315,7 @@ func brief(cfg *config.Config, kind briefing.Kind) int {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	cal := calendar.NewService(cfg)
+	cal := newCalendarSource(cfg)
 	cal.Refresh(ctx)
 	var src server.Sources
 	if cfg.WeatherEnabled() {
@@ -359,7 +375,7 @@ func loadTodosOnce(ctx context.Context, cfg *config.Config) todo.Source {
 }
 
 // newPusher sends each child's week and the briefings to the family app.
-func newPusher(cfg *config.Config, cal *calendar.Service, src server.Sources) *familyapp.Pusher {
+func newPusher(cfg *config.Config, cal calendar.Source, src server.Sources) *familyapp.Pusher {
 	p := &familyapp.Pusher{
 		Client: newAppClient(cfg), Loc: cfg.Location, Heartbeat: cfg.FamilyAppHeartbeat, ExtraCals: cfg.FamilyAppCalendars,
 		Gather: func(now time.Time) familyapp.Inputs {
@@ -371,6 +387,7 @@ func newPusher(cfg *config.Config, cal *calendar.Service, src server.Sources) *f
 			if src.Plan != nil {
 				in.Timetables = src.Plan.Build(now, cfg.Location)
 				in.PlanDays = src.Plan.Days(now, familyapp.Days, cfg.Location)
+				in.PlanDaysByID = src.Plan.DaysByID(now, familyapp.Days, cfg.Location)
 			}
 			if src.Meals != nil {
 				in.Meals = src.Meals.Snapshot()
@@ -390,7 +407,7 @@ func newPusher(cfg *config.Config, cal *calendar.Service, src server.Sources) *f
 func appPreviewRun(cfg *config.Config) int {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	cal := calendar.NewService(cfg)
+	cal := newCalendarSource(cfg)
 	cal.Refresh(ctx)
 	var src server.Sources
 	if cfg.SchoolEnabled() {

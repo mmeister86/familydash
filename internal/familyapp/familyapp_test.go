@@ -316,3 +316,242 @@ func TestBriefingPayload(t *testing.T) {
 		t.Errorf("payload: %+v", p)
 	}
 }
+
+// ---- central (Convex) mode: explicit person/calendar bindings ----
+
+func centralSnapshot() calendar.Snapshot {
+	succ := at("2026-10-02 06:55")
+	return calendar.Snapshot{
+		Central:               true,
+		ConfigurationRevision: 7,
+		UpdatedAt:             succ,
+		People: []calendar.Person{
+			{ID: "u-lukas", Slug: "lukas", Name: "Lukas Meister", Role: "child"},
+			{ID: "u-hannah", Slug: "hannah", Name: "Hannah Meister", Role: "child"},
+		},
+		Bindings: []calendar.PersonBinding{
+			{PersonID: "u-lukas", Kind: "besteschule", ExternalID: "bs-lukas"},
+			{PersonID: "u-hannah", Kind: "timetable", ExternalID: "plan-01"},
+		},
+		Calendars: []calendar.CalendarInfo{
+			{ID: 0, CalendarID: "cal-lukas", Name: "Schule Lukas", Color: "#F2B53A", Panel: "school", Into: -1,
+				PersonIDs: []string{"u-lukas"},
+				Status:    calendar.SourceStatus{LastAttemptAt: succ, LastSuccessAt: succ, Freshness: "fresh", LastAttemptStatus: "success"}},
+			{ID: 1, CalendarID: "cal-hannah", Name: "Schule Hannah", Color: "#46C28E", Panel: "school", Into: -1,
+				PersonIDs: []string{"u-hannah"},
+				Status:    calendar.SourceStatus{LastAttemptAt: succ, LastSuccessAt: succ, Freshness: "fresh", LastAttemptStatus: "success"}},
+		},
+		Events: []calendar.Event{
+			{Cal: 0, Calendar: "Schule Lukas", CalendarID: "cal-lukas", Title: "Elternsprechtag", Start: at("2026-10-06 17:00"), End: at("2026-10-06 18:00")},
+			{Cal: 1, Calendar: "Schule Hannah", CalendarID: "cal-hannah", Title: "Wandertag", AllDay: true, StartDate: "2026-10-05", EndDate: "2026-10-06"},
+		},
+	}
+}
+
+func centralInputs() Inputs {
+	return Inputs{
+		Calendar: centralSnapshot(),
+		School: &besteschule.School{UpdatedAt: at("2026-10-02 06:50"), Students: []besteschule.Student{
+			{ID: "bs-lukas", Name: "Lukas Meister"},
+		}},
+		SchoolDays: map[string][]besteschule.Day{"Lukas Meister": {
+			{Date: "2026-10-02", Lessons: []besteschule.Lesson{{Nr: 1, Subject: "Mathe"}}},
+		}},
+		Timetables: []timetable.Card{{Student: besteschule.Student{ID: "plan-01", Name: "Hannah"}, Calendar: "Schule Hannah"}},
+		PlanDays:   map[string][]besteschule.Day{},
+		PlanDaysByID: map[string][]besteschule.Day{"plan-01": {
+			{Date: "2026-10-02", Lessons: []besteschule.Lesson{{Nr: 1, Subject: "Deutsch"}}},
+		}},
+	}
+}
+
+func centralKid(kids []ChildSnapshot, slug string) ChildSnapshot {
+	for _, k := range kids {
+		if k.ChildSlug == slug {
+			return k
+		}
+	}
+	return ChildSnapshot{}
+}
+
+func TestCalendarReorderKeepsChildMapping(t *testing.T) {
+	now := at("2026-10-02 07:00")
+	kids := BuildChildren(centralInputs(), now, berlin, nil)
+	lukas, hannah := centralKid(kids, "lukas"), centralKid(kids, "hannah")
+	if lukas.ChildSlug == "" || hannah.ChildSlug == "" {
+		t.Fatalf("slugs come from bound users: %+v", kids)
+	}
+	if ev := lukas.Days[4].Events; len(ev) != 1 || ev[0].Title != "Elternsprechtag" {
+		t.Fatalf("lukas events: %+v", lukas.Days[4].Events)
+	}
+	if ev := hannah.Days[3].Events; len(ev) != 1 || ev[0].Title != "Wandertag" {
+		t.Fatalf("hannah events: %+v", hannah.Days[3].Events)
+	}
+
+	// same backend state, calendars renamed and reordered: the mapping must
+	// follow the stable ids, not names or numeric indexes
+	in := centralInputs()
+	in.Calendar.Calendars[0], in.Calendar.Calendars[1] = in.Calendar.Calendars[1], in.Calendar.Calendars[0]
+	for i := range in.Calendar.Calendars {
+		in.Calendar.Calendars[i].ID = i
+	}
+	in.Calendar.Calendars[0].Name = "Hannah (neu)"
+	in.Calendar.Calendars[1].Name = "Lukas (neu)"
+	for i := range in.Calendar.Events {
+		if in.Calendar.Events[i].CalendarID == "cal-lukas" {
+			in.Calendar.Events[i].Cal = 1
+			in.Calendar.Events[i].Calendar = "Lukas (neu)"
+		} else {
+			in.Calendar.Events[i].Cal = 0
+			in.Calendar.Events[i].Calendar = "Hannah (neu)"
+		}
+	}
+	again := BuildChildren(in, now, berlin, nil)
+	if ev := centralKid(again, "lukas").Days[4].Events; len(ev) != 1 || ev[0].Title != "Elternsprechtag" {
+		t.Errorf("lukas after reorder: %+v", ev)
+	}
+	if ev := centralKid(again, "hannah").Days[3].Events; len(ev) != 1 || ev[0].Title != "Wandertag" {
+		t.Errorf("hannah after reorder: %+v", ev)
+	}
+}
+
+func TestSameNamesDoNotMergeCentralBindings(t *testing.T) {
+	succ := at("2026-10-02 06:55")
+	fresh := calendar.SourceStatus{LastAttemptAt: succ, LastSuccessAt: succ, Freshness: "fresh", LastAttemptStatus: "success"}
+	in := Inputs{
+		Calendar: calendar.Snapshot{
+			Central: true,
+			People: []calendar.Person{
+				{ID: "u-1", Slug: "lukas1", Name: "Lukas Meister", Role: "child"},
+				{ID: "u-2", Slug: "lukas2", Name: "Lukas Müller", Role: "child"},
+			},
+			Bindings: []calendar.PersonBinding{
+				{PersonID: "u-1", Kind: "besteschule", ExternalID: "bs-1"},
+				{PersonID: "u-2", Kind: "besteschule", ExternalID: "bs-2"},
+			},
+			Calendars: []calendar.CalendarInfo{
+				{ID: 0, CalendarID: "c-1", Name: "Schule", Panel: "school", PersonIDs: []string{"u-1"}, Status: fresh},
+				{ID: 1, CalendarID: "c-2", Name: "Schule", Panel: "school", PersonIDs: []string{"u-2"}, Status: fresh},
+			},
+			Events: []calendar.Event{
+				{Cal: 0, Calendar: "Schule", CalendarID: "c-1", Title: "Test A", Start: at("2026-10-06 17:00"), End: at("2026-10-06 18:00")},
+				{Cal: 1, Calendar: "Schule", CalendarID: "c-2", Title: "Test B", Start: at("2026-10-06 17:00"), End: at("2026-10-06 18:00")},
+			},
+		},
+		School: &besteschule.School{UpdatedAt: succ, Students: []besteschule.Student{
+			{ID: "bs-1", Name: "Lukas Meister"},
+			{ID: "bs-2", Name: "Lukas Müller"},
+		}},
+		SchoolDays: map[string][]besteschule.Day{
+			"Lukas Meister": {{Date: "2026-10-02"}},
+			"Lukas Müller":  {{Date: "2026-10-02"}},
+		},
+	}
+	kids := BuildChildren(in, at("2026-10-02 07:00"), berlin, nil)
+	if len(kids) != 2 {
+		t.Fatalf("same-name source children must not merge: %+v", kids)
+	}
+	a, b := centralKid(kids, "lukas1"), centralKid(kids, "lukas2")
+	if a.ChildSlug == "" || b.ChildSlug == "" {
+		t.Fatalf("person slugs: %+v", kids)
+	}
+	if ev := a.Days[4].Events; len(ev) != 1 || ev[0].Title != "Test A" {
+		t.Errorf("lukas1 events: %+v", ev)
+	}
+	if ev := b.Days[4].Events; len(ev) != 1 || ev[0].Title != "Test B" {
+		t.Errorf("lukas2 events: %+v", ev)
+	}
+}
+
+func TestAllAssignedCalendarsIncluded(t *testing.T) {
+	in := centralInputs()
+	succ := at("2026-10-02 06:55")
+	in.Calendar.Calendars = append(in.Calendar.Calendars, calendar.CalendarInfo{
+		ID: 2, CalendarID: "cal-lukas-2", Name: "AG Lukas", Panel: "school", Into: -1,
+		PersonIDs: []string{"u-lukas"},
+		Status:    calendar.SourceStatus{LastAttemptAt: succ, LastSuccessAt: succ, Freshness: "fresh", LastAttemptStatus: "success"},
+	})
+	in.Calendar.Events = append(in.Calendar.Events, calendar.Event{
+		Cal: 2, Calendar: "AG Lukas", CalendarID: "cal-lukas-2", Title: "AG-Termin",
+		Start: at("2026-10-06 15:00"), End: at("2026-10-06 16:00"),
+	})
+	kids := BuildChildren(in, at("2026-10-02 07:00"), berlin, nil)
+	ev := centralKid(kids, "lukas").Days[4].Events
+	if len(ev) != 2 {
+		t.Fatalf("all assigned calendars included: %+v", ev)
+	}
+	if ev[0].Title != "AG-Termin" || ev[1].Title != "Elternsprechtag" {
+		t.Errorf("order: %+v", ev)
+	}
+}
+
+func TestMissingSourceNeverBecomesFresh(t *testing.T) {
+	in := centralInputs()
+	in.Calendar.Calendars[0].Status = calendar.SourceStatus{Freshness: "neverLoaded", LastAttemptStatus: "error", Error: "500"}
+	in.Calendar.Events = in.Calendar.Events[1:]
+	kids := BuildChildren(in, at("2026-10-02 07:00"), berlin, nil)
+	lukas := centralKid(kids, "lukas")
+	if lukas.ChildSlug == "" {
+		t.Fatal("child projection exists")
+	}
+	if !lukas.Incomplete {
+		t.Error("required never-loaded source must mark the projection incomplete")
+	}
+	if lukas.SourceUpdatedAt != 0 {
+		t.Errorf("sourceUpdatedAt = %d, want 0 (unknown, not now)", lukas.SourceUpdatedAt)
+	}
+	if len(lukas.Days[4].Events) != 0 {
+		t.Errorf("no guessed events: %+v", lukas.Days[4].Events)
+	}
+	// the healthy child is unaffected
+	if hannah := centralKid(kids, "hannah"); hannah.Incomplete || hannah.SourceUpdatedAt == 0 {
+		t.Errorf("healthy child: %+v", hannah)
+	}
+}
+
+func TestCentralIgnoresNumericExtrasAndNames(t *testing.T) {
+	in := centralInputs()
+	// numeric ENV indexes and timetable calendar names must not override bindings
+	kids := BuildChildren(in, at("2026-10-02 07:00"), berlin, map[string][]int{"lukas": {1}})
+	if ev := centralKid(kids, "lukas").Days[3].Events; len(ev) != 0 {
+		t.Errorf("numeric extra must not leak hannah's calendar into lukas: %+v", ev)
+	}
+}
+
+func TestUnmappedChildKeepsSchoolDataWithWarning(t *testing.T) {
+	in := centralInputs()
+	in.Calendar.Bindings = in.Calendar.Bindings[1:] // lukas' besteschule binding gone
+	kids := BuildChildren(in, at("2026-10-02 07:00"), berlin, nil)
+	lukas := centralKid(kids, "lukas")
+	if lukas.ChildSlug == "" {
+		t.Fatal("unmapped child keeps its projection")
+	}
+	if len(lukas.Days[0].Timetable) != 1 {
+		t.Errorf("school data kept: %+v", lukas.Days[0].Timetable)
+	}
+	if len(lukas.Days[4].Events) != 0 {
+		t.Errorf("no guessed calendars: %+v", lukas.Days[4].Events)
+	}
+	if lukas.Incomplete {
+		t.Error("a child without assigned calendars is complete (nothing required)")
+	}
+	warns := CentralWarnings(in.Calendar, in.School, nil)
+	if len(warns) != 1 {
+		t.Fatalf("configuration warning: %v", warns)
+	}
+}
+
+func TestPusherHoldsIncompleteCentralChild(t *testing.T) {
+	rc := &recorder{}
+	srv := httptest.NewServer(rc.handler(t))
+	defer srv.Close()
+	in := centralInputs()
+	in.Calendar.Calendars[0].Status = calendar.SourceStatus{Freshness: "neverLoaded", LastAttemptStatus: "error", Error: "500"}
+	in.Calendar.Events = in.Calendar.Events[1:]
+	p := &Pusher{Client: NewClient(srv.URL, "ingest", "read"), Loc: berlin,
+		Gather: func(time.Time) Inputs { return in }}
+	p.Push(context.Background(), at("2026-10-02 07:00"))
+	if got := strings.Join(rc.take(), " "); got != "/ingest/child:hannah" {
+		t.Fatalf("incomplete child held back, healthy child sent: %s", got)
+	}
+}
