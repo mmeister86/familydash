@@ -26,3 +26,17 @@ func TestDefaultFeedValid(t *testing.T) {
 		t.Errorf("night = %+v", night)
 	}
 }
+
+func TestDefaultHintsMorningOnly(t *testing.T) {
+	feed := DefaultFeed()
+	for _, s := range feed.Scenes {
+		for _, w := range s.Widgets {
+			if w.Type != "clock" || w.Props == nil || w.Props.Hints == nil {
+				continue
+			}
+			if want := s.ID == "morning"; *w.Props.Hints != want {
+				t.Errorf("%s hints = %v, want %v", s.ID, *w.Props.Hints, want)
+			}
+		}
+	}
+}
