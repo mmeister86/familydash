@@ -49,3 +49,16 @@ function briefingKind(widgets) {
   const w = (widgets || []).find((w) => w.type === "briefing");
   return w?.props?.kind || null;
 }
+
+// scenePayloadChanged reports whether a light /api/scene payload differs
+// from the dashboard state: scene, force/preview flags, preview window
+// (re-previewing the same scene bumps until, not revision) or revision.
+function scenePayloadChanged(cur, payload) {
+  const a = cur?.scene, b = payload?.scene;
+  if (!b) return false;
+  return a?.id !== b.id
+    || !!a?.forced !== !!b.forced
+    || !!a?.preview !== !!b.preview
+    || (b.preview && a?.until !== b.until)
+    || cur?.layout?.revision !== payload?.layout?.revision;
+}

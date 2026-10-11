@@ -893,11 +893,7 @@ async function refreshScene() {
     const payload = await res.json();
     const cur = state.data;
     if (!cur || !payload?.scene) return;
-    const changed = cur.scene?.id !== payload.scene.id
-      || cur.scene?.forced !== payload.scene.forced
-      || !!cur.scene?.preview !== !!payload.scene.preview
-      || cur.layout?.revision !== payload.layout?.revision;
-    if (changed) {
+    if (scenePayloadChanged(cur, payload)) {
       const briefingChanged = briefingKind(cur.layout?.widgets) !== briefingKind(payload.layout?.widgets);
       cur.scene = payload.scene;
       cur.layout = payload.layout;

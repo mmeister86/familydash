@@ -184,6 +184,29 @@ func TestResolveSceneFollowsFeedNotStaleProvider(t *testing.T) {
 	}
 }
 
+func TestResolveSceneFallbackUsesConfiguredTimes(t *testing.T) {
+	provider := scene.NewProvider(scene.Schedule{
+		SchoolDay: []scene.Start{
+			{ID: "morning", Name: "Morgen", Kind: "layout", Minute: 5 * 60},
+			{ID: "night", Name: "Nacht", Kind: "night", Minute: 21*60 + 30},
+		},
+		Weekend: []scene.Start{
+			{ID: "morning", Name: "Morgen", Kind: "layout", Minute: 5 * 60},
+			{ID: "night", Name: "Nacht", Kind: "night", Minute: 21*60 + 30},
+		},
+	})
+	svc := scenes.NewService(familyapp.NewClient("http://example.com", "", ""), "", "", nil)
+	s := &Server{cfg: &config.Config{Location: berlin(t)}, scenes: svc, sceneProvider: provider}
+	at, _ := time.ParseInLocation("2006-01-02 15:04", "2026-10-12 05:30", berlin(t))
+	got := s.resolveScene(at, "")
+	if got.Scene.ID != "morning" {
+		t.Errorf("scene = %q, want morning (configured 05:00 start)", got.Scene.ID)
+	}
+	if len(got.Layout.Widgets) != 5 {
+		t.Errorf("widgets = %d, want built-in morning layout", len(got.Layout.Widgets))
+	}
+}
+
 func TestResolveSceneKeepsProviderForce(t *testing.T) {
 	s := sceneTestServer(t, loadScenesFixture(t))
 	s.sceneProvider.SetForce("morning")

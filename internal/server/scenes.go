@@ -32,9 +32,10 @@ type scenePayload struct {
 // feed never loaded).
 func (s *Server) resolveScene(now time.Time, override string) scenePayload {
 	feed, revision := scenes.DefaultFeed(), 0
+	fromFeed := false
 	if s.scenes != nil {
 		if snap, err := s.scenes.Snapshot(); err == nil {
-			feed, revision = snap.Feed, snap.Feed.Revision
+			feed, revision, fromFeed = snap.Feed, snap.Feed.Revision, true
 		}
 	}
 	if override != "" {
@@ -73,6 +74,10 @@ func (s *Server) resolveScene(now time.Time, override string) scenePayload {
 			Scene:  cur,
 			Layout: sceneLayout{Revision: revision, Widgets: widgetsFor(feed, cur.ID)},
 		}
+	}
+	if !fromFeed {
+		// No feed yet: SCENE_* times (provider) with built-in layouts.
+		return payload(s.sceneProvider.At(now, s.cfg.Location))
 	}
 	// The schedule comes from the same snapshot as the widgets, so a request
 	// can never mix feed versions; the configured force still applies.

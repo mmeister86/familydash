@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import assert from "node:assert";
 
 const src = readFileSync(new URL("./static/layout.js", import.meta.url), "utf8");
-const { resolveLayout, briefingKind, EL } = new Function(`${src}; return { resolveLayout, briefingKind, EL };`)();
+const { resolveLayout, briefingKind, scenePayloadChanged, EL } = new Function(`${src}; return { resolveLayout, briefingKind, scenePayloadChanged, EL };`)();
 
 const allTypes = ["clock", "shopping", "briefing", "news", "photos", "school", "calendars"];
 const allShown = Object.fromEntries(allTypes.map((t) => [t, true]));
@@ -88,6 +88,21 @@ const allShown = Object.fromEntries(allTypes.map((t) => [t, true]));
   assert.strictEqual(briefingKind([{ type: "news" }]), null);
   assert.strictEqual(briefingKind([]), null);
   assert.strictEqual(briefingKind(undefined), null);
+}
+
+// scenePayloadChanged detects scene, flag, preview-window and revision changes
+{
+  const base = { scene: { id: "morning", forced: false }, layout: { revision: 3 } };
+  assert.strictEqual(scenePayloadChanged(base, { scene: { id: "morning" }, layout: { revision: 3 } }), false);
+  assert.strictEqual(scenePayloadChanged(base, { scene: { id: "day" }, layout: { revision: 3 } }), true);
+  assert.strictEqual(scenePayloadChanged(base, { scene: { id: "morning", forced: true }, layout: { revision: 3 } }), true);
+  assert.strictEqual(scenePayloadChanged(base, { scene: { id: "morning" }, layout: { revision: 4 } }), true);
+  assert.strictEqual(scenePayloadChanged(base, { scene: { id: "morning", until: "2026-10-11T20:00:00+02:00" }, layout: { revision: 3 } }), false);
+  const preview = { scene: { id: "morning", preview: true, until: "2026-10-11T20:00:00+02:00" }, layout: { revision: 3 } };
+  assert.strictEqual(scenePayloadChanged(base, preview), true);
+  const repreview = { scene: { id: "morning", preview: true, until: "2026-10-11T20:02:00+02:00" }, layout: { revision: 3 } };
+  assert.strictEqual(scenePayloadChanged(preview, repreview), true);
+  assert.strictEqual(scenePayloadChanged(preview, preview), false);
 }
 
 console.log("layout.test.mjs: all assertions passed");
