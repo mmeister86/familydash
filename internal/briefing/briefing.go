@@ -96,18 +96,52 @@ func schema() map[string]any {
 	}
 }
 
+// SceneWidgets marks which briefing cards a scene shows: a briefing widget
+// with kind "today" feeds the morning card, "tomorrow" the evening outlook.
+type SceneWidgets struct {
+	Today    bool
+	Tomorrow bool
+}
+
+// WidgetPlan maps scene ids to their briefing widgets. A nil plan means the
+// feed is unavailable: briefing falls back to the default morning/evening
+// times so the family app keeps its cards.
+type WidgetPlan map[string]SceneWidgets
+
+func (p WidgetPlan) usesToday() bool {
+	for _, w := range p {
+		if w.Today {
+			return true
+		}
+	}
+	return false
+}
+
+func (p WidgetPlan) usesTomorrow() bool {
+	for _, w := range p {
+		if w.Tomorrow {
+			return true
+		}
+	}
+	return false
+}
+
+// PlanFunc returns the current widget plan (nil, nil = feed unavailable).
+type PlanFunc func() (WidgetPlan, error)
+
 // Service keeps the briefings fresh. It wakes up every minute, looks at the
-// scene that starts within Lead (morning → today, evening → tomorrow), and
-// asks the model again only when the facts changed – at most every MinGap.
-// Morning and evening each keep their own card, so ?scene=… on a laptop can
-// look at the other one without disturbing the wall.
+// scene that starts within Lead (briefing widget today → today, tomorrow →
+// outlook), and asks the model again only when the facts changed – at most
+// every MinGap. Morning and evening each keep their own card, so ?scene=… on
+// a laptop can look at the other one without disturbing the wall.
 type Service struct {
 	Model  *Gemini // nil = rule-based only
-	Sched  *scene.Schedule
+	Sched  *scene.Provider
 	Loc    *time.Location
 	Lead   time.Duration // prepare this long before the scene starts
 	MinGap time.Duration // at most one model call per briefing within this time
 	Gather func(now time.Time) Data
+	Plan   PlanFunc // nil = always default times
 
 	started time.Time
 	mu      sync.Mutex
@@ -143,16 +177,70 @@ func (s *Service) Run(ctx context.Context) {
 	}
 }
 
-// KindAt is the briefing due at now: the one of the scene running Lead from now.
-func (s *Service) KindAt(now time.Time) (Kind, bool) {
-	return kindOf(s.Sched.At(now.Add(s.Lead), s.Loc).Name)
-}
+// defaultSched is the built-in schedule behind the fallback times: kinds no
+// scene shows are prepared at the default morning/evening starts.
+var defaultSched = func() *scene.Provider {
+	school, err := scene.Build(func(id string) string { return scene.DefaultSchoolDay[id] })
+	if err != nil {
+		panic("briefing: invalid default school-day schedule: " + err.Error())
+	}
+	weekend, err := scene.Build(func(id string) string {
+		if v, ok := scene.DefaultWeekend[id]; ok {
+			return v
+		}
+		return scene.DefaultSchoolDay[id]
+	})
+	if err != nil {
+		panic("briefing: invalid default weekend schedule: " + err.Error())
+	}
+	return scene.NewProvider(scene.Schedule{SchoolDay: school, Weekend: weekend})
+}()
 
-func kindOf(sceneName string) (Kind, bool) {
-	switch sceneName {
+func defaultKind(id string) (Kind, bool) {
+	switch id {
 	case scene.Morning:
 		return Morning, true
 	case scene.Evening:
+		return Evening, true
+	}
+	return "", false
+}
+
+func (s *Service) plan() WidgetPlan {
+	if s.Plan == nil {
+		return nil
+	}
+	plan, err := s.Plan()
+	if err != nil {
+		return nil
+	}
+	return plan
+}
+
+// KindAt is the briefing due at now: the one of a scene with a briefing
+// widget starting within Lead. Kinds no scene shows fall back to the
+// default morning/evening times; without any widget info the configured
+// schedule decides, so custom SCENE_* times prepare on time.
+func (s *Service) KindAt(now time.Time) (Kind, bool) {
+	plan := s.plan()
+	at := s.Sched.At(now.Add(s.Lead), s.Loc).ID
+	if w := plan[at]; w.Today {
+		return Morning, true
+	} else if w.Tomorrow {
+		return Evening, true
+	}
+	base := s.Sched
+	if plan != nil {
+		base = defaultSched
+	}
+	legacy, ok := defaultKind(base.At(now.Add(s.Lead), s.Loc).ID)
+	if !ok {
+		return "", false
+	}
+	if legacy == Morning && !plan.usesToday() {
+		return Morning, true
+	}
+	if legacy == Evening && !plan.usesTomorrow() {
 		return Evening, true
 	}
 	return "", false
@@ -240,12 +328,25 @@ func (s *Service) refresh(ctx context.Context, kind Kind, target, now time.Time)
 func (s *Service) Snapshot() *Briefing { return s.snapshotAt(time.Now()) }
 
 func (s *Service) snapshotAt(now time.Time) *Briefing {
-	kind, ok := kindOf(s.Sched.At(now, s.Loc).Name)
-	if !ok {
-		if kind, ok = s.KindAt(now); !ok {
-			return nil
+	plan := s.plan()
+	running := s.Sched.At(now, s.Loc).ID
+	if w := plan[running]; w.Today {
+		return s.slotCard(Morning)
+	} else if w.Tomorrow {
+		return s.slotCard(Evening)
+	}
+	if kind, ok := defaultKind(running); ok {
+		if (kind == Morning && !plan.usesToday()) || (kind == Evening && !plan.usesTomorrow()) {
+			return s.slotCard(kind)
 		}
 	}
+	if kind, ok := s.KindAt(now); ok {
+		return s.slotCard(kind)
+	}
+	return nil
+}
+
+func (s *Service) slotCard(kind Kind) *Briefing {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return copyOf(s.slot(kind).cur)
@@ -278,6 +379,33 @@ func (s *Service) For(kind Kind, now time.Time) *Briefing {
 		return copyOf(sl.cur)
 	}
 	return nil
+}
+
+// KindForScene maps a scene id (?scene=) to its briefing kind: the widget it
+// shows, or the legacy morning/evening card when that kind is unused.
+func (s *Service) KindForScene(id string) (Kind, bool) {
+	plan := s.plan()
+	if w := plan[id]; w.Today {
+		return Morning, true
+	} else if w.Tomorrow {
+		return Evening, true
+	}
+	kind, ok := defaultKind(id)
+	if !ok {
+		return "", false
+	}
+	if (kind == Morning && !plan.usesToday()) || (kind == Evening && !plan.usesTomorrow()) {
+		return kind, true
+	}
+	return "", false
+}
+
+// Card returns the current card of one kind without generating one (nil
+// when the slot is empty): for serving previews without blocking the wall.
+func (s *Service) Card(kind Kind) *Briefing {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return copyOf(s.slot(kind).cur)
 }
 
 // Cards returns the current card of every kind (morning and evening), for

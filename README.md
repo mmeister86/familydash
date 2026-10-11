@@ -48,6 +48,8 @@ All settings are environment variables.
 | `CALENDAR_SOURCE` | `local` | `local` = poll the `CALENDAR_n_URL` feeds here; `convex` = read all calendars exclusively from the family app's Convex backend (no local polling, no fallback — see [docs/CONVEX_CALENDAR_ROLLOUT.md](docs/CONVEX_CALENDAR_ROLLOUT.md)) |
 | `FAMILY_APP_CALENDAR_TOKEN` | – | Bearer token for `GET /dashboard/calendars` (= `CALENDAR_DASHBOARD_TOKEN` in Convex); required for `CALENDAR_SOURCE=convex`. Authorizes nothing else |
 | `CALENDAR_CACHE_FILE` | `/data/calendar-cache.json` | Persistent last-good calendar snapshot (calendars only); served with original source age after restarts/outages |
+| `FAMILY_APP_SCENES_TOKEN` | – | Bearer token for `GET /dashboard/scenes` (= `SCENES_DASHBOARD_TOKEN` in Convex); without it the wall runs on `SCENE_*` and built-in layouts. Authorizes nothing else |
+| `SCENES_CACHE_FILE` | `/data/scenes-cache.json` | Persistent last-good scenes feed; served after restarts/outages |
 | `WEATHER_LAT` / `WEATHER_LON` | – | Weather is off until set |
 | `WEATHER_NAME` | – | Label above the weather panel |
 | `WEATHER_REFRESH` | `15m` | |
@@ -70,7 +72,7 @@ All settings are environment variables.
 | `VIELFALT_n_NAME` | name from the portal | Card title, e.g. `Lukas` |
 | `SCENE_MORNING` … `SCENE_NIGHT` | `06:45`, `09:00` (DAY), `14:00` (AFTERNOON), `19:00` (EVENING), `21:30` (NIGHT) | Start of each time-of-day layout on school days (Mon–Fri); `off` skips a scene |
 | `SCENE_<NAME>_WEEKEND` | MORNING `07:30`, DAY `10:00`, rest = school-day value | Same for Saturday/Sunday |
-| `SCENE_FORCE` | – | Always show this scene (`morning`, `day`, `afternoon`, `evening`, `night`) – for testing |
+| `SCENE_FORCE` | – | Always show this scene id – for testing; unknown ids are ignored with a warning |
 | `PHOTOS_DIR` | `/data/pictures` | Folder with photos for the slideshow (subfolders ok); `off` disables it. May not exist yet – it's picked up once it does |
 | `PHOTOS_INTERVAL` | `45s` | Time per photo |
 | `PHOTOS_SHUFFLE` | `on` | Random order; `off` = alphabetical |

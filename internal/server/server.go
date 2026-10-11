@@ -17,6 +17,7 @@ import (
 	"familydash/internal/news"
 	"familydash/internal/photos"
 	"familydash/internal/scene"
+	"familydash/internal/scenes"
 	"familydash/internal/timetable"
 	"familydash/internal/todo"
 	"familydash/internal/uptime"
@@ -40,7 +41,10 @@ type Server struct {
 	uptime   *uptime.Service      // nil if not configured
 	news     *news.Service        // nil if not configured
 	briefing *briefing.Service    // nil if not configured
-	static   fs.FS
+	scenes   *scenes.Service
+	// Hot-swappable wall schedule (feed, SCENE_* fallback until first sync)
+	sceneProvider *scene.Provider
+	static        fs.FS
 }
 
 // Sources bundles the optional data sources (nil = not configured).
@@ -57,16 +61,21 @@ type Sources struct {
 	News    *news.Service
 	// AI card (morning briefing / evening outlook)
 	Briefing *briefing.Service
+	// Wall scenes feed (FAMILY_APP_SCENES_TOKEN) + schedule it drives
+	Scenes        *scenes.Service
+	SceneProvider *scene.Provider
 }
 
 func New(cfg *config.Config, version string, cal calendar.Source, src Sources, static fs.FS) *Server {
 	return &Server{cfg: cfg, version: version, calendar: cal, weather: src.Weather, bring: src.Bring, school: src.School,
-		plan: src.Plan, meals: src.Meals, waste: src.Waste, photos: src.Photos, todos: src.Todos, uptime: src.Uptime, news: src.News, briefing: src.Briefing, static: static}
+		plan: src.Plan, meals: src.Meals, waste: src.Waste, photos: src.Photos, todos: src.Todos, uptime: src.Uptime, news: src.News, briefing: src.Briefing,
+		scenes: src.Scenes, sceneProvider: src.SceneProvider, static: static}
 }
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/dashboard", s.handleDashboard)
+	mux.HandleFunc("GET /api/scene", s.handleScene)
 	if s.photos != nil {
 		mux.Handle("GET /photos/{path...}", s.photos)
 	}
@@ -97,8 +106,10 @@ type dashboard struct {
 	Meals *vielfalt.Meals `json:"meals,omitempty"`
 	// Next bin collections (WASTE_n_*)
 	Waste []waste.Pickup `json:"waste,omitempty"`
-	// Time-of-day layout (SCENE_*)
+	// Current wall scene (feed schedule or SCENE_* fallback)
 	Scene scene.Current `json:"scene"`
+	// Tile grid of the current scene with its feed revision
+	Layout sceneLayout `json:"layout"`
 	// Slideshow (PHOTOS_DIR); files at /photos/<path>?v=<v>
 	Photos *photos.Snapshot `json:"photos,omitempty"`
 	// Today's to-dos from the family app (FAMILY_APP_*)
@@ -126,7 +137,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		Calendar: s.calendar.Snapshot(),
 		Warnings: s.cfg.Warnings,
 	}
-	d.Scene = s.cfg.Scenes.At(d.Now, s.cfg.Location)
+	payload := s.resolveScene(d.Now, r.URL.Query().Get("scene"))
+	d.Scene, d.Layout = payload.Scene, payload.Layout
 	if d.Calendar.Events == nil {
 		d.Calendar.Events = []calendar.Event{}
 	}
@@ -171,11 +183,17 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		d.News = s.news.Snapshot()
 	}
 	if s.briefing != nil {
-		// ?scene=morning|evening (testing on a laptop): that scene's card, made on request
-		switch k := briefing.Kind(r.URL.Query().Get("scene")); k {
-		case briefing.Morning, briefing.Evening:
-			d.Briefing = s.briefing.For(k, d.Now)
-		default:
+		// ?scene=<id> (testing on a laptop): that scene's card, made on request
+		if id := r.URL.Query().Get("scene"); id != "" {
+			if kind, ok := s.briefing.KindForScene(id); ok {
+				d.Briefing = s.briefing.For(kind, d.Now)
+			} else {
+				slog.Warn("dashboard: unknown scene, ignoring", "scene", id)
+				d.Briefing = s.briefing.Snapshot()
+			}
+		} else if d.Scene.Preview {
+			d.Briefing = s.previewBriefing(d.Layout.Widgets)
+		} else {
 			d.Briefing = s.briefing.Snapshot()
 		}
 	}

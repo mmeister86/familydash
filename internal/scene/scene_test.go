@@ -54,8 +54,8 @@ func TestAt(t *testing.T) {
 	for _, c := range cases {
 		now, _ := time.ParseInLocation("2006-01-02 15:04", c.when, loc)
 		got := s.At(now, loc)
-		if got.Name != c.want {
-			t.Errorf("%s: scene %q, want %q", c.when, got.Name, c.want)
+		if got.ID != c.want {
+			t.Errorf("%s: scene %q, want %q", c.when, got.ID, c.want)
 		}
 		if u := got.Until.Format("2006-01-02 15:04"); u != c.until {
 			t.Errorf("%s: until %s, want %s", c.when, u, c.until)
@@ -66,6 +66,21 @@ func TestAt(t *testing.T) {
 	}
 }
 
+func TestCurrentIdentity(t *testing.T) {
+	loc, _ := time.LoadLocation("Europe/Berlin")
+	s := defaults(t)
+	morning, _ := time.ParseInLocation("2006-01-02 15:04", "2026-09-30 06:45", loc)
+	got := s.At(morning, loc)
+	if got.ID != Morning || got.Name != "Morgen" || got.Kind != "layout" {
+		t.Errorf("morning identity = %+v", got)
+	}
+	night, _ := time.ParseInLocation("2006-01-02 15:04", "2026-09-30 23:00", loc)
+	got = s.At(night, loc)
+	if got.ID != Night || got.Name != "Nacht" || got.Kind != "night" {
+		t.Errorf("night identity = %+v", got)
+	}
+}
+
 func TestSkipAndForce(t *testing.T) {
 	loc, _ := time.LoadLocation("Europe/Berlin")
 	s := &Schedule{
@@ -73,20 +88,24 @@ func TestSkipAndForce(t *testing.T) {
 		Weekend:   mustBuild(t, DefaultWeekend, DefaultSchoolDay),
 	}
 	now := time.Date(2026, 9, 30, 16, 0, 0, 0, loc)
-	if got := s.At(now, loc).Name; got != Day {
+	if got := s.At(now, loc).ID; got != Day {
 		t.Errorf("afternoon off: got %q, want day", got)
 	}
 	s.Force = Night
-	if got := s.At(now, loc); got.Name != Night || !got.Forced {
+	if got := s.At(now, loc); got.ID != Night || !got.Forced {
 		t.Errorf("force: got %+v", got)
+	}
+	s.Force = "brunch"
+	if got := s.At(now, loc); got.ID != Day || got.Forced {
+		t.Errorf("unknown force should be ignored, got %+v", got)
 	}
 }
 
 func TestEmptySchedule(t *testing.T) {
 	loc, _ := time.LoadLocation("Europe/Berlin")
 	s := &Schedule{}
-	if got := s.At(time.Now(), loc).Name; got != Day {
-		t.Errorf("empty schedule: %q", got)
+	if got := s.At(time.Now(), loc); got.ID != Day || got.Name != "Tag" || got.Kind != "layout" {
+		t.Errorf("empty schedule: %+v", got)
 	}
 }
 

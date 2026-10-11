@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "revision": 12,
+  "grid": { "cols": 12, "rows": 24 },
+  "scenes": [
+    {
+      "id": "morning",
+      "name": "Morgen",
+      "kind": "layout",
+      "start": { "schoolDay": "06:45", "weekend": "07:30" },
+      "widgets": [
+        {
+          "id": "w1",
+          "type": "clock",
+          "x": 0,
+          "y": 0,
+          "w": 12,
+          "h": 4,
+          "props": { "wide": true, "hints": true }
+        },
+        {
+          "id": "w2",
+          "type": "briefing",
+          "x": 0,
+          "y": 4,
+          "w": 6,
+          "h": 8,
+          "props": { "kind": "today" },
+          "fallback": "shopping"
+        },
+        {
+          "id": "w3",
+          "type": "school",
+          "x": 6,
+          "y": 4,
+          "w": 6,
+          "h": 8,
+          "props": { "mode": "plan-meal", "mealDay": "today" }
+        }
+      ]
+    },
+    {
+      "id": "s-k3f9q2",
+      "name": "Hausaufgaben",
+      "kind": "layout",
+      "start": { "schoolDay": "15:30", "weekend": null },
+      "widgets": []
+    },
+    {
+      "id": "night",
+      "name": "Nacht",
+      "kind": "night",
+      "start": { "schoolDay": "21:30", "weekend": "22:00" }
+    }
+  ],
+  "preview": {
+    "sceneId": "s-k3f9q2",
+    "until": 1791230400000,
+    "widgets": []
+  }
+}

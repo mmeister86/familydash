@@ -10,9 +10,11 @@ All requests go **from familydash to Convex** (HTTP actions on the "site" URL, e
 | `POST /ingest/briefing` | wall → app | ingest token | `FAMILY_APP_INGEST_TOKEN` | `INGEST_TOKEN` |
 | `GET /todos?days=2` | app → wall | dashboard token | `FAMILY_APP_DASHBOARD_TOKEN` | `DASHBOARD_TOKEN` |
 | `GET /dashboard/calendars` | app → wall | calendar token | `FAMILY_APP_CALENDAR_TOKEN` | `CALENDAR_DASHBOARD_TOKEN` |
+| `GET /dashboard/scenes` | app → wall | scenes token | `FAMILY_APP_SCENES_TOKEN` | `SCENES_DASHBOARD_TOKEN` |
 
 The calendar token authorizes only `GET /dashboard/calendars` (never ingest or parent functions); the ingest/dashboard
-tokens never authorize it. Calendar rollout, comparison and rollback: [docs/CONVEX_CALENDAR_ROLLOUT.md](CONVEX_CALENDAR_ROLLOUT.md).
+tokens never authorize it. The scenes token authorizes only `GET /dashboard/scenes` — no other token authorizes
+it, and it authorizes nothing else. Calendar rollout, comparison and rollback: [docs/CONVEX_CALENDAR_ROLLOUT.md](CONVEX_CALENDAR_ROLLOUT.md).
 
 Answers: `2xx` = ok (body ignored for POSTs), `400` invalid payload (message in the body), `401` wrong token.
 Optional fields are **omitted, never `null`** (fits `v.optional(...)`). Dates are `YYYY-MM-DD` in Europe/Berlin,
@@ -168,3 +170,37 @@ Only `mode: "convex"` calendars with their last published stand are included; `s
 invalid, arrays must be present), converts stable ids to display indexes after sorting by `order`/`sourceKey`,
 and atomically replaces its persistent last-good snapshot only on full success. A byte-identical fixture of this
 contract lives in `testdata/calendar-feed-v1.json` (mirrors the Companion's `tests/fixtures/calendar-feed-v1.json`).
+
+## `GET /dashboard/scenes`
+
+Read-only wall scenes feed (`version: 1`): the published schedule and 12 cols × 24 rows tile layouts, sorted by
+start time; drafts never reach the wall. `Cache-Control: no-store`. Answers `401` on a wrong token, `503` while
+unconfigured (seed with `npx convex run dashboardScenes:seedDefaultScenes`); without a token or feed the wall runs
+on `SCENE_*` and built-in layouts.
+
+```jsonc
+{
+  "version": 1,
+  "revision": 12, // bumped on every publish, night-time change and delete
+  "grid": { "cols": 12, "rows": 24 },
+  "scenes": [{
+    "id": "morning", // stable; seeded ids or "s-" + 6 chars
+    "name": "Morgen",
+    "kind": "layout|night", // night carries no widgets
+    "start": { "schoolDay": "06:45", "weekend": "07:30" }, // "HH:MM" or null = off
+    "widgets": [{
+      "id": "w1", "type": "clock|shopping|briefing|news|photos|school|calendars",
+      "x": 0, "y": 0, "w": 12, "h": 4,
+      "props": { "wide": true, "hints": true }, // per type; omitted when empty
+      "fallback": "shopping", // optional: shown when the widget is empty
+    }],
+  }],
+  "preview": { "sceneId": "…", "until": 1791230400000, "widgets": [/* … */] }, // optional: wins until then
+}
+```
+
+A scene runs from its start until the next start the same day; before the first start the last scene of the
+previous day runs on. Go validates strictly, polls every 15 s, replaces its persistent last-good snapshot
+(`SCENES_CACHE_FILE`) only on full success, and serves `scene` + `layout` on `/api/dashboard` plus the light
+`/api/scene` for the frontend's 10 s poll. A byte-identical fixture of this contract lives in
+`testdata/dashboard-scenes-v1.json` (mirrors the Companion's `tests/fixtures/dashboard-scenes-v1.json`).

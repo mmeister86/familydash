@@ -120,8 +120,13 @@ type Config struct {
 	// FAMILY_APP_CALENDAR_TOKEN: GET /dashboard/calendars; "" = no central
 	// calendars. Never authorizes ingest or parent functions.
 	FamilyAppCalendarToken string
-	FamilyAppRefresh       time.Duration
-	FamilyAppHeartbeat     time.Duration
+	// FAMILY_APP_SCENES_TOKEN: GET /dashboard/scenes; "" = wall runs on
+	// SCENE_* and built-in layouts. Never authorizes anything else.
+	FamilyAppScenesToken string
+	// SCENES_CACHE_FILE: last-good scenes feed across restarts.
+	ScenesCacheFile    string
+	FamilyAppRefresh   time.Duration
+	FamilyAppHeartbeat time.Duration
 	// FAMILY_APP_<SLUG>_CALENDARS=2,3 → slug → indexes into Calendars whose
 	// entries count as that child's appointments (besides its school calendar)
 	FamilyAppCalendars map[string][]int
@@ -190,6 +195,8 @@ func Load() (*Config, error) {
 		FamilyAppIngestToken:   env("FAMILY_APP_INGEST_TOKEN", ""),
 		FamilyAppReadToken:     env("FAMILY_APP_DASHBOARD_TOKEN", ""),
 		FamilyAppCalendarToken: env("FAMILY_APP_CALENDAR_TOKEN", ""),
+		FamilyAppScenesToken:   env("FAMILY_APP_SCENES_TOKEN", ""),
+		ScenesCacheFile:        env("SCENES_CACHE_FILE", "/data/scenes-cache.json"),
 		FamilyAppRefresh:       envDuration("FAMILY_APP_REFRESH", time.Minute),
 		FamilyAppHeartbeat:     envDuration("FAMILY_APP_HEARTBEAT", 15*time.Minute),
 	}
@@ -427,9 +434,8 @@ func (c *Config) loadScenes() error {
 		return fmt.Errorf("SCENE_*_WEEKEND: %w", err)
 	}
 	force := strings.ToLower(env("SCENE_FORCE", ""))
-	if force != "" && !scene.Valid(force) {
-		return fmt.Errorf("SCENE_FORCE %q: want one of %s", force, strings.Join(scene.Names, ", "))
-	}
+	// Lenient on purpose: custom feed scenes are unknown here, and an
+	// unknown force only warns (provider) instead of failing the start.
 	c.Scenes = scene.Schedule{SchoolDay: school, Weekend: weekend, Force: force}
 	return nil
 }
