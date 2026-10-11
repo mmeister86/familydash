@@ -1,6 +1,7 @@
 package server
 
 import (
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -24,15 +25,30 @@ type scenePayload struct {
 	Layout sceneLayout   `json:"layout"`
 }
 
-// resolveScene computes the current wall scene: an active preview wins over
-// everything, else the provider schedule decides; widgets come from the feed
-// (or the built-in defaults when the feed never loaded).
-func (s *Server) resolveScene(now time.Time) scenePayload {
+// resolveScene computes the current wall scene: a ?scene= override wins over
+// everything (local testing), then an active preview, else the provider
+// schedule; widgets come from the feed (or the built-in defaults when the
+// feed never loaded).
+func (s *Server) resolveScene(now time.Time, override string) scenePayload {
 	feed, revision := scenes.DefaultFeed(), 0
 	if s.scenes != nil {
 		if snap, err := s.scenes.Snapshot(); err == nil {
 			feed, revision = snap.Feed, snap.Feed.Revision
 		}
+	}
+	if override != "" {
+		for _, candidate := range feed.Scenes {
+			if candidate.ID == override {
+				return scenePayload{
+					Scene: scene.Current{
+						ID: candidate.ID, Name: candidate.Name, Kind: candidate.Kind,
+						SchoolDay: scene.IsSchoolDay(now), Forced: true,
+					},
+					Layout: sceneLayout{Revision: revision, Widgets: candidate.Widgets},
+				}
+			}
+		}
+		slog.Warn("dashboard: unknown scene, ignoring", "scene", override)
 	}
 	if preview := feed.Preview; preview != nil && preview.Until > now.UnixMilli() {
 		until := time.UnixMilli(preview.Until).In(s.cfg.Location)
@@ -70,5 +86,5 @@ func widgetsFor(feed scenes.Feed, id string) []scenes.Widget {
 // handleScene serves the light scene state for the frontend's fast poll.
 func (s *Server) handleScene(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, http.StatusOK, s.resolveScene(time.Now().In(s.cfg.Location)))
+	writeJSON(w, http.StatusOK, s.resolveScene(time.Now().In(s.cfg.Location), r.URL.Query().Get("scene")))
 }

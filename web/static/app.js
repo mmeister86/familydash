@@ -1,6 +1,7 @@
 "use strict";
 
 const POLL_MS = 60_000;
+const SCENE_POLL_MS = 10_000;
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -256,7 +257,7 @@ function lessonRow(l, isToday) {
 // opts.color tints the dot, opts.cal/opts.events add the child's school calendar,
 // opts.meal the child's lunch (VielfaltMenü). The school part absorbs any
 // overflow so Termine and Essen always stay visible at the bottom.
-function studentCard(st, opts = {}) {
+function studentCard(st, opts = {}, mealDay) {
   const day = st.day || {};
   const isToday = day.date === ymd(new Date());
   const exams = (st.exams || []).slice(0, MAX_EXAMS);
@@ -276,7 +277,7 @@ function studentCard(st, opts = {}) {
     </div>
     ${opts.todos?.length ? `<div class="kid-sec"><div class="sub-h">To-dos</div>${kidTodoRows(opts.todos)}</div>` : ""}
     ${opts.cal ? `<div class="kid-sec"><div class="sub-h">Termine</div>${calendarRows(opts.events || [], MAX_CARD_EVENTS) || `<div class="empty">Nichts eingetragen</div>`}</div>` : ""}
-    ${opts.meal ? `<div class="kid-sec"><div class="sub-h">Essen</div>${mealRows(opts.meal)}</div>` : ""}
+    ${opts.meal ? `<div class="kid-sec"><div class="sub-h">Essen</div>${mealRows(opts.meal, MEAL_DAYS, mealDay)}</div>` : ""}
   </div>`;
 }
 
@@ -319,7 +320,7 @@ function schoolCalendarCard(cal, events) {
 // next lunch (morning: today's, so you know whether to pack more breakfast;
 // evening: tomorrow's). The server already switches each
 // timetable to the next school day once today's lessons are over.
-function kidPlan(st, opts, withMeal) {
+function kidPlan(st, opts, withMeal, mealDay) {
   const day = st.day || {};
   const isToday = day.date === ymd(new Date());
   return `<div class="kid-plan">
@@ -329,7 +330,7 @@ function kidPlan(st, opts, withMeal) {
       ${(day.notices || []).map((n) => `<div class="notice">${esc(n)}</div>`).join("")}
       ${day.noSchool ? `<div class="empty">Keine Schule in Sicht 🎉</div>` : (day.lessons || []).map((l) => lessonRow(l, isToday)).join("")}
     </div>
-    ${withMeal && opts.meal ? `<div class="kid-sec"><div class="sub-h">Essen</div>${mealRows(opts.meal, 1)}</div>` : ""}
+    ${withMeal && opts.meal ? `<div class="kid-sec"><div class="sub-h">Essen</div>${mealRows(opts.meal, 1, mealDay)}</div>` : ""}
   </div>`;
 }
 
@@ -370,7 +371,7 @@ function schoolCalsFor(d, name, calName, personId, sourceKind, sourceId, usedCal
 // every mapping, and children without a binding get no guessed calendar.
 // mode: "full" (afternoon: everything, one card per child side by side),
 // "plan" (timetables stacked in one card), "plan-meal" (the same + the next lunch).
-function renderSchoolRow(d, mode) {
+function renderSchoolRow(d, mode, mealDay) {
   const cals = d.calendar?.calendars || [];
   const events = d.calendar?.events || [];
   const meals = d.meals?.children || [];
@@ -407,17 +408,17 @@ function renderSchoolRow(d, mode) {
 
   let html = "";
   if (mode === "full") {
-    html = kids.map(([st, opts]) => studentCard(st, opts)).join("");
+    html = kids.map(([st, opts]) => studentCard(st, opts, mealDay)).join("");
     if (d.school && !d.school.students?.length) {
       html = `<div class="panel"><h2>Schule</h2><p class="hint">${esc(d.school.error || "Noch keine Daten von beste.schule.")}</p></div>` + html;
     }
     for (const cal of cals.filter((c) => c.panel === "school" && !usedCals.has(calIdOf(c)))) {
       html += schoolCalendarCard(cal, events.filter((e) => evCalIdOf(e) === calIdOf(cal)));
     }
-    html += lonelyMeals().map(mealCard).join("");
+    html += lonelyMeals().map((ch) => mealCard(ch, mealDay)).join("");
   } else if (kids.length) {
     const withMeal = mode === "plan-meal";
-    html = `<div class="panel kid-stack">${kids.map(([st, opts]) => kidPlan(st, opts, withMeal)).join("")}</div>`;
+    html = `<div class="panel kid-stack">${kids.map(([st, opts]) => kidPlan(st, opts, withMeal, mealDay)).join("")}</div>`;
   }
   $("school").innerHTML = html;
   return !!html;
@@ -443,21 +444,26 @@ function mealRow(day) {
   return `<div class="${cls}"><span class="when">${esc(relDay(day.date))}</span><span class="what">${what}</span></div>`;
 }
 
-function mealRows(ch, max = MEAL_DAYS) {
+function mealRows(ch, max = MEAL_DAYS, mealDay) {
   const now = new Date(), today = ymd(now);
-  const days = (ch.days || [])
-    .filter((d) => d.date > today || (d.date === today && now.getHours() < LUNCH_OVER))
-    .slice(0, max);
+  let days = ch.days || [];
+  if (mealDay === "tomorrow") {
+    const tomorrow = ymd(addDays(now, 1));
+    days = days.filter((d) => d.date >= tomorrow);
+  } else {
+    days = days.filter((d) => d.date > today || (d.date === today && now.getHours() < LUNCH_OVER));
+  }
+  days = days.slice(0, max);
   return days.length
     ? days.map(mealRow).join("")
     : ch.error ? `<p class="hint">${esc(ch.error)}</p>` : `<div class="empty">Kein Essen in Sicht</div>`;
 }
 
 // lunch of a child without a school card: a card of its own
-function mealCard(ch) {
+function mealCard(ch, mealDay) {
   return `<div class="panel" style="--c:${esc(ch.color || "var(--accent)")}">
     <div class="head"><span class="dot"></span><span class="name">${esc(ch.name)}</span><span class="meta">Mittagessen</span></div>
-    ${mealRows(ch)}
+    ${mealRows(ch, MEAL_DAYS, mealDay)}
   </div>`;
 }
 
@@ -514,50 +520,53 @@ function renderCalendars(d) {
 
 // ------------------------------------------------------------------ scenes (time of day)
 
-// The server decides the scene from SCENE_* (school days vs. weekend) and
-// sends it with every poll. ?scene=evening in the URL overrides it – handy
-// for testing on the laptop. Each scene lists its sections; the grid itself
-// (and what fills in when a section is empty) lives in style.css.
-//   wide:   clock left, weather picture right, across the full width
-//   school: "full" = one card per child, "plan"/"plan-meal" = stacked timetables
-//           (+ the next lunch: today's in the morning, tomorrow's in the evening)
-//   briefing: the AI card. "replaces" = the section it takes the place of
-//           (morning: Bring!); without a briefing that section shows instead.
-const SCENES = {
-  morning:   { label: "Morgen",     wide: true,  show: ["briefing", "news", "school"], school: "plan-meal", hints: true, briefing: { replaces: "shopping" } },
-  day:       { label: "Tag",        wide: false, show: ["shopping", "photos", "news"] },
-  afternoon: { label: "Nachmittag", wide: false, show: ["shopping", "school"], school: "full" },
-  evening:   { label: "Abend",      wide: true,  show: ["briefing", "photos", "school"], school: "plan-meal", briefing: {} },
-  night:     { label: "Nacht",      wide: false, show: [] },
-};
-const SECTIONS = { shopping: "shopping", briefing: "briefing", news: "news", photos: "photo-frame", school: "school" };
+// The server resolves the scene (feed schedule, preview, or ?scene=
+// override) and sends it with the tile layout on every poll. Widget
+// placement is pure (see layout.js); this file only applies it to the DOM.
 
 const urlScene = new URLSearchParams(location.search).get("scene");
 
 function currentScene(d) {
-  const sc = { name: "day", schoolDay: true, ...(d?.scene || {}) };
-  if (urlScene && SCENES[urlScene]) Object.assign(sc, { name: urlScene, forced: true });
-  if (!SCENES[sc.name]) sc.name = "day";
-  return sc;
+  return { id: "day", kind: "layout", ...(d?.scene || {}) };
 }
 
-// hasBrief: whether the AI card has something for this scene; if not, the
-// section it replaces comes back (morning: Bring!)
-function applyScene(sc, hasBrief) {
-  const board = $("board");
-  for (const n of Object.keys(SCENES)) {
-    board.classList.toggle("scene-" + n, n === sc.name);
-    document.body.classList.toggle("scene-" + n, n === sc.name);
+function sceneWidgets(d) {
+  return d?.layout?.widgets || [];
+}
+
+function widgetProp(widgets, type, key) {
+  const w = (widgets || []).find((w) => w.type === type);
+  return w?.props?.[key];
+}
+
+// Applies the layout: night mode, clock width, tile positions, fallback
+// swaps for empty widgets. has: {type: bool} content flags. Returns the
+// visible widget types (for the slideshow).
+function applyScene(sc, widgets, has) {
+  const night = sc.kind === "night";
+  document.body.classList.toggle("scene-night", night);
+  $("board").classList.toggle("wide-top", widgetProp(widgets, "clock", "wide") === true && !night);
+  const { placements, hidden, unknown } = resolveLayout(widgets, has);
+  for (const p of placements) {
+    const el = $(EL[p.type]);
+    el.hidden = false;
+    el.style.gridColumn = `${p.x + 1} / span ${p.w}`;
+    el.style.gridRow = `${p.y + 1} / span ${p.h}`;
   }
-  const conf = SCENES[sc.name];
-  board.classList.toggle("wide-top", !!conf.wide);
-  const show = new Set(conf.show);
-  if (!hasBrief) {
-    show.delete("briefing");
-    if (conf.briefing?.replaces) show.add(conf.briefing.replaces);
+  for (const type of hidden) $(EL[type]).hidden = true;
+  warnUnknownTypes(unknown);
+  return new Set(placements.map((p) => p.type));
+}
+
+let warnedTypes = "";
+function warnUnknownTypes(unknown) {
+  const key = [...unknown].sort().join(",");
+  if (!key) {
+    warnedTypes = "";
+  } else if (key !== warnedTypes) {
+    warnedTypes = key;
+    console.warn("unknown widget types:", key);
   }
-  board.classList.toggle("no-brief", !show.has("briefing"));
-  for (const [key, id] of Object.entries(SECTIONS)) $(id).hidden = !show.has(key);
 }
 
 // ------------------------------------------------------------------ AI card (briefing / outlook)
@@ -571,11 +580,16 @@ const BRIEF_ICONS = {
   sport: "👟", todo: "✅", geburtstag: "🎂", hinweis: "💡",
 };
 
-// the briefing that belongs to this scene, or null
-function sceneBriefing(d, sc) {
-  const b = d.briefing;
-  if (!b || !SCENES[sc.name]?.briefing || b.kind !== sc.name) return null;
-  const want = sc.name === "evening" ? ymd(addDays(new Date(), 1)) : ymd(new Date());
+// the briefing that belongs to this layout, or null: the briefing widget's
+// kind ("today"/"tomorrow") selects the server card ("morning"/"evening")
+function sceneBriefing(d, widgets) {
+  const kind = widgetProp(widgets, "briefing", "kind");
+  if (!kind) return null;
+  const b = d?.briefing;
+  if (!b) return null;
+  const wantKind = kind === "tomorrow" ? "evening" : "morning";
+  if (b.kind !== wantKind) return null;
+  const want = wantKind === "evening" ? ymd(addDays(new Date(), 1)) : ymd(new Date());
   return b.date === want ? b : null;
 }
 
@@ -844,7 +858,8 @@ function renderStatus() {
   }
   if (d) {
     const sc = currentScene(d);
-    if (sc.forced) parts.push(`<span class="err">Szene fest: ${esc(SCENES[sc.name].label)}</span>`);
+    if (sc.forced) parts.push(`<span class="err">Szene fest: ${esc(sc.name || sc.id)}</span>`);
+    else if (sc.preview) parts.push(`<span class="err">Vorschau: ${esc(sc.name || sc.id)}</span>`);
   }
   if (state.lastOk) parts.push(`<span>aktualisiert ${fmt.time.format(new Date(state.lastOk))}</span>`);
   $("status").innerHTML = parts.join("");
@@ -869,21 +884,46 @@ async function refresh() {
   render();
 }
 
+// Light scene poll: layout changes apply without waiting for the dashboard.
+async function refreshScene() {
+  try {
+    const res = await fetch("api/scene" + (urlScene ? "?scene=" + encodeURIComponent(urlScene) : ""), { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const payload = await res.json();
+    const cur = state.data;
+    if (!cur || !payload?.scene) return;
+    const changed = cur.scene?.id !== payload.scene.id
+      || cur.scene?.forced !== payload.scene.forced
+      || !!cur.scene?.preview !== !!payload.scene.preview
+      || cur.layout?.revision !== payload.layout?.revision;
+    if (changed) {
+      cur.scene = payload.scene;
+      cur.layout = payload.layout;
+      render();
+    }
+  } catch (e) { /* keep last state; the dashboard poll retries */ }
+}
+
 function render() {
   const d = state.data;
   if (d) {
-    const sc = currentScene(d), conf = SCENES[sc.name];
-    const brief = sceneBriefing(d, sc);
-    applyScene(sc, !!brief);
+    const sc = currentScene(d);
+    const widgets = sceneWidgets(d);
+    const school = widgets.find((w) => w.type === "school");
+    const brief = sceneBriefing(d, widgets);
     renderBriefing(brief);
     slideshow.set(d.photos);
-    const board = $("board");
-    board.classList.toggle("no-school", !renderSchoolRow(d, conf.school || "full"));
-    board.classList.toggle("no-news", !renderNews(d.news));
-    const photos = conf.show.includes("photos") && slideshow.has();
-    board.classList.toggle("no-photos", !slideshow.has());
-    photos ? slideshow.start() : slideshow.stop();
-    renderWeather(d.weather, conf.hints && sc.schoolDay !== false ? weatherHints(d.weather, ymd(new Date()), 7, 16).filter(([ic]) => ic !== "👍") : []);
+    const hasSchool = renderSchoolRow(d, school?.props?.mode || "full", school?.props?.mealDay);
+    const hasNews = renderNews(d.news);
+    const hasPhotos = slideshow.has();
+    const visible = applyScene(sc, widgets, {
+      briefing: !!brief, school: hasSchool, news: hasNews, photos: hasPhotos,
+      clock: true, shopping: true, calendars: true,
+    });
+    visible.has("photos") && hasPhotos ? slideshow.start() : slideshow.stop();
+    const hints = widgetProp(widgets, "clock", "hints") === true && sc.schoolDay !== false
+      ? weatherHints(d.weather, ymd(new Date()), 7, 16).filter(([ic]) => ic !== "👍") : [];
+    renderWeather(d.weather, hints);
     renderWeatherBg(d);
     renderNight(d);
     renderWaste(d.waste);
@@ -897,5 +937,6 @@ tickClock();
 setInterval(tickClock, 1000);
 refresh();
 setInterval(refresh, POLL_MS);
+setInterval(refreshScene, SCENE_POLL_MS);
 // Re-render every minute on the minute so "jetzt"/past markers stay correct.
 setTimeout(() => { render(); setInterval(render, 60_000); }, (60 - new Date().getSeconds()) * 1000);

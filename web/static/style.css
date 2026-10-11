@@ -30,68 +30,19 @@ html, body {
   cursor: none; /* kiosk */
 }
 
-/* ---------- grid: one layout per scene (portrait, see the sketches)
-   app.js hides the sections a scene doesn't show (SCENES[…].show) and sets
-   no-news / no-photos / no-school when a section has nothing to show –
-   the templates below then let the neighbour take over the space. */
+/* ---------- grid: one fixed 12x24 portrait grid; app.js places every tile
+   from the feed layout (inline grid-column/row) and hides the rest. */
 [hidden] { display: none !important; }
 
 .board {
   height: calc(100% - var(--status-h));
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: repeat(24, minmax(0, 1fr));
   gap: var(--gap);
   padding: var(--gap) var(--gap) 0;
 }
-.clock-card  { grid-area: top; }
-.shopping    { grid-area: shop; }
-.news        { grid-area: news; }
-.photo-frame { grid-area: photo; }
-.school-row  { grid-area: school; }
-.calendars   { grid-area: cals; }
-.briefing    { grid-area: brief; }
-/* morning: the AI card takes Bring!'s place (Bring! comes back without it) */
-.board.scene-morning .briefing { grid-area: shop; }
-
-/* morning: clock | weather across the top, timetables left, Bring! + news right */
-.board.scene-morning {
-  grid-template-rows: minmax(min-content, 0.85fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.25fr);
-  grid-template-areas: "top top" "school shop" "school news" "cals cals";
-}
-.board.scene-morning.no-news   { grid-template-areas: "top top" "school shop" "school shop" "cals cals"; }
-.board.scene-morning.no-school { grid-template-areas: "top top" "shop news" "shop news" "cals cals"; }
-.board.scene-morning.no-school.no-news { grid-template-areas: "top top" "shop shop" "shop shop" "cals cals"; }
-
-/* day: compact clock + Bring!, photos | news */
-.board.scene-day {
-  grid-template-rows: minmax(min-content, 1fr) minmax(0, 2fr) minmax(0, 1.3fr);
-  grid-template-areas: "top shop" "photo news" "cals cals";
-}
-.board.scene-day.no-photos { grid-template-areas: "top shop" "news news" "cals cals"; }
-.board.scene-day.no-news   { grid-template-areas: "top shop" "photo photo" "cals cals"; }
-.board.scene-day.no-photos.no-news { grid-template-areas: "top shop" "cals cals" "cals cals"; }
-
-/* afternoon: compact clock + Bring!, one complete card per child */
-.board.scene-afternoon {
-  grid-template-rows: minmax(min-content, 1fr) minmax(0, 2fr) minmax(0, 1.3fr);
-  grid-template-areas: "top shop" "school school" "cals cals";
-}
-.board.scene-afternoon.no-school { grid-template-areas: "top shop" "cals cals" "cals cals"; }
-
-/* evening: clock | weather across the top; left the AI outlook on tomorrow
-   above the (halved) photos, right tomorrow's timetable + lunch */
-.board.scene-evening {
-  grid-template-rows: minmax(min-content, 0.9fr) minmax(0, 0.95fr) minmax(0, 0.75fr) minmax(0, 1fr);
-  grid-template-areas: "top top" "brief school" "photo school" "cals cals";
-}
-.board.scene-evening.no-photos { grid-template-areas: "top top" "brief school" "brief school" "cals cals"; }
-.board.scene-evening.no-school { grid-template-areas: "top top" "brief brief" "photo photo" "cals cals"; }
-.board.scene-evening.no-photos.no-school { grid-template-areas: "top top" "brief brief" "brief brief" "cals cals"; }
-/* without an AI card: photos | school as before */
-.board.scene-evening.no-brief { grid-template-areas: "top top" "photo school" "photo school" "cals cals"; }
-.board.scene-evening.no-brief.no-photos { grid-template-areas: "top top" "school school" "school school" "cals cals"; }
-.board.scene-evening.no-brief.no-school { grid-template-areas: "top top" "photo photo" "photo photo" "cals cals"; }
-.board.scene-evening.no-brief.no-photos.no-school { grid-template-areas: "top top" "cals cals" "cals cals" "cals cals"; }
+.board > * { min-width: 0; min-height: 0; }
 
 /* ---------- night scene: dimmed clock + weather, on black or on a picture (NIGHT_BG) */
 .night-clock { display: none; }

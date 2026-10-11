@@ -137,7 +137,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		Calendar: s.calendar.Snapshot(),
 		Warnings: s.cfg.Warnings,
 	}
-	payload := s.resolveScene(d.Now)
+	payload := s.resolveScene(d.Now, r.URL.Query().Get("scene"))
 	d.Scene, d.Layout = payload.Scene, payload.Layout
 	if d.Calendar.Events == nil {
 		d.Calendar.Events = []calendar.Event{}

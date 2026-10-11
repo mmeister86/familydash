@@ -87,7 +87,7 @@ func sceneTestServer(t *testing.T, body []byte) *Server {
 func TestResolveSceneFeed(t *testing.T) {
 	s := sceneTestServer(t, loadScenesFixture(t))
 	mon, _ := time.ParseInLocation("2006-01-02 15:04", "2026-10-12 07:00", berlin(t))
-	got := s.resolveScene(mon)
+	got := s.resolveScene(mon, "")
 	if got.Scene.ID != "morning" || got.Scene.Name != "Morgen" || got.Scene.Preview {
 		t.Errorf("scene = %+v", got.Scene)
 	}
@@ -109,7 +109,7 @@ func TestResolveScenePreview(t *testing.T) {
 		"preview":{"sceneId":"morning","until":%d,
 		 "widgets":[{"id":"p1","type":"news","x":0,"y":0,"w":12,"h":4}]}}`, until)
 	s := sceneTestServer(t, []byte(body))
-	got := s.resolveScene(now)
+	got := s.resolveScene(now, "")
 	if got.Scene.ID != "morning" || !got.Scene.Preview {
 		t.Fatalf("preview scene = %+v", got.Scene)
 	}
@@ -139,7 +139,7 @@ func TestResolveSceneFallback(t *testing.T) {
 		sceneProvider: provider,
 	}
 	mon, _ := time.ParseInLocation("2006-01-02 15:04", "2026-09-28 07:00", berlin(t))
-	got := s.resolveScene(mon)
+	got := s.resolveScene(mon, "")
 	if got.Scene.ID != "morning" || got.Scene.Preview {
 		t.Errorf("scene = %+v", got.Scene)
 	}
@@ -148,6 +148,27 @@ func TestResolveSceneFallback(t *testing.T) {
 	}
 	if len(got.Layout.Widgets) != 5 {
 		t.Errorf("fallback widgets = %d, want 5", len(got.Layout.Widgets))
+	}
+}
+
+func TestResolveSceneOverride(t *testing.T) {
+	s := sceneTestServer(t, loadScenesFixture(t))
+	mon, _ := time.ParseInLocation("2006-01-02 15:04", "2026-10-12 16:00", berlin(t))
+	got := s.resolveScene(mon, "morning")
+	if got.Scene.ID != "morning" || !got.Scene.Forced || got.Scene.Preview {
+		t.Errorf("override = %+v", got.Scene)
+	}
+	if len(got.Layout.Widgets) != 3 {
+		t.Errorf("override widgets = %d, want 3", len(got.Layout.Widgets))
+	}
+}
+
+func TestResolveSceneOverrideUnknown(t *testing.T) {
+	s := sceneTestServer(t, loadScenesFixture(t))
+	mon, _ := time.ParseInLocation("2006-01-02 15:04", "2026-10-12 07:00", berlin(t))
+	got := s.resolveScene(mon, "brunch")
+	if got.Scene.ID != "morning" || got.Scene.Forced || got.Scene.Preview {
+		t.Errorf("unknown override should fall back to time-based, got %+v", got.Scene)
 	}
 }
 
