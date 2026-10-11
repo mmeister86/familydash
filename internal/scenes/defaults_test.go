@@ -40,3 +40,21 @@ func TestDefaultHintsMorningOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestDefaultFeedFillsGrid(t *testing.T) {
+	feed := DefaultFeed()
+	for _, s := range feed.Scenes {
+		if s.Kind != "layout" {
+			continue
+		}
+		bottom := 0
+		for _, w := range s.Widgets {
+			if w.Y+w.H > bottom {
+				bottom = w.Y + w.H
+			}
+		}
+		if bottom != 24 {
+			t.Errorf("%s fills %d rows, want 24", s.ID, bottom)
+		}
+	}
+}
