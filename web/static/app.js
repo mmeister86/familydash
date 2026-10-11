@@ -507,7 +507,9 @@ function renderCalendars(d) {
         const ids = new Set([c.id, ...merged.map((m) => m.id)]);
         return calendarColumn(c, events.filter((e) => ids.has(e.cal)), d.days || 7, merged);
       }).join("")
-    : `<div class="calcol"><h2>Kalender</h2><p class="hint">Setze <code>CALENDAR_1_URL</code> auf die „Privatadresse im iCal-Format“ aus Google Kalender.</p></div>`;
+    : d.calendar?.central
+      ? `<div class="calcol"><h2>Kalender</h2><p class="hint">Im zentralen Convex-Kalender ist noch keine Quelle aktiv. Lege sie mit <code>calendarSources.save</code> an (<code>urlEnvKey</code> z. B. <code>CALENDAR_1_URL</code>, Adresse als Convex-Umgebungsvariable) und schalte sie mit <code>calendarSources.activate</code> auf <code>convex</code>.</p></div>`
+      : `<div class="calcol"><h2>Kalender</h2><p class="hint">Setze <code>CALENDAR_1_URL</code> auf die „Privatadresse im iCal-Format“ aus Google Kalender.</p></div>`;
 }
 
 // ------------------------------------------------------------------ scenes (time of day)
