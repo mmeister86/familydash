@@ -305,7 +305,7 @@ func service(m *Gemini) *Service {
 	sched.SchoolDay, _ = scene.Build(func(n string) string { return scene.DefaultSchoolDay[n] })
 	sched.Weekend = sched.SchoolDay
 	d := sample()
-	return &Service{Model: m, Sched: &sched, Loc: berlin, Lead: 20 * time.Minute, MinGap: 20 * time.Minute,
+	return &Service{Model: m, Sched: scene.NewProvider(sched), Loc: berlin, Lead: 20 * time.Minute, MinGap: 20 * time.Minute,
 		Gather: func(time.Time) Data { return d }, started: at("2026-10-01 00:00")}
 }
 

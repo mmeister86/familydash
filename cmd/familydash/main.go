@@ -22,6 +22,7 @@ import (
 	"familydash/internal/familyapp"
 	"familydash/internal/news"
 	"familydash/internal/photos"
+	"familydash/internal/scene"
 	"familydash/internal/server"
 	"familydash/internal/timetable"
 	"familydash/internal/todo"
@@ -266,7 +267,8 @@ func newCalendarSource(cfg *config.Config) calendar.Source {
 // newBriefing wires the AI card to the other sources (nil ones are skipped).
 func newBriefing(cfg *config.Config, cal calendar.Source, src server.Sources) *briefing.Service {
 	b := &briefing.Service{
-		Sched: &cfg.Scenes, Loc: cfg.Location, Lead: cfg.BriefingLead, MinGap: cfg.BriefingMinGap,
+		Sched: scene.NewProvider(cfg.Scenes), Loc: cfg.Location, Lead: cfg.BriefingLead, MinGap: cfg.BriefingMinGap,
+		// TODO(Phase 2/T4): share the scenes provider + widget plan with the server.
 		Gather: func(now time.Time) briefing.Data {
 			d := briefing.Data{Calendar: cal.Snapshot()}
 			if src.Weather != nil {
