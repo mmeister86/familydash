@@ -514,3 +514,17 @@ body.status-alert .status {
   border-top: 2px solid var(--danger);
 }
 body.status-alert .status .k-down { color: #FF8C80; }
+
+/* ---------- narrow tiles (custom layouts below 6 columns): stack instead
+   of squeezing, compact type. Default layouts never trigger this. */
+.school-row[data-narrow], .calendars[data-narrow] {
+  grid-auto-flow: row;
+  grid-auto-rows: max-content;
+  overflow: hidden;
+}
+.panel[data-narrow] { padding: 0.8rem 0.9rem; }
+.panel[data-narrow] .head .name { font-size: 1.02rem; }
+.panel[data-narrow] .head .meta { display: none; }
+.school-row[data-narrow] .panel, .calendars[data-narrow] .calcol { padding: 0.8rem 0.9rem; }
+.clock-card[data-narrow] .time { font-size: 3.2rem; }
+.board.wide-top .clock-card[data-narrow] { flex-direction: column; }

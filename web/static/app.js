@@ -552,6 +552,7 @@ function applyScene(sc, widgets, has) {
     el.hidden = false;
     el.style.gridColumn = `${p.x + 1} / span ${p.w}`;
     el.style.gridRow = `${p.y + 1} / span ${p.h}`;
+    el.toggleAttribute("data-narrow", p.narrow);
   }
   for (const type of hidden) $(EL[type]).hidden = true;
   warnUnknownTypes(unknown);

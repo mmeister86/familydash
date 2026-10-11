@@ -16,13 +16,22 @@ const allShown = Object.fromEntries(allTypes.map((t) => [t, true]));
   ];
   const got = resolveLayout(widgets, allShown);
   assert.deepStrictEqual(got.placements, [
-    { type: "clock", x: 0, y: 0, w: 12, h: 4 },
-    { type: "news", x: 0, y: 4, w: 6, h: 5 },
+    { type: "clock", x: 0, y: 0, w: 12, h: 4, narrow: false },
+    { type: "news", x: 0, y: 4, w: 6, h: 5, narrow: false },
   ]);
   assert.deepStrictEqual(got.hidden.sort(), ["shopping", "briefing", "photos", "school", "calendars"].sort());
   assert.deepStrictEqual(got.unknown, []);
   assert.strictEqual(EL["clock"], "clock-card");
   assert.strictEqual(EL["photos"], "photo-frame");
+}
+
+// narrow tiles (below 6 columns) are flagged for compact CSS
+{
+  const widgets = [{ type: "news", x: 0, y: 0, w: 4, h: 4 }];
+  const got = resolveLayout(widgets, allShown);
+  assert.deepStrictEqual(got.placements, [
+    { type: "news", x: 0, y: 0, w: 4, h: 4, narrow: true },
+  ]);
 }
 
 // empty widget: fallback takes the same tiles
@@ -31,7 +40,7 @@ const allShown = Object.fromEntries(allTypes.map((t) => [t, true]));
     { type: "briefing", x: 6, y: 4, w: 6, h: 5, fallback: "shopping" },
   ];
   const got = resolveLayout(widgets, { ...allShown, briefing: false });
-  assert.deepStrictEqual(got.placements, [{ type: "shopping", x: 6, y: 4, w: 6, h: 5 }]);
+  assert.deepStrictEqual(got.placements, [{ type: "shopping", x: 6, y: 4, w: 6, h: 5, narrow: false }]);
   assert.ok(got.hidden.includes("briefing"));
 }
 
@@ -50,7 +59,7 @@ const allShown = Object.fromEntries(allTypes.map((t) => [t, true]));
     { type: "news", x: 6, y: 4, w: 6, h: 5, fallback: "shopping" },
   ];
   const got = resolveLayout(widgets, { ...allShown, briefing: false, news: false });
-  assert.deepStrictEqual(got.placements, [{ type: "shopping", x: 0, y: 4, w: 6, h: 5 }]);
+  assert.deepStrictEqual(got.placements, [{ type: "shopping", x: 0, y: 4, w: 6, h: 5, narrow: false }]);
 }
 
 // unknown types are skipped and reported, empty fallback ignored

@@ -18,7 +18,8 @@ const EL = {
 // An empty widget hands its tiles to its fallback (when that one has
 // content and isn't placed yet); otherwise the area stays empty. Unknown
 // types are skipped and reported.
-// Returns {placements: [{type, x, y, w, h}], hidden: [type], unknown: [type]}.
+// Returns {placements: [{type, x, y, w, h, narrow}], hidden: [type], unknown: [type]}.
+// narrow flags tiles below 6 columns for compact CSS (data-narrow).
 function resolveLayout(widgets, has) {
   const placements = [];
   const hidden = new Set(Object.keys(EL));
@@ -37,7 +38,7 @@ function resolveLayout(widgets, has) {
     if (placed.has(type)) continue;
     placed.add(type);
     hidden.delete(type);
-    placements.push({ type, x: w.x, y: w.y, w: w.w, h: w.h });
+    placements.push({ type, x: w.x, y: w.y, w: w.w, h: w.h, narrow: w.w < 6 });
   }
   return { placements, hidden: [...hidden], unknown };
 }
