@@ -111,6 +111,42 @@ func (c *Client) getCalendarFeed(ctx context.Context, token string) ([]byte, err
 	return data, nil
 }
 
+// maxScenesFeedBytes bounds the scenes feed transport; the strict parser in
+// internal/scenes enforces the same bound (maxFeedBytes there).
+const maxScenesFeedBytes = 256 << 10
+
+// GetScenesFeed fetches the raw wall scenes feed (GET /dashboard/scenes)
+// using the scenes-only token. It returns the raw body for strict
+// validation by scenes.ParseScenesFeed.
+func (c *Client) GetScenesFeed(ctx context.Context, token string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+"/dashboard/scenes", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/json")
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("Familienapp nicht erreichbar: %w", err)
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxScenesFeedBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > maxScenesFeedBytes {
+		return nil, fmt.Errorf("Familienapp: Szenenantwort zu groß (> 256 KiB) – letzter Stand bleibt")
+	}
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		msg := strings.TrimSpace(string(data))
+		if len(msg) > 200 {
+			msg = msg[:200] + "…"
+		}
+		return nil, &StatusError{Status: resp.StatusCode, Body: msg}
+	}
+	return data, nil
+}
+
 func (c *Client) do(req *http.Request, token string, out any) error {
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/json")
