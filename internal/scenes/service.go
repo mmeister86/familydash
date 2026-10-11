@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"familydash/internal/familyapp"
+	"familydash/internal/scene"
 )
 
 // ScenesPollInterval is the default feed poll cadence.
@@ -26,22 +27,25 @@ type Snapshot struct {
 // serving the previous snapshot. Without any snapshot the wall falls back
 // to its SCENE_* schedule and built-in layouts.
 type Service struct {
-	client    *familyapp.Client
-	token     string
-	cachePath string
-	backend   string
-	mu        sync.RWMutex
-	refreshMu sync.Mutex
-	snap      *Snapshot
-	lastErr   error
-	configErr string
+	client     *familyapp.Client
+	token      string
+	cachePath  string
+	backend    string
+	provider   *scene.Provider
+	swappedRev int
+	mu         sync.RWMutex
+	refreshMu  sync.Mutex
+	snap       *Snapshot
+	lastErr    error
+	configErr  string
 }
 
 // NewService builds the scenes source. A missing backend URL or token does
 // not fail; the snapshot stays unavailable until a poll succeeds. A strictly
 // validated persistent cache is loaded when it belongs to this backend.
-func NewService(client *familyapp.Client, token, cachePath string) *Service {
-	s := &Service{client: client, token: token, cachePath: cachePath}
+// Accepted feeds are pushed into provider (nil = no sync).
+func NewService(client *familyapp.Client, token, cachePath string, provider *scene.Provider) *Service {
+	s := &Service{client: client, token: token, cachePath: cachePath, provider: provider, swappedRev: -1}
 	if client != nil {
 		s.backend = normalizeScenesBackend(client.BaseURL)
 	}
@@ -60,6 +64,7 @@ func NewService(client *familyapp.Client, token, cachePath string) *Service {
 			}
 		} else {
 			s.snap = snap
+			s.maybeSwap(snap.Feed)
 		}
 	}
 	return s
@@ -99,12 +104,29 @@ func (s *Service) Refresh(ctx context.Context) {
 	s.snap = &Snapshot{Feed: feed, FetchedAt: fetchedAt}
 	s.lastErr = nil
 	s.mu.Unlock()
+	s.maybeSwap(feed)
 	if s.cachePath != "" {
 		if err := saveScenesCache(s.cachePath, s.backend, fetchedAt, raw); err != nil {
 			// Warning only: the accepted RAM data stays.
 			slog.Warn("scenes cache not saved", "path", s.cachePath, "err", err)
 		}
 	}
+}
+
+// maybeSwap pushes newly accepted feeds into the provider schedule. The
+// revision guard keeps swaps (and force warnings) to actual feed changes;
+// failures never touch the provider, so the last schedule survives outages.
+func (s *Service) maybeSwap(feed Feed) {
+	if s.provider == nil || feed.Revision == s.swappedRev {
+		return
+	}
+	sched, err := feed.Schedule()
+	if err != nil {
+		slog.Warn("scenes schedule rejected", "err", err)
+		return
+	}
+	s.provider.SetSchedule(sched)
+	s.swappedRev = feed.Revision
 }
 
 // Run polls every interval until ctx ends.

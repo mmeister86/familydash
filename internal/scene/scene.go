@@ -66,6 +66,7 @@ type Current struct {
 	Until     time.Time `json:"until"`
 	SchoolDay bool      `json:"schoolDay"` // Mon–Fri; public holidays/vacations: TODO
 	Forced    bool      `json:"forced,omitempty"`
+	Preview   bool      `json:"preview,omitempty"` // wall shows a 2-minute preview, not the schedule
 }
 
 // ParseClock parses "HH:MM" (also "H:MM", "HH.MM") into minutes of the day.

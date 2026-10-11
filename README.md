@@ -48,6 +48,8 @@ All settings are environment variables.
 | `CALENDAR_SOURCE` | `local` | `local` = poll the `CALENDAR_n_URL` feeds here; `convex` = read all calendars exclusively from the family app's Convex backend (no local polling, no fallback — see [docs/CONVEX_CALENDAR_ROLLOUT.md](docs/CONVEX_CALENDAR_ROLLOUT.md)) |
 | `FAMILY_APP_CALENDAR_TOKEN` | – | Bearer token for `GET /dashboard/calendars` (= `CALENDAR_DASHBOARD_TOKEN` in Convex); required for `CALENDAR_SOURCE=convex`. Authorizes nothing else |
 | `CALENDAR_CACHE_FILE` | `/data/calendar-cache.json` | Persistent last-good calendar snapshot (calendars only); served with original source age after restarts/outages |
+| `FAMILY_APP_SCENES_TOKEN` | – | Bearer token for `GET /dashboard/scenes` (= `SCENES_DASHBOARD_TOKEN` in Convex); without it the wall runs on `SCENE_*` and built-in layouts. Authorizes nothing else |
+| `SCENES_CACHE_FILE` | `/data/scenes-cache.json` | Persistent last-good scenes feed; served after restarts/outages |
 | `WEATHER_LAT` / `WEATHER_LON` | – | Weather is off until set |
 | `WEATHER_NAME` | – | Label above the weather panel |
 | `WEATHER_REFRESH` | `15m` | |

@@ -31,7 +31,7 @@ func scenesServer(t *testing.T, h http.HandlerFunc) (*httptest.Server, *string) 
 func scenesService(t *testing.T, srv *httptest.Server, token string) *Service {
 	t.Helper()
 	c := familyapp.NewClient(srv.URL, "", "")
-	return NewService(c, token, filepath.Join(t.TempDir(), "scenes-cache.json"))
+	return NewService(c, token, filepath.Join(t.TempDir(), "scenes-cache.json"), nil)
 }
 
 func refreshScenes(t *testing.T, s *Service) {
@@ -98,13 +98,13 @@ func TestRefreshKeepsLastGood(t *testing.T) {
 }
 
 func TestSnapshotUnconfigured(t *testing.T) {
-	if _, err := NewService(nil, "tok", "").Snapshot(); err == nil {
+	if _, err := NewService(nil, "tok", "", nil).Snapshot(); err == nil {
 		t.Error("missing backend URL should fail")
 	} else if want := "FAMILY_APP_SITE_URL"; !strings.Contains(err.Error(), want) {
 		t.Errorf("error %q should mention %s", err, want)
 	}
 	c := familyapp.NewClient("http://example.com", "", "")
-	if _, err := NewService(c, "", "").Snapshot(); err == nil {
+	if _, err := NewService(c, "", "", nil).Snapshot(); err == nil {
 		t.Error("missing token should fail")
 	} else if want := "FAMILY_APP_SCENES_TOKEN"; !strings.Contains(err.Error(), want) {
 		t.Errorf("error %q should mention %s", err, want)
@@ -113,7 +113,7 @@ func TestSnapshotUnconfigured(t *testing.T) {
 
 func TestSnapshotNeverLoaded(t *testing.T) {
 	c := familyapp.NewClient("http://example.com", "", "")
-	if _, err := NewService(c, "tok", "").Snapshot(); err == nil {
+	if _, err := NewService(c, "tok", "", nil).Snapshot(); err == nil {
 		t.Error("expected an error before the first refresh")
 	}
 }

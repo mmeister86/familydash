@@ -19,7 +19,7 @@ func TestScenesCacheRestart(t *testing.T) {
 		w.Write(fixture)
 	})
 	cache := filepath.Join(t.TempDir(), "scenes-cache.json")
-	s := NewService(familyapp.NewClient(srv.URL, "", ""), "tok", cache)
+	s := NewService(familyapp.NewClient(srv.URL, "", ""), "tok", cache, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	s.Refresh(ctx)
@@ -32,7 +32,7 @@ func TestScenesCacheRestart(t *testing.T) {
 	}
 
 	// Restart: same backend and cache path, no refresh. Snapshot from disk.
-	restarted := NewService(familyapp.NewClient(srv.URL, "", ""), "tok", cache)
+	restarted := NewService(familyapp.NewClient(srv.URL, "", ""), "tok", cache, nil)
 	snap, err := restarted.Snapshot()
 	if err != nil {
 		t.Fatalf("restarted snapshot: %v", err)
@@ -52,7 +52,7 @@ func TestScenesWrongBackendCacheRejected(t *testing.T) {
 		w.Write(fixture)
 	})
 	cache := filepath.Join(t.TempDir(), "scenes-cache.json")
-	a := NewService(familyapp.NewClient(srvA.URL, "", ""), "tok", cache)
+	a := NewService(familyapp.NewClient(srvA.URL, "", ""), "tok", cache, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	a.Refresh(ctx)
@@ -63,7 +63,7 @@ func TestScenesWrongBackendCacheRejected(t *testing.T) {
 	other, _ := scenesServer(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Write(fixture)
 	})
-	b := NewService(familyapp.NewClient(other.URL, "", ""), "tok", cache)
+	b := NewService(familyapp.NewClient(other.URL, "", ""), "tok", cache, nil)
 	if _, err := b.Snapshot(); err == nil {
 		t.Error("foreign-backend cache should be rejected")
 	}
@@ -79,7 +79,7 @@ func TestScenesInvalidResponsePreservesCache(t *testing.T) {
 		w.Write(body)
 	})
 	cache := filepath.Join(t.TempDir(), "scenes-cache.json")
-	s := NewService(familyapp.NewClient(srv.URL, "", ""), "tok", cache)
+	s := NewService(familyapp.NewClient(srv.URL, "", ""), "tok", cache, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	s.Refresh(ctx)

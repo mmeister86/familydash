@@ -23,6 +23,7 @@ import (
 	"familydash/internal/news"
 	"familydash/internal/photos"
 	"familydash/internal/scene"
+	"familydash/internal/scenes"
 	"familydash/internal/server"
 	"familydash/internal/timetable"
 	"familydash/internal/todo"
@@ -155,7 +156,11 @@ func main() {
 		go nw.Run(ctx, cfg.NewsRefresh)
 	}
 
-	src := server.Sources{Weather: wx, Bring: br, School: sc, Plan: plan, Meals: ml, Waste: ws, Photos: ph, Todos: todos, Uptime: up, News: nw}
+	sceneProvider := scene.NewProvider(cfg.Scenes)
+	scenesSvc := scenes.NewService(newAppClient(cfg), cfg.FamilyAppScenesToken, cfg.ScenesCacheFile, sceneProvider)
+	go scenesSvc.Run(ctx, scenes.ScenesPollInterval)
+
+	src := server.Sources{Weather: wx, Bring: br, School: sc, Plan: plan, Meals: ml, Waste: ws, Photos: ph, Todos: todos, Uptime: up, News: nw, Scenes: scenesSvc, SceneProvider: sceneProvider}
 	if cfg.BriefingEnabled() {
 		src.Briefing = newBriefing(cfg, cal, src)
 		go src.Briefing.Run(ctx)
@@ -178,7 +183,7 @@ func main() {
 	slog.Info("familydash started", "version", version, "addr", cfg.ListenAddr,
 		"calendars", len(cfg.Calendars), "weather", cfg.WeatherEnabled(), "tz", cfg.Location.String(),
 		"bring", cfg.BringEnabled(), "besteschule", cfg.SchoolEnabled(), "timetable", plan != nil, "vielfalt", len(cfg.Meals), "waste", len(cfg.Waste),
-		"photos", cfg.PhotosDir, "todos", todoMode(cfg), "familyappPush", cfg.FamilyAppPushEnabled(), "briefing", briefingMode(cfg), "uptime", cfg.UptimeEnabled(), "news", len(cfg.NewsFeeds), "weatherBg", cfg.WeatherBGDir, "scene", cfg.Scenes.At(time.Now(), cfg.Location).Name)
+		"photos", cfg.PhotosDir, "todos", todoMode(cfg), "familyappPush", cfg.FamilyAppPushEnabled(), "briefing", briefingMode(cfg), "uptime", cfg.UptimeEnabled(), "news", len(cfg.NewsFeeds), "weatherBg", cfg.WeatherBGDir, "scene", sceneProvider.At(time.Now(), cfg.Location).Name)
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("server", "err", err)
 		os.Exit(1)
@@ -267,8 +272,29 @@ func newCalendarSource(cfg *config.Config) calendar.Source {
 // newBriefing wires the AI card to the other sources (nil ones are skipped).
 func newBriefing(cfg *config.Config, cal calendar.Source, src server.Sources) *briefing.Service {
 	b := &briefing.Service{
-		Sched: scene.NewProvider(cfg.Scenes), Loc: cfg.Location, Lead: cfg.BriefingLead, MinGap: cfg.BriefingMinGap,
-		// TODO(Phase 2/T4): share the scenes provider + widget plan with the server.
+		Sched: src.SceneProvider, Loc: cfg.Location, Lead: cfg.BriefingLead, MinGap: cfg.BriefingMinGap,
+		Plan: func() (briefing.WidgetPlan, error) {
+			snap, err := src.Scenes.Snapshot()
+			if err != nil {
+				return nil, err
+			}
+			plan := make(briefing.WidgetPlan, len(snap.Feed.Scenes))
+			for _, sc := range snap.Feed.Scenes {
+				var w briefing.SceneWidgets
+				for _, widget := range sc.Widgets {
+					if widget.Type == "briefing" && widget.Props != nil {
+						switch widget.Props.Kind {
+						case "today":
+							w.Today = true
+						case "tomorrow":
+							w.Tomorrow = true
+						}
+					}
+				}
+				plan[sc.ID] = w
+			}
+			return plan, nil
+		},
 		Gather: func(now time.Time) briefing.Data {
 			d := briefing.Data{Calendar: cal.Snapshot()}
 			if src.Weather != nil {
