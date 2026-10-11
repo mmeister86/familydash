@@ -1,17 +1,19 @@
-// Package scene decides which time-of-day layout ("scene") the wall display
-// shows: morning, day, afternoon, evening or night. The frontend switches
-// its layout and focus zone on the scene name.
+// Package scene decides which wall scene the display shows and when. Scene
+// identities come from the Convex feed (or the SCENE_* fallback); the
+// frontend switches its layout on the scene id.
 package scene
 
 import (
 	"fmt"
+	"log/slog"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
-// Scene names, in the order they happen during a day.
+// Built-in scene ids, kept stable so ?scene= and SCENE_FORCE keep working.
 const (
 	Morning   = "morning"
 	Day       = "day"
@@ -20,13 +22,25 @@ const (
 	Night     = "night"
 )
 
-// Names lists all scenes in day order.
-var Names = []string{Morning, Day, Afternoon, Evening, Night}
+// FallbackScene describes one built-in scene for the SCENE_* fallback.
+type FallbackScene struct {
+	ID, Name, Kind string
+}
 
-// Start is the minute of the day (0…1439) a scene begins.
+// FallbackScenes lists the built-in scenes in day order.
+var FallbackScenes = []FallbackScene{
+	{Morning, "Morgen", "layout"},
+	{Day, "Tag", "layout"},
+	{Afternoon, "Nachmittag", "layout"},
+	{Evening, "Abend", "layout"},
+	{Night, "Nacht", "night"},
+}
+
+// Start is one scene start: the minute of the day (0…1439) it begins,
+// with the scene identity.
 type Start struct {
-	Name   string
-	Minute int
+	ID, Name, Kind string
+	Minute         int
 }
 
 // Schedule holds the start times for school days (Mon–Fri) and for weekends.
@@ -34,7 +48,7 @@ type Start struct {
 type Schedule struct {
 	SchoolDay []Start
 	Weekend   []Start
-	Force     string // SCENE_FORCE: always this scene (for testing), "" = off
+	Force     string // SCENE_FORCE: always this scene id (for testing), "" = off
 }
 
 // Defaults: SCENE_<NAME> for school days, SCENE_<NAME>_WEEKEND for Sat/Sun.
@@ -45,7 +59,9 @@ var (
 
 // Current is what /api/dashboard reports.
 type Current struct {
+	ID        string    `json:"id"`
 	Name      string    `json:"name"`
+	Kind      string    `json:"kind"`
 	Since     time.Time `json:"since"`
 	Until     time.Time `json:"until"`
 	SchoolDay bool      `json:"schoolDay"` // Mon–Fri; public holidays/vacations: TODO
@@ -72,21 +88,21 @@ func ParseClock(s string) (int, error) {
 	return hh*60 + mm, nil
 }
 
-// Build turns name→"HH:MM" maps into a sorted list. get returns the raw
-// value for a scene name (already merged with defaults by the caller).
-func Build(get func(name string) string) ([]Start, error) {
+// Build turns id→"HH:MM" maps into a sorted list. get returns the raw
+// value for a scene id (already merged with defaults by the caller).
+func Build(get func(id string) string) ([]Start, error) {
 	var out []Start
-	for _, n := range Names {
-		v := get(n)
+	for _, scene := range FallbackScenes {
+		v := get(scene.ID)
 		if v == "" {
 			continue
 		}
 		m, err := ParseClock(v)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %w", n, err)
+			return nil, fmt.Errorf("%s: %w", scene.ID, err)
 		}
 		if m >= 0 {
-			out = append(out, Start{Name: n, Minute: m})
+			out = append(out, Start{ID: scene.ID, Name: scene.Name, Kind: scene.Kind, Minute: m})
 		}
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Minute < out[j].Minute })
@@ -105,6 +121,17 @@ func (s *Schedule) startsFor(day time.Time) []Start {
 		return s.SchoolDay
 	}
 	return s.Weekend
+}
+
+func (s *Schedule) known(id string) (Start, bool) {
+	for _, list := range [][]Start{s.SchoolDay, s.Weekend} {
+		for _, st := range list {
+			if st.ID == id {
+				return st, true
+			}
+		}
+	}
+	return Start{}, false
 }
 
 // at returns the wall-clock time `minute` on the calendar day of `day`.
@@ -129,15 +156,16 @@ func (s *Schedule) At(now time.Time, loc *time.Location) Current {
 		}
 	}
 	if idx >= 0 {
-		cur.Name, cur.Since = today[idx].Name, at(now, today[idx].Minute, loc)
+		st := today[idx]
+		cur.ID, cur.Name, cur.Kind, cur.Since = st.ID, st.Name, st.Kind, at(now, st.Minute, loc)
 	} else {
 		// … or, before the first start, whatever ran last on an earlier day
 		// (normally last night's "night")
-		for back := 1; back <= 7 && cur.Name == ""; back++ {
+		for back := 1; back <= 7 && cur.ID == ""; back++ {
 			prev := now.AddDate(0, 0, -back)
 			if list := s.startsFor(prev); len(list) > 0 {
 				last := list[len(list)-1]
-				cur.Name, cur.Since = last.Name, at(prev, last.Minute, loc)
+				cur.ID, cur.Name, cur.Kind, cur.Since = last.ID, last.Name, last.Kind, at(prev, last.Minute, loc)
 			}
 		}
 	}
@@ -155,21 +183,70 @@ func (s *Schedule) At(now time.Time, loc *time.Location) Current {
 		}
 	}
 
-	if cur.Name == "" {
-		cur.Name = Day
+	if cur.ID == "" {
+		cur.ID = Day
+		for _, fb := range FallbackScenes {
+			if fb.ID == Day {
+				cur.Name, cur.Kind = fb.Name, fb.Kind
+			}
+		}
 	}
 	if s.Force != "" {
-		cur.Name, cur.Forced = s.Force, true
+		if st, ok := s.known(s.Force); ok {
+			cur.ID, cur.Name, cur.Kind, cur.Forced = st.ID, st.Name, st.Kind, true
+		}
+		// Unknown force ids stay silent here (warned once per schedule
+		// swap); the time-based scene runs instead of failing the wall.
 	}
 	return cur
 }
 
-// Valid reports whether name is a known scene.
-func Valid(name string) bool {
-	for _, n := range Names {
-		if n == name {
-			return true
-		}
+// Provider serves the current scene from a hot-swappable schedule: the wall
+// follows feed updates without a restart.
+type Provider struct {
+	mu    sync.RWMutex
+	sched Schedule
+}
+
+// NewProvider serves sched; an unknown initial force warns once.
+func NewProvider(sched Schedule) *Provider {
+	p := &Provider{}
+	p.SetSchedule(Schedule{SchoolDay: sched.SchoolDay, Weekend: sched.Weekend})
+	p.SetForce(sched.Force)
+	return p
+}
+
+// SetSchedule swaps the schedule, keeping the force. An unknown force warns
+// (once per swap) and stays set: a later feed may still provide that scene.
+func (p *Provider) SetSchedule(sched Schedule) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	sched.Force = p.sched.Force
+	p.sched = sched
+	p.warnUnknownForceLocked()
+}
+
+// SetForce pins one scene id; unknown ids warn and are ignored by At until
+// a schedule provides them.
+func (p *Provider) SetForce(force string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.sched.Force = force
+	p.warnUnknownForceLocked()
+}
+
+func (p *Provider) warnUnknownForceLocked() {
+	if p.sched.Force == "" {
+		return
 	}
-	return false
+	if _, ok := p.sched.known(p.sched.Force); !ok {
+		slog.Warn("scene force matches no known scene, ignoring", "force", p.sched.Force)
+	}
+}
+
+// At returns the scene active at now.
+func (p *Provider) At(now time.Time, loc *time.Location) Current {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.sched.At(now, loc)
 }

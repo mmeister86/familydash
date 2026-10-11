@@ -70,7 +70,7 @@ All settings are environment variables.
 | `VIELFALT_n_NAME` | name from the portal | Card title, e.g. `Lukas` |
 | `SCENE_MORNING` … `SCENE_NIGHT` | `06:45`, `09:00` (DAY), `14:00` (AFTERNOON), `19:00` (EVENING), `21:30` (NIGHT) | Start of each time-of-day layout on school days (Mon–Fri); `off` skips a scene |
 | `SCENE_<NAME>_WEEKEND` | MORNING `07:30`, DAY `10:00`, rest = school-day value | Same for Saturday/Sunday |
-| `SCENE_FORCE` | – | Always show this scene (`morning`, `day`, `afternoon`, `evening`, `night`) – for testing |
+| `SCENE_FORCE` | – | Always show this scene id – for testing; unknown ids are ignored with a warning |
 | `PHOTOS_DIR` | `/data/pictures` | Folder with photos for the slideshow (subfolders ok); `off` disables it. May not exist yet – it's picked up once it does |
 | `PHOTOS_INTERVAL` | `45s` | Time per photo |
 | `PHOTOS_SHUFFLE` | `on` | Random order; `off` = alphabetical |

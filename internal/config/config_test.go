@@ -53,9 +53,9 @@ func TestScenes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	find := func(list []scene.Start, name string) int {
+	find := func(list []scene.Start, id string) int {
 		for _, s := range list {
-			if s.Name == name {
+			if s.ID == id {
 				return s.Minute
 			}
 		}
@@ -78,8 +78,12 @@ func TestScenes(t *testing.T) {
 	}
 
 	t.Setenv("SCENE_FORCE", "brunch")
-	if _, err := Load(); err == nil {
-		t.Error("SCENE_FORCE=brunch: want error")
+	c, err = Load()
+	if err != nil {
+		t.Fatalf("SCENE_FORCE=brunch should pass through, got %v", err)
+	}
+	if c.Scenes.Force != "brunch" {
+		t.Errorf("force = %q, want brunch passthrough", c.Scenes.Force)
 	}
 }
 

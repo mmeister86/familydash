@@ -145,7 +145,7 @@ func (s *Service) Run(ctx context.Context) {
 
 // KindAt is the briefing due at now: the one of the scene running Lead from now.
 func (s *Service) KindAt(now time.Time) (Kind, bool) {
-	return kindOf(s.Sched.At(now.Add(s.Lead), s.Loc).Name)
+	return kindOf(s.Sched.At(now.Add(s.Lead), s.Loc).ID)
 }
 
 func kindOf(sceneName string) (Kind, bool) {
@@ -240,7 +240,7 @@ func (s *Service) refresh(ctx context.Context, kind Kind, target, now time.Time)
 func (s *Service) Snapshot() *Briefing { return s.snapshotAt(time.Now()) }
 
 func (s *Service) snapshotAt(now time.Time) *Briefing {
-	kind, ok := kindOf(s.Sched.At(now, s.Loc).Name)
+	kind, ok := kindOf(s.Sched.At(now, s.Loc).ID)
 	if !ok {
 		if kind, ok = s.KindAt(now); !ok {
 			return nil

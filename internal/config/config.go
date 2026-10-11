@@ -427,9 +427,8 @@ func (c *Config) loadScenes() error {
 		return fmt.Errorf("SCENE_*_WEEKEND: %w", err)
 	}
 	force := strings.ToLower(env("SCENE_FORCE", ""))
-	if force != "" && !scene.Valid(force) {
-		return fmt.Errorf("SCENE_FORCE %q: want one of %s", force, strings.Join(scene.Names, ", "))
-	}
+	// Lenient on purpose: custom feed scenes are unknown here, and an
+	// unknown force only warns (provider) instead of failing the start.
 	c.Scenes = scene.Schedule{SchoolDay: school, Weekend: weekend, Force: force}
 	return nil
 }
