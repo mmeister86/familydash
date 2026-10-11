@@ -148,12 +148,17 @@ func validateFeed(raw feedJSON) (Feed, error) {
 	}
 	feed := Feed{Version: raw.Version, Revision: raw.Revision, Grid: raw.Grid}
 	names := map[string]bool{}
+	ids := map[string]bool{}
 	layouts := 0
 	nights := 0
 	for _, rs := range raw.Scenes {
 		if strings.TrimSpace(rs.ID) == "" {
 			return Feed{}, scenesErr("every scene needs an id")
 		}
+		if ids[rs.ID] {
+			return Feed{}, scenesErr("duplicate scene id %q", rs.ID)
+		}
+		ids[rs.ID] = true
 		if rs.Kind != "layout" && rs.Kind != "night" {
 			return Feed{}, scenesErr("scene %q has unknown kind %q", rs.ID, rs.Kind)
 		}

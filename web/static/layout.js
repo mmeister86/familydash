@@ -42,3 +42,10 @@ function resolveLayout(widgets, has) {
   }
   return { placements, hidden: [...hidden], unknown };
 }
+
+// briefingKind returns the briefing kind a layout needs ("today"/
+// "tomorrow") or null when it shows no briefing widget.
+function briefingKind(widgets) {
+  const w = (widgets || []).find((w) => w.type === "briefing");
+  return w?.props?.kind || null;
+}

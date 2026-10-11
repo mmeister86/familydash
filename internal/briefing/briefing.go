@@ -219,7 +219,8 @@ func (s *Service) plan() WidgetPlan {
 
 // KindAt is the briefing due at now: the one of a scene with a briefing
 // widget starting within Lead. Kinds no scene shows fall back to the
-// default morning/evening times.
+// default morning/evening times; without any widget info the configured
+// schedule decides, so custom SCENE_* times prepare on time.
 func (s *Service) KindAt(now time.Time) (Kind, bool) {
 	plan := s.plan()
 	at := s.Sched.At(now.Add(s.Lead), s.Loc).ID
@@ -228,7 +229,11 @@ func (s *Service) KindAt(now time.Time) (Kind, bool) {
 	} else if w.Tomorrow {
 		return Evening, true
 	}
-	legacy, ok := defaultKind(defaultSched.At(now.Add(s.Lead), s.Loc).ID)
+	base := s.Sched
+	if plan != nil {
+		base = defaultSched
+	}
+	legacy, ok := defaultKind(base.At(now.Add(s.Lead), s.Loc).ID)
 	if !ok {
 		return "", false
 	}
@@ -393,6 +398,14 @@ func (s *Service) KindForScene(id string) (Kind, bool) {
 		return kind, true
 	}
 	return "", false
+}
+
+// Card returns the current card of one kind without generating one (nil
+// when the slot is empty): for serving previews without blocking the wall.
+func (s *Service) Card(kind Kind) *Briefing {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return copyOf(s.slot(kind).cur)
 }
 
 // Cards returns the current card of every kind (morning and evening), for

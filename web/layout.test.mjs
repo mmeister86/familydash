@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import assert from "node:assert";
 
 const src = readFileSync(new URL("./static/layout.js", import.meta.url), "utf8");
-const { resolveLayout, EL } = new Function(`${src}; return { resolveLayout, EL };`)();
+const { resolveLayout, briefingKind, EL } = new Function(`${src}; return { resolveLayout, briefingKind, EL };`)();
 
 const allTypes = ["clock", "shopping", "briefing", "news", "photos", "school", "calendars"];
 const allShown = Object.fromEntries(allTypes.map((t) => [t, true]));
@@ -78,6 +78,16 @@ const allShown = Object.fromEntries(allTypes.map((t) => [t, true]));
   const got = resolveLayout([], allShown);
   assert.deepStrictEqual(got.placements, []);
   assert.deepStrictEqual(got.hidden.sort(), allTypes.sort());
+}
+
+// briefingKind selects the card a layout needs
+{
+  assert.strictEqual(briefingKind([{ type: "briefing", props: { kind: "today" } }]), "today");
+  assert.strictEqual(briefingKind([{ type: "briefing", props: { kind: "tomorrow" } }]), "tomorrow");
+  assert.strictEqual(briefingKind([{ type: "briefing" }]), null);
+  assert.strictEqual(briefingKind([{ type: "news" }]), null);
+  assert.strictEqual(briefingKind([]), null);
+  assert.strictEqual(briefingKind(undefined), null);
 }
 
 console.log("layout.test.mjs: all assertions passed");

@@ -191,6 +191,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 				slog.Warn("dashboard: unknown scene, ignoring", "scene", id)
 				d.Briefing = s.briefing.Snapshot()
 			}
+		} else if d.Scene.Preview {
+			d.Briefing = s.previewBriefing(d.Layout.Widgets)
 		} else {
 			d.Briefing = s.briefing.Snapshot()
 		}

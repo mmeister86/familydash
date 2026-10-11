@@ -898,9 +898,13 @@ async function refreshScene() {
       || !!cur.scene?.preview !== !!payload.scene.preview
       || cur.layout?.revision !== payload.layout?.revision;
     if (changed) {
+      const briefingChanged = briefingKind(cur.layout?.widgets) !== briefingKind(payload.layout?.widgets);
       cur.scene = payload.scene;
       cur.layout = payload.layout;
       render();
+      // The light response carries no card: fetch the full dashboard when
+      // the layout needs a different briefing, or the tile stays hidden.
+      if (briefingChanged) refresh();
     }
   } catch (e) { /* keep last state; the dashboard poll retries */ }
 }

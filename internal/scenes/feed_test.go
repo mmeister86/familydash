@@ -174,6 +174,9 @@ func TestParseInvalid(t *testing.T) {
 		{"dupName", func(t *testing.T, feed map[string]any) {
 			findScene(t, feed, "night")["name"] = "Morgen"
 		}, "duplicate scene name"},
+		{"dupID", func(t *testing.T, feed map[string]any) {
+			findScene(t, feed, "night")["id"] = "morning"
+		}, "duplicate scene id"},
 		{"longName", func(t *testing.T, feed map[string]any) {
 			findScene(t, feed, "morning")["name"] = strings.Repeat("x", 31)
 		}, "1-30"},

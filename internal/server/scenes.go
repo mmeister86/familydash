@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"familydash/internal/briefing"
 	"familydash/internal/scene"
 	"familydash/internal/scenes"
 )
@@ -67,11 +68,21 @@ func (s *Server) resolveScene(now time.Time, override string) scenePayload {
 			Layout: sceneLayout{Revision: revision, Widgets: preview.Widgets},
 		}
 	}
-	cur := s.sceneProvider.At(now, s.cfg.Location)
-	return scenePayload{
-		Scene:  cur,
-		Layout: sceneLayout{Revision: revision, Widgets: widgetsFor(feed, cur.ID)},
+	payload := func(cur scene.Current) scenePayload {
+		return scenePayload{
+			Scene:  cur,
+			Layout: sceneLayout{Revision: revision, Widgets: widgetsFor(feed, cur.ID)},
+		}
 	}
+	// The schedule comes from the same snapshot as the widgets, so a request
+	// can never mix feed versions; the configured force still applies.
+	sched, err := feed.Schedule()
+	if err != nil {
+		slog.Warn("dashboard: feed schedule rejected, using provider", "err", err)
+		return payload(s.sceneProvider.At(now, s.cfg.Location))
+	}
+	sched.Force = s.sceneProvider.Force()
+	return payload(sched.At(now, s.cfg.Location))
 }
 
 func widgetsFor(feed scenes.Feed, id string) []scenes.Widget {
@@ -81,6 +92,24 @@ func widgetsFor(feed scenes.Feed, id string) []scenes.Widget {
 		}
 	}
 	return []scenes.Widget{}
+}
+
+// previewBriefing serves the existing card matching the preview layout's
+// briefing widget, without triggering generation; layouts without one (or
+// empty slots) fall back to the scheduled card.
+func (s *Server) previewBriefing(widgets []scenes.Widget) *briefing.Briefing {
+	for _, w := range widgets {
+		if w.Type != "briefing" || w.Props == nil {
+			continue
+		}
+		switch w.Props.Kind {
+		case "today":
+			return s.briefing.Card(briefing.Morning)
+		case "tomorrow":
+			return s.briefing.Card(briefing.Evening)
+		}
+	}
+	return s.briefing.Snapshot()
 }
 
 // handleScene serves the light scene state for the frontend's fast poll.

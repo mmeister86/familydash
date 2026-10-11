@@ -251,3 +251,10 @@ func (p *Provider) At(now time.Time, loc *time.Location) Current {
 	defer p.mu.RUnlock()
 	return p.sched.At(now, loc)
 }
+
+// Force returns the pinned scene id, if any.
+func (p *Provider) Force() string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.sched.Force
+}
