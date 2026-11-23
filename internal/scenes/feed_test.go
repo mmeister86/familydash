@@ -229,6 +229,9 @@ func TestParseInvalid(t *testing.T) {
 		{"fallbackSelf", func(t *testing.T, feed map[string]any) {
 			morningWidget(t, feed, "w2")["fallback"] = "briefing"
 		}, "own fallback"},
+		{"fallbackNeedsProps", func(t *testing.T, feed map[string]any) {
+			morningWidget(t, feed, "w2")["fallback"] = "school"
+		}, "cannot be a fallback"},
 		{"previewInvalidWidget", func(t *testing.T, feed map[string]any) {
 			feed["preview"].(map[string]any)["widgets"] = []any{
 				map[string]any{"id": "p1", "type": "clock", "x": 0, "y": 0, "w": 13, "h": 4},

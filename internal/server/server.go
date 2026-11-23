@@ -154,6 +154,9 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	var school *besteschule.School
 	if s.school != nil {
 		school = s.school.Snapshot()
+		if s.plan != nil {
+			applyHolidayNotices(school, s.plan, d.Now)
+		}
 		d.School = enrichSchool(school, d.Calendar)
 	}
 	var planCards []timetable.Card
@@ -217,6 +220,34 @@ type dashboardSchool struct {
 	Students  []dashboardStudent `json:"students"`
 	UpdatedAt time.Time          `json:"updatedAt"`
 	Error     string             `json:"error,omitempty"`
+}
+
+// applyHolidayNotices copies the fixed timetable's holiday banner
+// ("Herbstferien bis 24.10.") onto beste.schule students who are off without
+// one. Both go to school in the same state, but the API only sends nameless
+// dates – the hardcoded plan names them. The snapshot is rebuilt on every
+// poll, so appending here never duplicates.
+func applyHolidayNotices(school *besteschule.School, plan *timetable.File, now time.Time) {
+	if school == nil || plan == nil {
+		return
+	}
+	notice := plan.HolidayNotice(now.Format("2006-01-02"))
+	if notice == "" {
+		return
+	}
+outer:
+	for i := range school.Students {
+		day := &school.Students[i].Day
+		if !day.NoSchool {
+			continue
+		}
+		for _, n := range day.Notices {
+			if strings.EqualFold(n, notice) || strings.Contains(strings.ToLower(n), "ferien") {
+				continue outer // already bannered
+			}
+		}
+		day.Notices = append(day.Notices, notice)
+	}
 }
 
 // enrichSchool attaches central person ids to a school snapshot. The input

@@ -309,6 +309,11 @@ func validateWidgets(in []widgetJSON) ([]Widget, error) {
 			if raw.Fallback == raw.Type {
 				return nil, scenesErr("widget cannot be its own fallback")
 			}
+			// A fallback carries no props, so types with required settings
+			// cannot serve as one (mirrors the Convex backend).
+			if raw.Fallback == "briefing" || raw.Fallback == "school" {
+				return nil, scenesErr("widget %q needs its own settings and cannot be a fallback", raw.Fallback)
+			}
 		}
 		if ids[raw.ID] {
 			return nil, scenesErr("duplicate widget id %q", raw.ID)
