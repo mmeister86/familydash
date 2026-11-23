@@ -2,3 +2,4 @@
 .env.local
 /familydash
 .worktrees/
+node_modules/
