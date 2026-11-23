@@ -27,6 +27,7 @@ import (
 )
 
 type Server struct {
+	now      func() time.Time // clock; nil means time.Now (tests pin it)
 	cfg      *config.Config
 	version  string
 	calendar calendar.Source
@@ -128,10 +129,18 @@ type dashboard struct {
 	Warnings []string `json:"warnings,omitempty"`
 }
 
+// clock returns the current time in the configured location.
+func (s *Server) clock() time.Time {
+	if s.now != nil {
+		return s.now().In(s.cfg.Location)
+	}
+	return time.Now().In(s.cfg.Location)
+}
+
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	d := dashboard{
 		Version:  s.version,
-		Now:      time.Now().In(s.cfg.Location),
+		Now:      s.clock(),
 		Timezone: s.cfg.Location.String(),
 		Days:     s.cfg.CalendarDays,
 		Calendar: s.calendar.Snapshot(),

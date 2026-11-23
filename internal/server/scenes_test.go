@@ -270,6 +270,10 @@ func (s stubCalendar) Run(context.Context, time.Duration) {
 
 func TestDashboardSceneAndLayout(t *testing.T) {
 	s := sceneTestServer(t, loadScenesFixture(t))
+	// Pin the clock to Monday morning: the fixture's night scene has no
+	// widgets, so a wall-clock run after 21:30 used to fail.
+	mon, _ := time.ParseInLocation("2006-01-02 15:04", "2026-10-12 07:00", berlin(t))
+	s.now = func() time.Time { return mon }
 	s.calendar = stubCalendar{}
 	s.briefing = &briefing.Service{
 		Sched: s.sceneProvider, Loc: berlin(t),

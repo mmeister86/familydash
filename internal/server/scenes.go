@@ -120,5 +120,5 @@ func (s *Server) previewBriefing(widgets []scenes.Widget) *briefing.Briefing {
 // handleScene serves the light scene state for the frontend's fast poll.
 func (s *Server) handleScene(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, http.StatusOK, s.resolveScene(time.Now().In(s.cfg.Location), r.URL.Query().Get("scene")))
+	writeJSON(w, http.StatusOK, s.resolveScene(s.clock(), r.URL.Query().Get("scene")))
 }
