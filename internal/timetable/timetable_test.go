@@ -88,14 +88,28 @@ func TestHolidays(t *testing.T) {
 	if c.Day.Date != "2026-10-26" {
 		t.Fatalf("before break → %s", c.Day.Date)
 	}
-	// during the break: notice + first day after
+	// during the break: today itself is shown as a day off with the holiday notice
 	c = plan(t).Build(at("2026-10-14 09:00"), berlin)[0]
-	if c.Day.Date != "2026-10-26" || len(c.Day.Notices) != 1 || c.Day.Notices[0] != "Herbstferien bis 24.10." {
-		t.Fatalf("in break → %s %v", c.Day.Date, c.Day.Notices)
+	if c.Day.Date != "2026-10-14" || !c.Day.NoSchool || len(c.Day.Notices) != 1 || c.Day.Notices[0] != "Herbstferien bis 24.10." {
+		t.Fatalf("in break → %s %+v", c.Day.Date, c.Day)
 	}
 	// Buß- und Bettag (Wed 18.11.) is skipped
 	if d := plan(t).Build(at("2026-11-17 16:00"), berlin)[0].Day.Date; d != "2026-11-19" {
 		t.Fatalf("Buß- und Bettag → %s", d)
+	}
+}
+
+func TestHolidayNotice(t *testing.T) {
+	f := plan(t)
+	for date, want := range map[string]string{
+		"2026-10-14": "Herbstferien bis 24.10.",
+		"2026-11-18": "Buß- und Bettag",
+		"2026-10-09": "",
+		"2026-10-26": "",
+	} {
+		if got := f.HolidayNotice(date); got != want {
+			t.Errorf("%s → %q, want %q", date, got, want)
+		}
 	}
 }
 

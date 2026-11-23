@@ -367,6 +367,9 @@ func schoolDay(day besteschule.Day, key string) *SchoolDay {
 }
 
 func mealOn(m vielfalt.Child, key string, sd *SchoolDay) string {
+	if sd != nil && sd.Frei {
+		return "" // Ferien/schulfrei: keine Brotdose nötig – egal ob etwas bestellt ist
+	}
 	for _, day := range m.Days {
 		if day.Date != key {
 			continue

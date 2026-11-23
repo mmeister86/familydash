@@ -187,7 +187,12 @@ func (f *File) Build(now time.Time, loc *time.Location) []Card {
 }
 
 // pickDay mirrors beste.schule: today while school runs, then the next school day.
+// On a day off today itself is shown as a day off, so the wall reads
+// "Du hast Ferien" instead of the timetable from after the break.
 func (c *Child) pickDay(now, today time.Time) besteschule.Day {
+	if r := c.holiday(today); r != nil {
+		return besteschule.Day{Date: today.Format("2006-01-02"), Lessons: []besteschule.Lesson{}, NoSchool: true, Notices: []string{holidayNotice(r)}}
+	}
 	for i := 0; i < lookahead; i++ {
 		d := today.AddDate(0, 0, i)
 		lessons := c.lessonsOn(d)
@@ -197,17 +202,9 @@ func (c *Child) pickDay(now, today time.Time) besteschule.Day {
 		if i == 0 && !now.Before(clock(d, lastEnd(lessons))) {
 			continue // school's out – show the next school day
 		}
-		day := besteschule.Day{Date: d.Format("2006-01-02"), Lessons: lessons}
-		if r := c.holiday(today); r != nil && i > 0 {
-			day.Notices = []string{holidayNotice(r)}
-		}
-		return day
+		return besteschule.Day{Date: d.Format("2006-01-02"), Lessons: lessons}
 	}
-	day := besteschule.Day{Date: today.Format("2006-01-02"), Lessons: []besteschule.Lesson{}, NoSchool: true}
-	if r := c.holiday(today); r != nil {
-		day.Notices = []string{holidayNotice(r)}
-	}
-	return day
+	return besteschule.Day{Date: today.Format("2006-01-02"), Lessons: []besteschule.Lesson{}, NoSchool: true}
 }
 
 func (c *Child) lessonsOn(d time.Time) []besteschule.Lesson {
@@ -271,7 +268,10 @@ func sortLessons(ls []besteschule.Lesson) {
 }
 
 func (c *Child) holiday(d time.Time) *Range {
-	date := d.Format("2006-01-02")
+	return c.holidayAt(d.Format("2006-01-02"))
+}
+
+func (c *Child) holidayAt(date string) *Range {
 	for i := range c.NoSchool {
 		r := &c.NoSchool[i]
 		to := r.To
@@ -283,6 +283,18 @@ func (c *Child) holiday(d time.Time) *Range {
 		}
 	}
 	return nil
+}
+
+// HolidayNotice names the holiday covering date ("Herbstferien bis 24.10."),
+// or "" when no child is off that day. The server reuses it for beste.schule
+// students, who share the same state holidays.
+func (f *File) HolidayNotice(date string) string {
+	for i := range f.Children {
+		if r := f.Children[i].holidayAt(date); r != nil {
+			return holidayNotice(r)
+		}
+	}
+	return ""
 }
 
 func holidayNotice(r *Range) string {

@@ -252,6 +252,19 @@ function lessonRow(l, isToday) {
   </div>`;
 }
 
+// During holidays the cards read "Du hast Ferien" instead of the timetable
+// from after the break (or "Keine Schule"). NoSchool alone already means a
+// break of 8+/31+ days without lessons – the wall only lands there in holidays.
+function onHoliday(day) {
+  return day.noSchool || (day.notices || []).some((n) => /ferien|schulfrei/i.test(n));
+}
+
+function schoolBody(day, isToday) {
+  return onHoliday(day)
+    ? `<div class="empty">Du hast Ferien 🥳🥳🥳</div>`
+    : (day.lessons || []).map((l) => lessonRow(l, isToday)).join("");
+}
+
 // beste.schule or fixed timetable: one card per child, top to bottom
 // school (lessons, exams, homework) → Termine → Essen.
 // opts.color tints the dot, opts.cal/opts.events add the child's school calendar,
@@ -267,7 +280,7 @@ function studentCard(st, opts = {}, mealDay) {
       <span class="meta">${day.noSchool ? "" : esc(relDay(day.date))}</span></div>
     <div class="kid-main">
     ${(day.notices || []).map((n) => `<div class="notice">${esc(n)}</div>`).join("")}
-    ${day.noSchool ? `<div class="empty">Keine Schule in Sicht 🎉</div>` : (day.lessons || []).map((l) => lessonRow(l, isToday)).join("")}
+    ${schoolBody(day, isToday)}
     ${exams.length ? `<div class="sub-h">Arbeiten</div>${exams.map((e) => `
       <div class="entry exam"><span class="when">${esc(shortDay(e.date))}</span>
         <span class="what"><b>${esc(e.subject || e.kind || "Arbeit")}</b> ${esc(e.kind && e.subject ? e.kind : "")}${e.text ? ` · <span class="muted">${esc(e.text)}</span>` : ""}</span></div>`).join("")}` : ""}
@@ -277,7 +290,7 @@ function studentCard(st, opts = {}, mealDay) {
     </div>
     ${opts.todos?.length ? `<div class="kid-sec"><div class="sub-h">To-dos</div>${kidTodoRows(opts.todos)}</div>` : ""}
     ${opts.cal ? `<div class="kid-sec"><div class="sub-h">Termine</div>${calendarRows(opts.events || [], MAX_CARD_EVENTS) || `<div class="empty">Nichts eingetragen</div>`}</div>` : ""}
-    ${opts.meal ? `<div class="kid-sec"><div class="sub-h">Essen</div>${mealRows(opts.meal, MEAL_DAYS, mealDay)}</div>` : ""}
+    ${showMeal(day, opts.meal, MEAL_DAYS, mealDay) ? `<div class="kid-sec"><div class="sub-h">Essen</div>${mealRows(opts.meal, MEAL_DAYS, mealDay)}</div>` : ""}
   </div>`;
 }
 
@@ -328,9 +341,9 @@ function kidPlan(st, opts, withMeal, mealDay) {
       <span class="meta">${day.noSchool ? "" : esc(relDay(day.date))}</span></div>
     <div class="kid-main">
       ${(day.notices || []).map((n) => `<div class="notice">${esc(n)}</div>`).join("")}
-      ${day.noSchool ? `<div class="empty">Keine Schule in Sicht 🎉</div>` : (day.lessons || []).map((l) => lessonRow(l, isToday)).join("")}
+      ${schoolBody(day, isToday)}
     </div>
-    ${withMeal && opts.meal ? `<div class="kid-sec"><div class="sub-h">Essen</div>${mealRows(opts.meal, 1, mealDay)}</div>` : ""}
+    ${withMeal && showMeal(day, opts.meal, 1, mealDay) ? `<div class="kid-sec"><div class="sub-h">Essen</div>${mealRows(opts.meal, 1, mealDay)}</div>` : ""}
   </div>`;
 }
 
@@ -444,7 +457,7 @@ function mealRow(day) {
   return `<div class="${cls}"><span class="when">${esc(relDay(day.date))}</span><span class="what">${what}</span></div>`;
 }
 
-function mealRows(ch, max = MEAL_DAYS, mealDay) {
+function visibleMealDays(ch, max = MEAL_DAYS, mealDay) {
   const now = new Date(), today = ymd(now);
   let days = ch.days || [];
   if (mealDay === "tomorrow") {
@@ -453,10 +466,21 @@ function mealRows(ch, max = MEAL_DAYS, mealDay) {
   } else {
     days = days.filter((d) => d.date > today || (d.date === today && now.getHours() < LUNCH_OVER));
   }
-  days = days.slice(0, max);
+  return days.slice(0, max);
+}
+
+function mealRows(ch, max = MEAL_DAYS, mealDay) {
+  const days = visibleMealDays(ch, max, mealDay);
   return days.length
     ? days.map(mealRow).join("")
     : ch.error ? `<p class="hint">${esc(ch.error)}</p>` : `<div class="empty">Kein Essen in Sicht</div>`;
+}
+
+// During holidays the Essen section is hidden – nothing is usually ordered.
+// An actual order during the holidays is still shown.
+function showMeal(day, meal, max, mealDay) {
+  if (!meal) return false;
+  return !onHoliday(day) || visibleMealDays(meal, max, mealDay).some((d) => (d.ordered || []).length);
 }
 
 // lunch of a child without a school card: a card of its own

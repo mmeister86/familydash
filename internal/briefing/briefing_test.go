@@ -133,6 +133,36 @@ func TestBuildFactsWeekendHasNoSchool(t *testing.T) {
 	}
 }
 
+// Monday morning in the autumn holidays: no lunchbox hint, whether or not
+// the caterer lists (or even ordered) a meal that day.
+func TestBuildFactsHolidayHasNoLunchbox(t *testing.T) {
+	mk := func(ordered []vielfalt.Dish) Data {
+		d := sample()
+		d.School.Students[0].Day = besteschule.Day{Date: "2026-10-12", NoSchool: true,
+			Notices: []string{"Herbstferien bis 24.10."}, Lessons: []besteschule.Lesson{}}
+		d.Meals.Children[0].Days = []vielfalt.Day{{Date: "2026-10-12", Ordered: ordered}}
+		return d
+	}
+	now := at("2026-10-12 06:40")
+	key := Target(Morning, now, berlin)
+	for _, ordered := range [][]vielfalt.Dish{nil, {{Name: "Nudeln"}}} {
+		f := BuildFacts(Morning, now, key, berlin, mk(ordered))
+		k := f.Kinder[0]
+		if k.Schule == nil || !k.Schule.Frei {
+			t.Fatalf("ordered=%v: school: %+v", ordered, k.Schule)
+		}
+		if k.Essen != "" {
+			t.Errorf("ordered=%v: lunch fact %q, want empty (no Brotbox in the holidays)", ordered, k.Essen)
+		}
+		b := Fallback(Morning, key, f, Colors(mk(ordered)))
+		for _, it := range b.Items {
+			if it.Icon == "brotbox" {
+				t.Errorf("ordered=%v: fallback brotbox item: %+v", ordered, it)
+			}
+		}
+	}
+}
+
 func TestBuildFactsMorningSkipsPastEvents(t *testing.T) {
 	d := sample()
 	d.Calendar.Events = append(d.Calendar.Events,
