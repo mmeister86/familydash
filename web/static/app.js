@@ -61,7 +61,8 @@ function tickClock() {
   const now = new Date();
   const t = fmt.time.format(now), d = fmt.longDate.format(now);
   $("time").textContent = t;
-  $("date").textContent = d;
+  $("weekday").textContent = fmt.weekday.format(now);
+  $("date").textContent = fmt.dayMonth.format(now);
   $("night-time").textContent = t;
   $("night-date").textContent = d;
 }
@@ -75,14 +76,13 @@ function renderWeather(w, hints = []) {
   if (!w.current || !w.daily) { el.innerHTML = `<p class="hint">Noch keine Wetterdaten.</p>`; return; }
   const c = w.current;
   const today = ymd(new Date());
+  const outlook = rainOutlook(w.today || w.hourly, new Date());
+  const label = outlook ? `${c.label}, ${outlook}` : c.label;
   el.innerHTML = `
     <div class="wx-now">
       ${icon(c.icon)}
-      <div>
-        <div class="wx-temp">${round(c.temp)}°</div>
-        <div class="wx-label">${esc(c.label)}</div>
-        <div class="wx-meta">gefühlt ${round(c.feels)}° · Wind ${round(c.wind)} km/h</div>
-      </div>
+      <b class="wx-temp">${round(c.temp)}°</b>
+      <span class="wx-label">${esc(label)}</span>
     </div>
     <div class="wx-days">
       ${w.daily.slice(0, 5).map((d) => `
@@ -99,19 +99,10 @@ function renderWeather(w, hints = []) {
 // ------------------------------------------------------------------ weather picture
 
 // The clock card shows a photo matching the weather (WEATHER_BG_DIR, the
-// server picks the file) or, without one, a gradient for the condition.
-// Names match the photo files: klar, heiter, bewoelkt, nebel, regen, schnee, gewitter.
-const WX_NAME = {
-  sun: "klar", moon: "klar", partly: "heiter", "partly-night": "heiter", cloud: "bewoelkt",
-  fog: "nebel", drizzle: "regen", rain: "regen", sleet: "schnee", snow: "schnee", thunder: "gewitter",
-};
+// server picks the file); without one it is the plain sheet.
 
 function renderWeatherBg(d) {
   const card = $("clock-card"), bg = $("wx-bg");
-  const c = d.weather?.current;
-  card.dataset.wx = c ? WX_NAME[c.icon] || "bewoelkt" : "";
-  card.classList.toggle("wx-night", !!c && !c.isDay);
-
   const url = d.weatherBg ? `weather-bg/${encodeURIComponent(d.weatherBg.name)}?v=${d.weatherBg.v}` : "";
   if (bg.dataset.url === url) return;
   bg.dataset.url = url;
@@ -181,13 +172,10 @@ function eventsOn(events, day) {
 
 // ------------------------------------------------------------------ waste collection
 
-// Bin icons next to the clock: outline = collected tomorrow (put it out
-// tonight), filled + pulsing = collected today (until WASTE_TODAY_UNTIL).
+// A sentence below the weather line: "Gelbe Tonne heute Abend rausstellen"
+// (collected tomorrow) or "... wird heute abgeholt" (collected today, until
+// WASTE_TODAY_UNTIL).
 const WASTE_TODAY_UNTIL = 12; // hour; afterwards today's bins are gone
-const BIN_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true">
-  <path class="bin-body" d="M5.5 8h13l-1.1 12a1.8 1.8 0 0 1-1.8 1.6H8.4a1.8 1.8 0 0 1-1.8-1.6z"/>
-  <rect class="bin-lid" x="3.5" y="5" width="17" height="2" rx="1"/>
-  <path class="bin-handle" d="M9.5 5V3.5h5V5"/></svg>`;
 
 function renderWaste(list) {
   const now = new Date();
@@ -199,11 +187,12 @@ function renderWaste(list) {
     else if (dates.includes(tomorrow)) bins.push({ b, day: tomorrow, state: "tomorrow" });
   }
   const html = bins.map(({ b, day, state }) => {
-    const moved = (b.shifted || []).includes(day) ? " (verlegt)" : "";
-    const label = `${b.name} ${state === "today" ? "heute" : "morgen"}${moved}`;
-    return `<span class="bin bin--${state}" style="--c:${esc(b.color)}" title="${esc(label)}">${BIN_SVG}</span>`;
+    const name = esc(b.name);
+    const sentence = esc(wasteSentence(b.name, state, (b.shifted || []).includes(day)));
+    const rest = sentence.startsWith(name) ? sentence.slice(name.length) : ` ${sentence}`;
+    return `<span class="bin bin--${state}" style="--c:${esc(b.color)}"><i></i><span><b>${name}</b>${rest}</span></span>`;
   }).join("");
-  // render() runs every minute – only touch the DOM on change, so the pulse doesn't restart
+  // render() runs every minute – only touch the DOM on change
   const el = $("waste");
   if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
 }

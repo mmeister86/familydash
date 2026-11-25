@@ -15,13 +15,16 @@
     <section class="panel clock-card" id="clock-card">
       <div class="wx-bg" id="wx-bg"></div>
       <div class="cc-clock">
-        <div class="time-row">
-          <div class="time" id="time">--:--</div>
-          <div class="waste" id="waste"></div>
+        <div class="time" id="time">--:--</div>
+        <div class="dateblock">
+          <div class="weekday" id="weekday"></div>
+          <div class="date" id="date"></div>
         </div>
-        <div class="date" id="date"></div>
       </div>
-      <div class="cc-weather weather" id="weather"></div>
+      <div class="cc-weather">
+        <div class="weather" id="weather"></div>
+        <div class="waste" id="waste"></div>
+      </div>
     </section>
 
     <section class="panel shopping" id="shopping"></section>
@@ -52,6 +55,7 @@
   <footer class="status" id="status"></footer>
   <script src="calendar-mapping.js" defer></script>
   <script src="layout.js" defer></script>
+  <script src="wallfmt.js" defer></script>
   <script src="app.js" defer></script>
 </body>
 </html>

@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node web/layout.test.mjs && node tests/calendar-mapping.test.mjs && node tests/preview.test.mjs && node tests/theme.test.mjs"
+    "test": "node web/layout.test.mjs && node tests/calendar-mapping.test.mjs && node tests/preview.test.mjs && node tests/theme.test.mjs && node tests/wallfmt.test.mjs"
   },
   "keywords": [],
   "author": "",
