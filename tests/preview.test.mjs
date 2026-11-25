@@ -1,0 +1,21 @@
+import assert from "node:assert";
+import { demoDashboard, demoScenes } from "../web/preview-data.mjs";
+const now = new Date(2026, 8, 30, 13, 18); // Wed 30 Sep 2026, local
+const d = demoDashboard(now, { scene: "afternoon" });
+assert.strictEqual(d.scene.id, "afternoon");
+assert.strictEqual(d.scene.kind, "layout");
+assert.deepStrictEqual(d.layout.widgets, demoScenes.afternoon);
+assert.strictEqual(d.days, 7);
+assert.ok(d.calendar.calendars.length >= 3 && d.calendar.events.length >= 6);
+assert.ok(d.calendar.events.every((e) => e.allDay ? e.startDate && e.endDate : e.start && e.end));
+assert.ok(d.calendar.events.some((e) => !e.allDay && e.start.startsWith("2026-09-30")));
+assert.strictEqual(d.weather.daily.length, 5);
+assert.strictEqual(d.weather.daily[0].date, "2026-09-30");
+assert.ok(d.weather.hourly.length === 12);
+assert.ok(d.shopping.items.length === 10);
+assert.strictEqual(d.school.students[0].day.date, "2026-09-30");
+assert.ok(d.school.students[0].day.lessons.length === 7);
+assert.ok(d.meals.children.length >= 1 && d.todos.tasks.length >= 3 && d.waste.length >= 1);
+assert.strictEqual(demoDashboard(now, { scene: "night" }).scene.kind, "night");
+assert.deepStrictEqual(Object.keys(demoScenes).sort(), ["afternoon", "day", "evening", "morning"]);
+console.log("preview.test.mjs: all assertions passed");
