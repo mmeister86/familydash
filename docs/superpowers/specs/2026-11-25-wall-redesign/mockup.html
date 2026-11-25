@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Familiendashboard – Entwurf</title>
+<style>
+@font-face { font-family: "Sofia"; src: url(fonts/sofia-sans.woff2) format("woff2"); font-weight: 100 900; }
+@font-face { font-family: "SofiaC"; src: url(fonts/sofia-sans-condensed.woff2) format("woff2"); font-weight: 100 900; }
+@font-face { font-family: "SofiaX"; src: url(fonts/sofia-sans-extra-condensed.woff2) format("woff2"); font-weight: 100 900; }
+
+:root {
+  /* Tag: Papier */
+  --sheet: #E6ECE5;
+  --plate: #FAFCF8;
+  --ink: #14211B;
+  --soft: #55645B;
+  --faint: #93A097;
+  --rule: #CDD7CE;
+  --free: #C4372C;      /* Sonn- und Feiertage, Ausfall */
+  --swap: #8F5B00;      /* Vertretung */
+  --rain: #2F7FD1;
+  --notice: #FFE9A8;
+  --notice-ink: #4A3600;
+  /* Personen */
+  --lukas: #2460D8;
+  --hannah: #F2B705;
+  --mama: #D43F7A;
+  --dienst: #7A4BD6;
+  --on-hannah: #2B2000;
+}
+html[data-scene="evening"] {
+  /* Abend: Tafel */
+  --sheet: #101D17;
+  --plate: #192A22;
+  --ink: #E8EDE4;
+  --soft: #9BAA9F;
+  --faint: #62746A;
+  --rule: #2A3F34;
+  --free: #FF7B6B;
+  --swap: #F2B705;
+  --rain: #6FB2F2;
+  --notice: #4A3B0C;
+  --notice-ink: #FFE39A;
+  --lukas: #4C86F5;
+  --mama: #EC5C95;
+  --dienst: #9A70F0;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1080px; height: 1920px; overflow: hidden; }
+body {
+  background: var(--sheet);
+  color: var(--ink);
+  font: 400 23px/1.3 "Sofia", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+.board {
+  height: 100%;
+  padding: 22px 26px 0;
+  display: grid;
+  grid-template-rows: 232px 280px minmax(0, 1fr) 506px 84px 30px;
+  gap: 16px;
+}
+.plate { background: var(--plate); border-radius: 6px; overflow: hidden; }
+
+/* ---------- Kopf: Uhr als Schild */
+.top { display: grid; grid-template-columns: auto 1fr; gap: 34px; align-items: end; padding: 0 6px; }
+.clock {
+  font: 800 304px/0.74 "SofiaX", sans-serif;
+  letter-spacing: -0.01em;
+  padding-bottom: 14px;
+}
+.clock .colon { position: relative; top: -0.05em; margin: 0 -0.02em; }
+.dateblock { padding-bottom: 10px; }
+.dateblock .wd { font: 800 62px/1 "Sofia", sans-serif; letter-spacing: -0.02em; }
+.dateblock .dm { font: 300 62px/1.02 "Sofia", sans-serif; letter-spacing: -0.02em; }
+.now-wx { display: flex; align-items: center; gap: 14px; margin-top: 16px; font-size: 26px; white-space: nowrap; }
+.now-wx svg { width: 44px; height: 44px; flex: none; }
+.now-wx b { font-weight: 800; }
+.now-wx span { color: var(--soft); }
+.bins { margin-top: 8px; font-size: 23px; color: var(--soft); display: flex; align-items: center; gap: 10px; }
+.bins i { width: 16px; height: 20px; border-radius: 3px 3px 5px 5px; background: #E5C100; box-shadow: inset 0 0 0 1.5px rgba(0,0,0,.25); }
+.bins b { color: var(--ink); font-weight: 700; }
+
+/* ---------- Tagesband: eine Zeitachse für Wetter und alle */
+.band { padding: 14px 22px 16px 0; display: grid; grid-template-columns: 132px 1fr; row-gap: 5px; align-content: start; position: relative; }
+.band .who { font: 700 25px/40px "SofiaC", sans-serif; padding-left: 22px; white-space: nowrap; }
+.band .who.wx { color: var(--soft); font-weight: 500; }
+.track { position: relative; height: 40px; }
+.axis { height: 26px; font: 600 18px/26px "SofiaC", sans-serif; color: var(--soft); }
+.axis span { position: absolute; white-space: nowrap; left: calc((var(--h) - 6) / 16 * 100%); transform: translateX(-50%); }
+.axis span:first-child { transform: none; }
+.axis span:last-child { transform: translateX(-100%); }
+/* Stundenraster hinter allen Bahnen */
+.grid-lines { position: absolute; left: 132px; right: 22px; top: 44px; bottom: 16px; pointer-events: none;
+  background: repeating-linear-gradient(to right, var(--rule) 0 1px, transparent 1px calc(100% / 8)); }
+.bar {
+  position: absolute; top: 3px; bottom: 3px;
+  left: calc((var(--s) - 6) / 16 * 100%);
+  width: calc((var(--e) - var(--s)) / 16 * 100%);
+  background: var(--c); color: #fff;
+  border-radius: 4px;
+  font: 700 21px/34px "SofiaC", sans-serif;
+  padding: 0 9px; white-space: nowrap; overflow: hidden;
+}
+.bar.light { background: color-mix(in srgb, var(--c) 28%, var(--plate)); color: var(--ink); font-weight: 600; }
+.bar.out { overflow: visible; padding: 0; }
+.bar.out span { position: absolute; left: calc(100% + 8px); color: var(--ink); font-weight: 600; }
+.bar.out.left span { left: auto; right: calc(100% + 8px); }
+.c-lukas { --c: var(--lukas); }
+.c-hannah { --c: var(--hannah); }
+.c-hannah.bar:not(.light) { color: var(--on-hannah); }
+.c-mama { --c: var(--mama); }
+.c-dienst { --c: var(--dienst); }
+.c-fam { --c: var(--ink); }
+.c-fam.bar:not(.light) { color: var(--plate); }
+
+.wxslot { position: absolute; left: calc((var(--h) - 6) / 16 * 100%); transform: translateX(-50%); display: flex; align-items: center; gap: 4px; top: 4px; font: 700 22px/28px "SofiaC", sans-serif; }
+.wxslot svg { width: 26px; height: 26px; }
+.rainbar { position: absolute; bottom: 0; height: 5px; border-radius: 3px; background: var(--rain);
+  left: calc((var(--s) - 6) / 16 * 100%); width: calc((var(--e) - var(--s)) / 16 * 100%); }
+/* Vergangenes Wetter verblasst, die Jetzt-Linie wandert */
+.wxslot.gone { color: var(--faint); }
+.nowline { position: absolute; left: calc(132px + (100% - 154px) * var(--now)); top: 34px; bottom: 8px; width: 3px; margin-left: -1.5px; background: var(--ink); border-radius: 2px; box-shadow: 0 0 0 3px var(--plate); }
+.nowline::before { content: ""; position: absolute; top: -3px; left: -5.5px; width: 14px; height: 14px; border-radius: 50%; background: var(--ink); }
+.band { --now: calc((13.3 - 6) / 16); }
+
+/* ---------- Kinder */
+.kids { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; min-height: 0; }
+.kid { display: flex; flex-direction: column; min-height: 0; }
+.kid-head { display: flex; align-items: stretch; }
+.nameplate { background: var(--c); color: #fff; font: 800 40px/58px "SofiaX", sans-serif; letter-spacing: .02em; padding: 0 22px 0 20px; border-radius: 0 0 6px 0; }
+.c-hannah .nameplate { color: var(--on-hannah); }
+.kid-head .when { margin-left: auto; padding: 0 20px; font: 500 22px/58px "SofiaC", sans-serif; color: var(--soft); }
+.kid-body { padding: 12px 20px 16px; min-height: 0; }
+.notice { background: var(--notice); color: var(--notice-ink); font: 600 21px/1.25 "SofiaC", sans-serif; padding: 7px 11px; border-radius: 4px; margin-bottom: 8px; }
+
+.lessons { display: grid; grid-template-columns: 62px 1fr auto; column-gap: 12px; font: 500 23px/29px "SofiaC", sans-serif; }
+.lessons .t { color: var(--soft); font-weight: 400; }
+.lessons .r { color: var(--soft); font-weight: 400; font-size: 20px; }
+.lessons .done { color: var(--faint); }
+.lessons .done.t, .lessons .done.r { color: var(--faint); }
+.lessons .next { font-weight: 800; color: var(--ink); }
+.lessons .off s { text-decoration-thickness: 2px; }
+.lessons em { font-style: normal; font-weight: 700; font-size: 20px; margin-left: 8px; }
+.lessons .off em { color: var(--free); }
+.lessons .sub em { color: var(--swap); }
+.lessons .done em { opacity: .75; }
+
+.kid h3 { font: 700 19px/1 "Sofia", sans-serif; color: var(--soft); margin: 11px 0 5px; padding-top: 10px; border-top: 1px solid var(--rule); }
+.rows { display: grid; grid-template-columns: 96px 1fr; column-gap: 12px; row-gap: 3px; font: 400 22px/1.25 "SofiaC", sans-serif; }
+.rows .d { color: var(--soft); }
+.rows .d.soon { color: var(--free); font-weight: 700; }
+.rows .d.today { color: var(--ink); font-weight: 800; }
+.rows b { font-weight: 700; }
+.rows .x { color: var(--soft); }
+.rows .warn { color: var(--free); font-weight: 700; }
+.todo { display: grid; grid-template-columns: 26px 1fr auto; column-gap: 10px; row-gap: 4px; font: 500 22px/1.25 "SofiaC", sans-serif; align-items: center; }
+.todo .box { width: 22px; height: 22px; border: 2.5px solid var(--ink); border-radius: 5px; }
+.todo .box.wait { border-style: dashed; border-color: var(--soft); }
+.todo .pts { font-weight: 800; }
+.todo .waiting { color: var(--soft); }
+
+/* ---------- Woche: Zeilen sind Tage, Spalten sind Kalender */
+.week { display: grid; grid-template-columns: 178px 1.2fr 1fr 1fr; grid-auto-rows: min-content; align-content: start; }
+.week > div { padding: 9px 14px 9px 0; border-top: 1px solid var(--rule); min-width: 0; }
+.week .col { border-top: 0; padding: 12px 14px 8px 0; font: 800 26px/1 "SofiaX", sans-serif; letter-spacing: .03em; display: flex; align-items: center; gap: 9px; }
+.week .col i { width: 22px; height: 8px; border-radius: 2px; background: var(--c); }
+.week .day { padding-left: 22px; font: 400 20px/1.2 "SofiaC", sans-serif; color: var(--soft); }
+.week .day { white-space: nowrap; }
+.week .day b { font: 800 25px/1.15 "SofiaC", sans-serif; color: var(--ink); margin-right: 7px; }
+.week .day.free, .week .day.free b { color: var(--free); }
+.week .is-today { background: color-mix(in srgb, var(--ink) 6%, var(--plate)); }
+.ev { display: grid; grid-template-columns: 58px 1fr; column-gap: 8px; font: 600 23px/1.2 "SofiaC", sans-serif; }
+.ev + .ev { margin-top: 5px; }
+.ev .t { font-weight: 400; color: var(--soft); }
+.ev small { display: block; font: 400 18px/1.2 "SofiaC", sans-serif; color: var(--soft); }
+.ev.done, .ev.done .t, .ev.done small { color: var(--faint); font-weight: 400; }
+.allday { font: 600 22px/1.2 "SofiaC", sans-serif; color: var(--soft); }
+.allday.free { color: var(--free); }
+.allday + .ev { margin-top: 5px; }
+.none { color: var(--faint); font: 400 20px/1.3 "SofiaC", sans-serif; }
+
+/* ---------- Einkauf */
+.shop { display: flex; align-items: center; gap: 22px; padding: 0 22px; }
+.shop h2 { font: 800 30px/1 "SofiaX", sans-serif; letter-spacing: .03em; white-space: nowrap; }
+.shop h2 span { font-weight: 400; color: var(--soft); margin-left: 6px; }
+.shop ul { list-style: none; display: flex; flex-wrap: wrap; column-gap: 22px; row-gap: 2px; font: 600 23px/1.3 "SofiaC", sans-serif; max-height: 60px; overflow: hidden; }
+.shop li span { font-weight: 400; color: var(--soft); margin-left: 5px; }
+
+.status { display: flex; justify-content: space-between; font: 400 16px/1 "SofiaC", sans-serif; color: var(--soft); padding: 0 6px; }
+.status i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #2E9E6B; margin-right: 6px; }
+.status span + span { margin-left: 16px; }
+
+.ic { fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.ic .sun { stroke: #E0A000; }
+.ic .drop { stroke: var(--rain); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="cloud" viewBox="0 0 48 48"><path class="ic" d="M14 36h20a8 8 0 0 0 1-16 11 11 0 0 0-21-2 9 9 0 0 0 0 18z"/></symbol>
+  <symbol id="partly" viewBox="0 0 48 48"><g class="ic"><g class="sun"><circle cx="17" cy="16" r="6"/><path d="M17 4v3M5 16h3M8 7l2 2M26 7l-2 2"/></g><path d="M18 40h18a7 7 0 0 0 1-14 10 10 0 0 0-19-2 8 8 0 0 0 0 16z" fill="var(--plate)"/></g></symbol>
+  <symbol id="rain" viewBox="0 0 48 48"><g class="ic"><path d="M14 30h20a8 8 0 0 0 1-16 11 11 0 0 0-21-2 9 9 0 0 0 0 18z"/><path class="drop" d="M17 37l-2 6M25 37l-2 6M33 37l-2 6"/></g></symbol>
+</svg>
+
+<main class="board">
+
+  <header class="top">
+    <div class="clock">13<span class="colon">:</span>18</div>
+    <div class="dateblock">
+      <div class="wd">Mittwoch</div>
+      <div class="dm">30. September</div>
+      <div class="now-wx"><svg><use href="#partly"/></svg><b>14°</b><span>bewölkt, ab 16 Uhr Regen</span></div>
+      <div class="bins"><i></i><span><b>Gelbe Tonne</b> heute Abend rausstellen</span></div>
+    </div>
+  </header>
+
+  <section class="plate band">
+    <div></div>
+    <div class="track axis">
+      <span style="--h:6">6</span><span style="--h:8">8</span><span style="--h:10">10</span><span style="--h:12">12</span><span style="--h:14">14</span><span style="--h:16">16</span><span style="--h:18">18</span><span style="--h:20">20</span><span style="--h:22">22 Uhr</span>
+    </div>
+    <div class="grid-lines"></div>
+
+    <div class="who wx">Wetter</div>
+    <div class="track">
+      <div class="wxslot gone" style="--h:7"><svg><use href="#cloud"/></svg>8°</div>
+      <div class="wxslot gone" style="--h:9"><svg><use href="#cloud"/></svg>10°</div>
+      <div class="wxslot gone" style="--h:11"><svg><use href="#partly"/></svg>12°</div>
+      <div class="wxslot gone" style="--h:13"><svg><use href="#partly"/></svg>14°</div>
+      <div class="wxslot" style="--h:15"><svg><use href="#partly"/></svg>16°</div>
+      <div class="wxslot" style="--h:17"><svg><use href="#rain"/></svg>13°</div>
+      <div class="wxslot" style="--h:19"><svg><use href="#rain"/></svg>11°</div>
+      <div class="wxslot" style="--h:21"><svg><use href="#cloud"/></svg>9°</div>
+      <div class="rainbar" style="--s:16;--e:19.5"></div>
+    </div>
+
+    <div class="who">Lukas</div>
+    <div class="track"><div class="bar c-lukas" style="--s:7.5;--e:14.25">Schule bis 14:15</div></div>
+
+    <div class="who">Hannah</div>
+    <div class="track">
+      <div class="bar c-hannah" style="--s:8;--e:12.5">Schule</div>
+      <div class="bar c-hannah light" style="--s:12.5;--e:15">Hort</div>
+      <div class="bar c-hannah out" style="--s:15;--e:15.2"><span>15:00 Abholung Hort-Ausflug</span></div>
+    </div>
+
+    <div class="who">Familie</div>
+    <div class="track">
+      <div class="bar c-fam out left" style="--s:11;--e:12"><span>Zahnarzt</span></div>
+      <div class="bar c-fam out left" style="--s:18.5;--e:20.5"><span>Elternabend 3b</span></div>
+    </div>
+
+    <div class="who">Mama</div>
+    <div class="track"><div class="bar c-mama" style="--s:16;--e:17.5">Yoga</div></div>
+
+        <div class="nowline"></div>
+  </section>
+
+  <section class="kids">
+    <article class="plate kid c-lukas">
+      <div class="kid-head"><div class="nameplate">LUKAS</div><div class="when">heute, noch 1 Stunde</div></div>
+      <div class="kid-body">
+        <div class="notice">7. Stunde endet 14:15 wegen Dienstberatung</div>
+        <div class="lessons">
+          <span class="t done">07:30</span><span class="done">Mathematik</span><span class="r done">R12</span>
+          <span class="t done">08:25</span><span class="done off"><s>Deutsch</s><em>entfiel</em></span><span class="r done"></span>
+          <span class="t done">09:30</span><span class="done">Englisch</span><span class="r done">R08</span>
+          <span class="t done">10:25</span><span class="done sub">Mathematik<em>statt Sport</em></span><span class="r done">R07</span>
+          <span class="t done">11:30</span><span class="done">Biologie</span><span class="r done">BIO</span>
+          <span class="t done">12:25</span><span class="done sub">Geschichte<em>Vertretung</em></span><span class="r done">R21</span>
+          <span class="t next">13:40</span><span class="next">Informatik</span><span class="r next">PC1</span>
+        </div>
+        <h3>Arbeiten</h3>
+        <div class="rows">
+          <span class="d soon">Fr 2.10.</span><span><b>Englisch</b> Vokabeltest Unit 1</span>
+          <span class="d">Do 8.10.</span><span><b>Mathematik</b> Klassenarbeit Bruchrechnung</span>
+        </div>
+        <h3>Hausaufgaben</h3>
+        <div class="rows">
+          <span class="d today">morgen</span><span><b>Deutsch</b> Arbeitsblatt Kommasetzung S. 2–3</span>
+          <span class="d today">morgen</span><span><b>Mathematik</b> Buch S. 54 Nr. 3a–d</span>
+          <span class="d">Di 6.10.</span><span><b>Englisch</b> Vokabeln Unit 2 lernen</span>
+        </div>
+        <h3>Aufgaben</h3>
+        <div class="todo">
+          <span class="box"></span><span>Zimmer aufräumen</span><span class="pts">5 ★</span>
+          <span class="box wait"></span><span class="waiting">Müll rausbringen, wartet auf Bestätigung</span><span class="pts waiting">3 ★</span>
+        </div>
+      </div>
+    </article>
+
+    <article class="plate kid c-hannah">
+      <div class="kid-head"><div class="nameplate">HANNAH</div><div class="when">nächste 3 Wochen</div></div>
+      <div class="kid-body">
+        <div class="rows">
+          <span class="d today">heute 15:00</span><span><b>Hort-Ausflug</b> Abholung am Hort</span>
+          <span class="d soon">morgen</span><span><b>Sportsachen</b> mitbringen</span>
+          <span class="d">Mi 7.10.</span><span>Diktat</span>
+          <span class="d">Mi 14.10.</span><span>Wandertag Klasse 2</span>
+          <span class="d">Fr 16.10.</span><span>17:00 Elternabend 2b <span class="x">Grundschule</span></span>
+        </div>
+        <h3>Aufgaben</h3>
+        <div class="todo">
+          <span class="box"></span><span>Tisch decken</span><span class="pts">3 ★</span>
+          <span class="box"></span><span>15 Minuten lesen</span><span class="pts">5 ★</span>
+          <span class="box wait"></span><span class="waiting">Ranzen packen, wartet auf Bestätigung</span><span class="pts waiting">2 ★</span>
+        </div>
+        <h3>Mittagessen</h3>
+        <div class="rows">
+          <span class="d">morgen</span><span><b>Nudeln mit Tomatensoße</b> <span class="x">Reibekäse, Obst</span></span>
+          <span class="d">Fr 2.10.</span><span class="warn">Noch nichts bestellt</span>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <section class="plate week">
+    <div class="col"></div>
+    <div class="col c-fam"><i></i>FAMILIE</div>
+    <div class="col c-dienst"><i></i>DIENST</div>
+    <div class="col c-mama"><i></i>MAMA</div>
+
+    <div class="day is-today"><b>Heute</b>Mi 30.9.</div>
+    <div class="is-today">
+      <div class="ev done"><span class="t">07:30</span><span>Lukas zur Schule bringen</span></div>
+      <div class="ev done"><span class="t">11:00</span><span>Zahnarzt</span></div>
+      <div class="ev"><span class="t">18:30</span><span>Elternabend Klasse 3b<small>Grundschule</small></span></div>
+    </div>
+    <div class="is-today"><div class="none">frei</div></div>
+    <div class="is-today"><div class="ev"><span class="t">16:00</span><span>Yoga<small>Studio am Markt</small></span></div></div>
+
+    <div class="day"><b>Morgen</b>Do 1.10.</div>
+    <div><div class="ev"><span class="t">17:00</span><span>Schwimmtraining<small>Stadtbad</small></span></div></div>
+    <div><div class="ev"><span class="t">09:00</span><span>Referatsbesprechung</span></div></div>
+    <div><div class="ev"><span class="t">19:00</span><span>Mädelsabend</span></div></div>
+
+    <div class="day"><b>Freitag</b>2.10.</div>
+    <div></div>
+    <div><div class="ev"><span class="t">14:00</span><span>Rückfahrt Crimmitschau</span></div></div>
+    <div></div>
+
+    <div class="day free"><b>Samstag</b>3.10.</div>
+    <div><div class="allday free">Tag der Deutschen Einheit</div></div><div></div><div></div>
+
+    <div class="day"><b>Montag</b>5.10.</div>
+    <div><div class="allday">Herbstferien</div></div><div></div>
+    <div><div class="ev"><span class="t">08:00</span><span>Kundentermin</span></div></div>
+
+    <div class="day"><b>Dienstag</b>6.10.</div>
+    <div><div class="allday">Herbstferien</div><div class="ev"><span class="t">17:00</span><span>Schwimmtraining<small>Stadtbad</small></span></div></div>
+    <div></div><div></div>
+  </section>
+
+  <section class="plate shop">
+    <h2>EINKAUFEN<span>10</span></h2>
+    <ul>
+      <li>Milch<span>2 l</span></li><li>Brot</li><li>Hähnchen<span>500 g</span></li><li>Äpfel</li><li>Hundefutter<span>trocken</span></li><li>Kaffee</li><li>Eier<span>10</span></li><li>Käse</li><li>Tomaten</li><li>Nudeln</li>
+    </ul>
+  </section>
+
+  <footer class="status">
+    <div><span><i></i>Unraid</span><span><i></i>Internet</span><span><i></i>Familien-App</span></div>
+    <div>Stand 13:18</div>
+  </footer>
+</main>
+<script>
+  const s = new URLSearchParams(location.search).get("scene");
+  if (s) document.documentElement.dataset.scene = s;
+</script>
+</body>
+</html>
