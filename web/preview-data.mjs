@@ -162,6 +162,22 @@ export function demoDashboard(now, opts = {}) {
     updatedAt: iso(now),
   };
 
+  // --- Hannah: fixed timetable (timetable.Card); `calendar` pulls her school calendar into the card
+  const timetables = [{
+    id: "hannah", name: "Hannah", calendar: "Hannah",
+    day: {
+      date: ymd(0),
+      lessons: [
+        lesson(1, "08:00", "08:45", "Mathe", "2b"),
+        lesson(2, "08:55", "09:40", "Deutsch", "2b"),
+        lesson(3, "10:00", "10:45", "Sachunterricht", "2b"),
+        lesson(4, "10:55", "11:40", "Sport", "Halle"),
+        lesson(5, "11:45", "12:30", "Kunst", "2b"),
+      ],
+    },
+    homework: [], exams: [],
+  }];
+
   // --- lunch for Hannah
   const meals = {
     children: [{
@@ -207,6 +223,7 @@ export function demoDashboard(now, opts = {}) {
     weather,
     shopping: { name: "Einkauf", items, updatedAt: iso(now) },
     school,
+    timetables,
     meals,
     waste,
     todos,
