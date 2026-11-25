@@ -71,7 +71,8 @@ function tickClock() {
 
 // hints: plain-language tips for the way to school (morning only)
 function renderWeather(w, hints = []) {
-  const el = $("weather");
+  const el = $("weather"), fc = $("forecast");
+  fc.innerHTML = "";
   if (!w) { el.innerHTML = ""; return; }
   if (!w.current || !w.daily) { el.innerHTML = `<p class="hint">Noch keine Wetterdaten.</p>`; return; }
   const c = w.current;
@@ -84,6 +85,9 @@ function renderWeather(w, hints = []) {
       <b class="wx-temp">${round(c.temp)}°</b>
       <span class="wx-label">${esc(label)}</span>
     </div>
+    ${hints.length ? `<div class="wx-hints">${hints.map(([ic, what]) => `<span class="wx-hint"><span class="ic">${ic}</span>${esc(what)}</span>`).join("")}</div>` : ""}`;
+  // five-day row sits in its own container below the waste line
+  fc.innerHTML = `
     <div class="wx-days">
       ${w.daily.slice(0, 5).map((d) => `
         <div>
@@ -92,8 +96,7 @@ function renderWeather(w, hints = []) {
           <div class="r">${round(d.max)}°<span>${round(d.min)}°</span></div>
           <div class="p">${d.precipProb >= 20 ? d.precipProb + " %" : ""}</div>
         </div>`).join("")}
-    </div>
-    ${hints.length ? `<div class="wx-hints">${hints.map(([ic, what]) => `<span class="wx-hint"><span class="ic">${ic}</span>${esc(what)}</span>`).join("")}</div>` : ""}`;
+    </div>`;
 }
 
 // ------------------------------------------------------------------ weather picture
@@ -188,8 +191,7 @@ function renderWaste(list) {
   }
   const html = bins.map(({ b, day, state }) => {
     const name = esc(b.name);
-    const sentence = esc(wasteSentence(b.name, state, (b.shifted || []).includes(day)));
-    const rest = sentence.startsWith(name) ? sentence.slice(name.length) : ` ${sentence}`;
+    const rest = esc(wasteSentence(b.name, state, (b.shifted || []).includes(day))).slice(name.length);
     return `<span class="bin bin--${state}" style="--c:${esc(b.color)}"><i></i><span><b>${name}</b>${rest}</span></span>`;
   }).join("");
   // render() runs every minute – only touch the DOM on change

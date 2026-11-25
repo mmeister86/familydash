@@ -236,6 +236,7 @@ export function demoDashboard(now, opts = {}) {
     meals,
     waste,
     todos,
+    ...(opts.weatherBg ? { weatherBg: { name: opts.weatherBg, v: 1 } } : {}),
     scene,
     layout: { revision: 0, widgets: demoScenes[sceneId] || [] },
   };

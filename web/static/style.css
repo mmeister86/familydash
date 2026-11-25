@@ -152,19 +152,19 @@ h2 {
   background: none;
   padding: 0 0.35rem;
 }
-.cc-clock, .cc-weather { position: relative; z-index: 1; }
+/* above the photo layer; .cc-clock is display:contents in the wide layout, so its children carry this themselves */
+.time, .dateblock, .cc-weather { position: relative; z-index: 1; }
 .time {
   font-family: "SofiaX", sans-serif;
-  font-size: min(92cqh, 46cqw);
+  font-size: min(50cqh, 46cqw);
   font-weight: 800;
   line-height: 0.74;
   letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
   white-space: nowrap;
   padding-bottom: 0.06em;
 }
-.dateblock { padding: 0.5rem 0 0.2rem; }
-.weekday, .date { font-size: 2rem; letter-spacing: -0.02em; line-height: 1.02; }
+.dateblock { display: flex; align-items: baseline; gap: 0.6rem; padding: 0.4rem 0 0.2rem; }
+.weekday, .date { font-size: 1.8rem; letter-spacing: -0.02em; line-height: 1.02; }
 .weekday { font-weight: 800; }
 .date { font-weight: 300; }
 
@@ -183,8 +183,8 @@ h2 {
   grid-template-columns: repeat(5, 1fr);
   text-align: center;
   gap: 0.2rem;
-  margin-top: 0.7rem;
-  padding-top: 0.6rem;
+  margin-top: 0.5rem;
+  padding-top: 0.3rem;
   border-top: 1px solid var(--line);
 }
 .wx-days .d { font-size: 0.75rem; color: var(--muted); }
@@ -193,7 +193,7 @@ h2 {
 .wx-days .r span { color: var(--muted); margin-left: 0.2rem; }
 .wx-days .p { font-size: 0.68rem; color: var(--rain); min-height: 1em; }
 /* too short for the five-day forecast */
-@container (max-height: 26rem) { .wx-days { display: none; } }
+@container (max-height: 18rem) { .wx-days { display: none; } }
 
 .wx-hints { display: flex; flex-wrap: wrap; gap: 0.3rem 1.2rem; margin-top: 0.7rem; }
 .wx-hint { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.95rem; font-weight: 600; }
@@ -234,13 +234,13 @@ h2 {
   align-items: end;
 }
 .board.wide-top .cc-clock { display: contents; }
-.board.wide-top .time { grid-column: 1; grid-row: 1 / 4; font-size: min(100cqh, 27cqw); }
-.board.wide-top .dateblock { grid-column: 2; grid-row: 2; padding-bottom: 0.6rem; }
+.board.wide-top .time { grid-column: 1; grid-row: 1 / 4; font-size: min(100cqh, 29cqw); }
+.board.wide-top .dateblock { grid-column: 2; grid-row: 2; display: block; padding-bottom: 0.6rem; }
 .board.wide-top .cc-weather { grid-column: 2; grid-row: 3; padding-bottom: 0.7rem; }
-.board.wide-top .weekday, .board.wide-top .date { font-size: 3.55rem; }
-.board.wide-top .wx-now { font-size: 1.5rem; gap: 0.8rem; }
+.board.wide-top .weekday, .board.wide-top .date { font-size: 2.9rem; }
+.board.wide-top .wx-now { font-size: 1.3rem; gap: 0.8rem; }
 .board.wide-top .wx-now .icon { width: 2.5rem; height: 2.5rem; }
-.board.wide-top .bin { font-size: 1.3rem; gap: 0.6rem; }
+.board.wide-top .bin { font-size: 1.2rem; gap: 0.6rem; }
 .board.wide-top .bin i { width: 0.9rem; height: 1.15rem; }
 /* short wide tile (e.g. 12x3): smaller right column */
 @container (max-height: 15rem) {
@@ -532,4 +532,4 @@ body.status-alert .status .k-down { color: var(--danger); }
 /* narrow clock tile: the wide arrangement falls back to the stacked one */
 .board.wide-top .clock-card[data-narrow] { display: flex; flex-direction: column; }
 .board.wide-top .clock-card[data-narrow] .cc-clock { display: block; }
-.board.wide-top .clock-card[data-narrow] .time { font-size: min(92cqh, 46cqw); }
+.board.wide-top .clock-card[data-narrow] .time { font-size: min(50cqh, 46cqw); }

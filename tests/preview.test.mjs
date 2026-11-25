@@ -25,4 +25,6 @@ assert.strictEqual(d.timetables[0].day.date, "2026-09-30");
 assert.ok(d.meals.children.length >= 1 && d.todos.tasks.length >= 3 && d.waste.length >= 1);
 assert.strictEqual(demoDashboard(now, { scene: "night" }).scene.kind, "night");
 assert.deepStrictEqual(Object.keys(demoScenes).sort(), ["afternoon", "day", "evening", "morning"]);
+assert.strictEqual(d.weatherBg, undefined);
+assert.deepStrictEqual(demoDashboard(now, { scene: "afternoon", weatherBg: "x.png" }).weatherBg, { name: "x.png", v: 1 });
 console.log("preview.test.mjs: all assertions passed");
