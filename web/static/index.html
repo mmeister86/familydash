@@ -6,7 +6,7 @@
   <meta name="google" content="notranslate">
   <title>Familiendashboard</title>
   <link rel="stylesheet" href="style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234F8EF7'/><path d='M8 16l8-7 8 7v8H8z' fill='white'/></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2314211B'/><path d='M8 16l8-7 8 7v8H8z' fill='white'/></svg>">
 </head>
 <body>
   <main class="board" id="board">
@@ -15,14 +15,20 @@
     <section class="panel clock-card" id="clock-card">
       <div class="wx-bg" id="wx-bg"></div>
       <div class="cc-clock">
-        <div class="time-row">
-          <div class="time" id="time">--:--</div>
-          <div class="waste" id="waste"></div>
+        <div class="time" id="time">--:--</div>
+        <div class="dateblock">
+          <div class="weekday" id="weekday"></div>
+          <div class="date" id="date"></div>
         </div>
-        <div class="date" id="date"></div>
       </div>
-      <div class="cc-weather weather" id="weather"></div>
+      <div class="cc-weather">
+        <div class="weather" id="weather"></div>
+        <div class="waste" id="waste"></div>
+        <div class="forecast" id="forecast"></div>
+      </div>
     </section>
+
+    <section class="panel dayband" id="dayband"></section>
 
     <section class="panel shopping" id="shopping"></section>
 
@@ -35,6 +41,8 @@
     <section class="photo-frame" id="photo-frame"><img class="ph" alt=""><img class="ph" alt=""></section>
 
     <section class="school-row" id="school"></section>
+
+    <section class="panel week fade" id="week"></section>
 
     <section class="calendars" id="calendars"></section>
   </main>
@@ -52,6 +60,9 @@
   <footer class="status" id="status"></footer>
   <script src="calendar-mapping.js" defer></script>
   <script src="layout.js" defer></script>
+  <script src="wallfmt.js" defer></script>
+  <script src="dayband.js" defer></script>
+  <script src="week.js" defer></script>
   <script src="app.js" defer></script>
 </body>
 </html>

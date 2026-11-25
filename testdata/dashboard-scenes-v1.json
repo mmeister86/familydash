@@ -8,6 +8,7 @@
       "name": "Morgen",
       "kind": "layout",
       "start": { "schoolDay": "06:45", "weekend": "07:30" },
+      "palette": "paper",
       "widgets": [
         {
           "id": "w1",

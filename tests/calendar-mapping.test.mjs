@@ -49,6 +49,7 @@ test("missing binding yields no guessed match", () => {
 // binding for the child — especially when the mapping helper itself failed
 // to load (FamilyCalendarMapping missing).
 
+const wallfmtSrc = readFileSync(new URL("../web/static/wallfmt.js", import.meta.url), "utf8");
 const appSrc = readFileSync(new URL("../web/static/app.js", import.meta.url), "utf8");
 const mappingSrc = readFileSync(new URL("../web/static/calendar-mapping.js", import.meta.url), "utf8");
 
@@ -74,6 +75,7 @@ function loadWall({ withMapping }) {
   };
   vm.createContext(sandbox);
   if (withMapping) vm.runInContext(mappingSrc, sandbox, { filename: "calendar-mapping.js" });
+  vm.runInContext(wallfmtSrc, sandbox, { filename: "wallfmt.js" });
   vm.runInContext(appSrc, sandbox, { filename: "app.js" });
   return { sandbox, html: (id) => elements.get(id)?.innerHTML ?? "" };
 }
@@ -101,7 +103,7 @@ test("central mode without mapping helper attaches no calendar (treat as unmappe
   assert.equal(vm.runInContext("typeof FamilyCalendarMapping", sandbox), "undefined");
   sandbox.renderSchoolRow(renderData({ central: true }), "full");
   const out = html("school");
-  assert.match(out, /panel fade/, "same-name calendar stays a standalone card");
+  assert.match(out, /panel kid fade/, "same-name calendar stays a standalone card");
   assert.doesNotMatch(out, /Termine/, "no name-matched calendar section in the child card");
 });
 
@@ -110,7 +112,7 @@ test("local mode keeps the legacy name match", () => {
   sandbox.renderSchoolRow(renderData({ central: false }), "full");
   const out = html("school");
   assert.match(out, /Termine/, "same-name calendar merges into the child card");
-  assert.doesNotMatch(out, /panel fade/, "no standalone card left behind");
+  assert.doesNotMatch(out, /panel kid fade/, "no standalone card left behind");
 });
 
 test("central mode with mapping helper and binding attaches by stable id", () => {
@@ -121,5 +123,5 @@ test("central mode with mapping helper and binding attaches by stable id", () =>
   sandbox.renderSchoolRow(data, "full");
   const out = html("school");
   assert.match(out, /Termine/, "bound calendar merges into the child card");
-  assert.doesNotMatch(out, /panel fade/, "no standalone card left behind");
+  assert.doesNotMatch(out, /panel kid fade/, "no standalone card left behind");
 });

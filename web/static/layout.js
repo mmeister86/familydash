@@ -11,6 +11,8 @@ const EL = {
   photos: "photo-frame",
   school: "school",
   calendars: "calendars",
+  dayband: "dayband",
+  week: "week",
 };
 
 // resolveLayout places feed widgets onto the grid.
@@ -18,8 +20,8 @@ const EL = {
 // An empty widget hands its tiles to its fallback (when that one has
 // content and isn't placed yet); otherwise the area stays empty. Unknown
 // types are skipped and reported.
-// Returns {placements: [{type, x, y, w, h, narrow}], hidden: [type], unknown: [type]}.
-// narrow flags tiles below 6 columns for compact CSS (data-narrow).
+// Returns {placements: [{type, x, y, w, h, narrow, flat}], hidden: [type], unknown: [type]}.
+// narrow flags tiles below 6 columns for compact CSS (data-narrow); flat flags tiles of two rows or less (data-flat).
 function resolveLayout(widgets, has) {
   const placements = [];
   const hidden = new Set(Object.keys(EL));
@@ -38,7 +40,7 @@ function resolveLayout(widgets, has) {
     if (placed.has(type)) continue;
     placed.add(type);
     hidden.delete(type);
-    placements.push({ type, x: w.x, y: w.y, w: w.w, h: w.h, narrow: w.w < 6 });
+    placements.push({ type, x: w.x, y: w.y, w: w.w, h: w.h, narrow: w.w < 6, flat: w.h <= 2 });
   }
   return { placements, hidden: [...hidden], unknown };
 }

@@ -55,6 +55,7 @@ type Scene struct {
 	Name    string   `json:"name"`
 	Kind    string   `json:"kind"`
 	Start   Start    `json:"start"`
+	Palette string   `json:"palette,omitempty"` // "", "paper" or "board"; never set on night scenes
 	Widgets []Widget `json:"widgets,omitempty"`
 }
 
@@ -99,6 +100,7 @@ type sceneJSON struct {
 	Name    string       `json:"name"`
 	Kind    string       `json:"kind"`
 	Start   Start        `json:"start"`
+	Palette string       `json:"palette"`
 	Widgets []widgetJSON `json:"widgets"`
 }
 
@@ -174,6 +176,9 @@ func validateFeed(raw feedJSON) (Feed, error) {
 		if err := validateStart(rs.ID, rs.Start); err != nil {
 			return Feed{}, err
 		}
+		if rs.Palette != "" && rs.Palette != "paper" && rs.Palette != "board" {
+			return Feed{}, scenesErr("scene %q has unknown palette %q", rs.ID, rs.Palette)
+		}
 		if rs.Kind == "night" {
 			nights++
 			if len(rs.Widgets) > 0 {
@@ -187,7 +192,7 @@ func validateFeed(raw feedJSON) (Feed, error) {
 		if err != nil {
 			return Feed{}, err
 		}
-		feed.Scenes = append(feed.Scenes, Scene{ID: rs.ID, Name: name, Kind: rs.Kind, Start: rs.Start, Widgets: widgets})
+		feed.Scenes = append(feed.Scenes, Scene{ID: rs.ID, Name: name, Kind: rs.Kind, Start: rs.Start, Palette: rs.Palette, Widgets: widgets})
 	}
 	if nights != 1 {
 		return Feed{}, scenesErr("want exactly one night scene, got %d", nights)

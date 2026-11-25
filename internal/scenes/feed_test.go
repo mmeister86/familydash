@@ -91,6 +91,9 @@ func TestParseFixture(t *testing.T) {
 	if feed.Scenes[2].Widgets != nil {
 		t.Errorf("night should have no widgets, got %+v", feed.Scenes[2].Widgets)
 	}
+	if feed.Scenes[0].Palette != "paper" || feed.Scenes[1].Palette != "" {
+		t.Errorf("palettes = %q, %q; want paper, empty", feed.Scenes[0].Palette, feed.Scenes[1].Palette)
+	}
 	if feed.Preview == nil {
 		t.Fatal("preview missing")
 	}
@@ -253,5 +256,30 @@ func TestParseInvalid(t *testing.T) {
 				t.Errorf("error %q should contain %q", err, tc.wantErr)
 			}
 		})
+	}
+}
+
+func TestParsePalette(t *testing.T) {
+	feed := feedMap(t)
+	findScene(t, feed, "morning")["palette"] = "board"
+	findScene(t, feed, "night")["palette"] = "board"
+	parsed, err := ParseScenesFeed(feedBytes(t, feed))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := parsed.Scenes[0].Palette; got != "board" {
+		t.Errorf("morning palette = %q, want board", got)
+	}
+	if got := parsed.Scenes[1].Palette; got != "" {
+		t.Errorf("scene without palette = %q, want empty", got)
+	}
+	if got := parsed.Scenes[2].Palette; got != "" {
+		t.Errorf("night palette = %q, want empty (dropped)", got)
+	}
+
+	findScene(t, feed, "morning")["palette"] = "neon"
+	_, err = ParseScenesFeed(feedBytes(t, feed))
+	if err == nil || !strings.Contains(err.Error(), `unknown palette "neon"`) {
+		t.Errorf("err = %v, want unknown palette \"neon\"", err)
 	}
 }

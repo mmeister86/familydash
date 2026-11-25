@@ -8,12 +8,14 @@ func TestCatalog(t *testing.T) {
 	}
 	want := []WidgetDef{
 		{Type: WidgetClock, MinW: 4, MinH: 3},
-		{Type: WidgetShopping, MinW: 4, MinH: 4},
+		{Type: WidgetShopping, MinW: 4, MinH: 2},
 		{Type: WidgetBriefing, MinW: 4, MinH: 4},
 		{Type: WidgetNews, MinW: 4, MinH: 3},
 		{Type: WidgetPhotos, MinW: 4, MinH: 4},
 		{Type: WidgetSchool, MinW: 6, MinH: 4},
 		{Type: WidgetCalendars, MinW: 6, MinH: 4},
+		{Type: WidgetDayband, MinW: 8, MinH: 4},
+		{Type: WidgetWeek, MinW: 6, MinH: 5},
 	}
 	if len(Catalog) != len(want) {
 		t.Fatalf("catalog = %d entries, want %d", len(Catalog), len(want))

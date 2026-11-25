@@ -110,10 +110,10 @@ Values may be wrapped in quotes (`KEY="value"`) – they are stripped, since `do
 
 ### Layout
 
-Built for a **portrait** wall display. Every time-of-day scene has its own layout (see *Time-of-day scenes*); the calendars always fill the bottom row:
+Built for a **portrait** wall display. Every time-of-day scene has its own layout (see *Time-of-day scenes*); in the older layouts sketched first the calendars fill the bottom row, the afternoon scene has none:
 
 ```
-morning                         day / afternoon                 evening
+morning                         day                             evening
 ┌─────────────┬─────────────┐   ┌─────────────┬─────────────┐   ┌─────────────┬─────────────┐
 │ clock       │ weather pic │   │ clock+wx pic│ Bring! list │   │ clock       │ weather pic │
 ├─────────────┼─────────────┤   ├─────────────┼─────────────┤   ├─────────────┼─────────────┤
@@ -123,6 +123,23 @@ morning                         day / afternoon                 evening
 ├────────┬────┴───┬─────────┤   ├────────┬────┴───┬─────────┤   ├────────┬────┴───┬─────────┤
 │ cal 1  │ cal 2  │ cal 3 … │   │ cal 1  │ cal 2  │ cal 3 … │   │ cal 1  │ cal 2  │ cal 3 … │
 └────────┴────────┴─────────┘   └────────┴────────┴─────────┘   └────────┴────────┴─────────┘
+```
+
+The built-in `afternoon` scene is a different layout (Familienplaner look, full width):
+
+```
+afternoon
+┌───────────────────────────────────────┐
+│ clock (wide)    weekday, date, weather│
+├───────────────────────────────────────┤
+│ day band: weather + every lane, 06-22 │
+├───────────────────┬───────────────────┤
+│ child 1           │ child 2           │
+├───────────────────┴───────────────────┤
+│ week matrix: days x calendars         │
+├───────────────────────────────────────┤
+│ Bring! strip: name + items in one row │
+└───────────────────────────────────────┘
 ```
 
 A section with nothing to show (no photos, no news configured …) hands its space to its neighbour. Without the AI card the
@@ -253,15 +270,18 @@ The board changes its layout with the time of day:
 |---|---|---|
 | `morning` | 06:45 | Timetables of all children in one card with today's lunch (nothing ordered = highlighted: pack more breakfast), AI briefing for today (Bring! without it), news. Weather tips for the way to school („Regenjacke mitnehmen") on school days |
 | `day` | 09:00 | Bring!, photo slideshow, news |
-| `afternoon` | 14:00 | Bring!, one complete card per child (school, to-dos, Termine, lunch) |
+| `afternoon` | 14:00 | Day band (weather and every lane on one time axis), one complete card per child (school, to-dos, Termine, lunch), week matrix (days x calendars), Bring! as a one-row strip |
 | `evening` | 19:00 | AI outlook on tomorrow above the photo slideshow, tomorrow's timetables + lunch in one card |
 | `night` | 21:30 | Everything hidden – only a dimmed clock, date and current weather (icon + temperature), on black or on the `NIGHT_BG` picture |
 
 Morning and evening put the clock on the left and the weather (with its picture) on the right, across the full width;
-day and afternoon use a compact card with the picture behind clock and weather.
+day uses a compact card with the picture behind clock and weather; the afternoon clock is wide and short (12x3).
 
-Try a scene on your laptop with `http://<unraid-ip>:8095/?scene=evening`. Scenes and their sections are defined in `SCENES` in
-`web/static/app.js`, the grid of each scene in `.board.scene-*` in `style.css`.
+The wall comes in two palettes, `paper` (light, default) and `board` (dark; the built-in evening scene). Scenes from the family app pick one with `palette`. Besides the older tiles there are `dayband` (one time axis for weather and all people) and `week` (days as rows, calendars as columns). The Bring! tile flows its items as text and turns into a single strip when it is at most two grid rows tall (minimum 4x2).
+
+Try a scene on your laptop with `http://<unraid-ip>:8095/?scene=evening`. Each scene is a list of widgets with grid
+positions (the built-in ones live in `internal/scenes/defaults.go`, the family app can supply its own); `web/static/layout.js`
+resolves them to grid areas and `applyScene` in `web/static/app.js` places the tiles.
 
 ### AI card (morning briefing / evening outlook)
 
@@ -370,7 +390,7 @@ At night (`SCENE_NIGHT`) the page shows only a dimmed clock. Portrait and landsc
 
 | | |
 |---|---|
-| `GET /api/dashboard` | Everything the frontend needs (JSON), incl. `uptime` and `briefing` |
+| `GET /api/dashboard` | Everything the frontend needs (JSON), incl. `uptime` and `briefing`; `weather.today` holds every hour of the current day, `calendar.people[].color` the person's colour (central calendar feed) |
 | `GET /photos/<path>` | Slideshow files (only those listed in `/api/dashboard`) |
 | `GET /healthz` | Liveness |
 
@@ -383,6 +403,17 @@ set -a; . ./.env; set +a; go run ./cmd/familydash
 ```
 
 Frontend: edit `web/static/*`, restart the binary (files are embedded).
+
+### Preview
+
+Design the wall without any credentials: the preview harness serves the frontend with demo data (the content of the design mockup).
+
+```sh
+node web/preview.mjs --port 8099 [--palette paper|board] [--weather-photo <file>]
+# then open http://127.0.0.1:8099/?scene=afternoon   (morning | day | afternoon | evening | night)
+```
+
+The wall uses Sofia Sans (variable fonts in `web/static/fonts`, SIL Open Font License 1.1, see `OFL.txt` there).
 
 ## Roadmap
 

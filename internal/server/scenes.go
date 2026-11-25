@@ -45,6 +45,7 @@ func (s *Server) resolveScene(now time.Time, override string) scenePayload {
 					Scene: scene.Current{
 						ID: candidate.ID, Name: candidate.Name, Kind: candidate.Kind,
 						SchoolDay: scene.IsSchoolDay(now), Forced: true,
+						Palette: paletteFor(candidate, now),
 					},
 					Layout: sceneLayout{Revision: revision, Widgets: candidate.Widgets},
 				}
@@ -54,22 +55,23 @@ func (s *Server) resolveScene(now time.Time, override string) scenePayload {
 	}
 	if preview := feed.Preview; preview != nil && preview.Until > now.UnixMilli() {
 		until := time.UnixMilli(preview.Until).In(s.cfg.Location)
-		name, kind := preview.SceneID, "layout"
+		name, kind, palette := preview.SceneID, "layout", ""
 		for _, candidate := range feed.Scenes {
 			if candidate.ID == preview.SceneID {
-				name, kind = candidate.Name, candidate.Kind
+				name, kind, palette = candidate.Name, candidate.Kind, paletteFor(candidate, now)
 			}
 		}
 		return scenePayload{
 			Scene: scene.Current{
 				ID: preview.SceneID, Name: name, Kind: kind,
 				Since: until.Add(-previewDuration), Until: until,
-				SchoolDay: scene.IsSchoolDay(now), Preview: true,
+				SchoolDay: scene.IsSchoolDay(now), Preview: true, Palette: palette,
 			},
 			Layout: sceneLayout{Revision: revision, Widgets: preview.Widgets},
 		}
 	}
 	payload := func(cur scene.Current) scenePayload {
+		cur.Palette = scenePalette(feed, cur, now)
 		return scenePayload{
 			Scene:  cur,
 			Layout: sceneLayout{Revision: revision, Widgets: widgetsFor(feed, cur.ID)},
@@ -88,6 +90,46 @@ func (s *Server) resolveScene(now time.Time, override string) scenePayload {
 	}
 	sched.Force = s.sceneProvider.Force()
 	return payload(sched.At(now, s.cfg.Location))
+}
+
+// paletteFor is the palette a layout scene shows: its explicit one, else the
+// default for the hour its schedule starts it today. Night scenes have none.
+func paletteFor(sc scenes.Scene, now time.Time) string {
+	if sc.Kind == "night" {
+		return ""
+	}
+	if sc.Palette != "" {
+		return sc.Palette
+	}
+	start := sc.Start.SchoolDay
+	if !scene.IsSchoolDay(now) {
+		start = sc.Start.Weekend
+	}
+	if start == nil {
+		if start = sc.Start.SchoolDay; start == nil {
+			start = sc.Start.Weekend
+		}
+	}
+	if start != nil {
+		if minute, err := scene.ParseClock(*start); err == nil && minute >= 0 {
+			return scene.DefaultPalette(time.Date(2000, 1, 1, minute/60, minute%60, 0, 0, time.UTC))
+		}
+	}
+	return "paper"
+}
+
+// scenePalette resolves the palette for a scheduled scene; an id the feed
+// does not know (stale provider schedule) falls back to the start time.
+func scenePalette(feed scenes.Feed, cur scene.Current, now time.Time) string {
+	for _, candidate := range feed.Scenes {
+		if candidate.ID == cur.ID {
+			return paletteFor(candidate, now)
+		}
+	}
+	if cur.Kind == "night" {
+		return ""
+	}
+	return scene.DefaultPalette(cur.Since)
 }
 
 func widgetsFor(feed scenes.Feed, id string) []scenes.Widget {

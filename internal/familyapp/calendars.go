@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -36,6 +37,8 @@ const (
 // intervals stay centrally configured.
 const ConvexPollInterval = time.Minute
 
+var personColorRe = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
+
 // ---------------------------------------------------------------- wire types
 
 // The wire structs mirror CalendarFeedV1. Slices and the window are pointers
@@ -49,10 +52,11 @@ type feedWindow struct {
 }
 
 type feedPerson struct {
-	ID   string `json:"id"`
-	Slug string `json:"slug"`
-	Name string `json:"name"`
-	Role string `json:"role"`
+	ID    string `json:"id"`
+	Slug  string `json:"slug"`
+	Name  string `json:"name"`
+	Role  string `json:"role"`
+	Color string `json:"color"` // optional #RRGGBB; absent in older feeds
 }
 
 type feedBinding struct {
@@ -166,6 +170,9 @@ func ParseCalendarFeed(data []byte, loc *time.Location) (calendar.Snapshot, erro
 		if p.Role != "parent" && p.Role != "child" {
 			return calendar.Snapshot{}, feedErr("people[%d]: role %q, want parent|child", i, p.Role)
 		}
+		if !personColorRe.MatchString(p.Color) {
+			p.Color = "" // cosmetic: drop a malformed colour instead of rejecting the feed
+		}
 		if personIDs[p.ID] {
 			return calendar.Snapshot{}, feedErr("duplicate person id %q", p.ID)
 		}
@@ -174,7 +181,7 @@ func ParseCalendarFeed(data []byte, loc *time.Location) (calendar.Snapshot, erro
 		}
 		personIDs[p.ID] = true
 		slugs[p.Slug] = true
-		people = append(people, calendar.Person{ID: p.ID, Slug: p.Slug, Name: p.Name, Role: p.Role})
+		people = append(people, calendar.Person{ID: p.ID, Slug: p.Slug, Name: p.Name, Role: p.Role, Color: p.Color})
 	}
 
 	bindings := make([]calendar.PersonBinding, 0, len(*f.Bindings))

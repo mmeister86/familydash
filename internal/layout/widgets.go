@@ -21,6 +21,8 @@ const (
 	WidgetPhotos    WidgetType = "photos"
 	WidgetSchool    WidgetType = "school"
 	WidgetCalendars WidgetType = "calendars"
+	WidgetDayband   WidgetType = "dayband"
+	WidgetWeek      WidgetType = "week"
 )
 
 // WidgetDef pins one catalog entry: the type and its minimum tile size.
@@ -32,12 +34,14 @@ type WidgetDef struct {
 // Catalog lists every widget type with its minimum size.
 var Catalog = []WidgetDef{
 	{Type: WidgetClock, MinW: 4, MinH: 3},
-	{Type: WidgetShopping, MinW: 4, MinH: 4},
+	{Type: WidgetShopping, MinW: 4, MinH: 2},
 	{Type: WidgetBriefing, MinW: 4, MinH: 4},
 	{Type: WidgetNews, MinW: 4, MinH: 3},
 	{Type: WidgetPhotos, MinW: 4, MinH: 4},
 	{Type: WidgetSchool, MinW: 6, MinH: 4},
 	{Type: WidgetCalendars, MinW: 6, MinH: 4},
+	{Type: WidgetDayband, MinW: 8, MinH: 4},
+	{Type: WidgetWeek, MinW: 6, MinH: 5},
 }
 
 // Lookup returns the catalog entry for a type string.

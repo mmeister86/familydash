@@ -151,7 +151,7 @@ or when the response would exceed 4 MiB (the Go cache is kept then).
   "configurationRevision": 7,       // bumped on every source/mode change; revokes old commit permission
   "generatedAt": 1728123456789,     // feed build time — NOT source freshness
   "window": { "fromDate": "2026-10-03", "toDate": "2026-11-14", "fromMs": 0, "toMs": 0 }, // 42 Berlin days, end exclusive
-  "people": [{ "id": "…", "slug": "lukas", "name": "Lukas", "role": "child" }],
+  "people": [{ "id": "…", "slug": "lukas", "name": "Lukas", "role": "child", "color": "#16a34a" }],  // color optional #RRGGBB; anything else is dropped (the person stays)
   "bindings": [{ "personId": "…", "kind": "besteschule|timetable", "externalId": "…" }],
   "calendars": [{
     "id": "…", "sourceKey": "family", "name": "Familie", "color": "#4F8EF7",
@@ -188,8 +188,9 @@ on `SCENE_*` and built-in layouts.
     "name": "Morgen",
     "kind": "layout|night", // night carries no widgets
     "start": { "schoolDay": "06:45", "weekend": "07:30" }, // "HH:MM" or null = off
+    "palette": "paper", // optional "paper|board" (layout scenes only; ignored on night)
     "widgets": [{
-      "id": "w1", "type": "clock|shopping|briefing|news|photos|school|calendars",
+      "id": "w1", "type": "clock|shopping|briefing|news|photos|school|calendars|dayband|week",
       "x": 0, "y": 0, "w": 12, "h": 4,
       "props": { "wide": true, "hints": true }, // per type; omitted when empty
       "fallback": "shopping", // optional: shown when the widget is empty
@@ -198,6 +199,17 @@ on `SCENE_*` and built-in layouts.
   "preview": { "sceneId": "…", "until": 1791230400000, "widgets": [/* … */] }, // optional: wins until then
 }
 ```
+
+Widget catalog (minimum size in grid columns x rows): clock 4x3, shopping 4x2, briefing 4x4, news 4x3, photos 4x4,
+school 6x4, calendars 6x4, dayband 8x4, week 6x5. A tile at most two rows tall is `flat` (the shopping tile then
+renders as a one-row strip).
+
+The built-in default `afternoon` scene (start 14:00, palette `paper`) is: clock 12x3 at y=0 (`wide: true`,
+`hints: false`), dayband 12x4 at y=3, school 12x8 at y=7 (`mode: "full"`, `mealDay: "today"`), week 12x7 at y=15,
+shopping 12x2 at y=22; widget ids equal their types. The family app seeds the same values.
+
+`palette` is optional and additive: an older family app sends none. Without it the wall derives the palette from
+the scene's start hour ("board" from 18:00 until 05:59, "paper" otherwise) and reports it as `scene.palette`.
 
 A scene runs from its start until the next start the same day; before the first start the last scene of the
 previous day runs on. Go validates strictly, polls every 15 s, replaces its persistent last-good snapshot

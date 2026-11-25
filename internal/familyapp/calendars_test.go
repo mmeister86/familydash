@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"familydash/internal/calendar"
 )
 
 func loadFixture(t *testing.T) []byte {
@@ -305,5 +307,40 @@ func TestOversizeDetected(t *testing.T) {
 	refresh(t, s)
 	if n := len(s.Snapshot().Events); n != 3 {
 		t.Errorf("oversize must preserve last-good: events = %d", n)
+	}
+}
+
+func TestPersonColor(t *testing.T) {
+	fixture := loadFixture(t)
+	var base map[string]any
+	if err := json.Unmarshal(fixture, &base); err != nil {
+		t.Fatal(err)
+	}
+	parse := func(color any, set bool) (calendar.Snapshot, error) {
+		raw, _ := json.Marshal(base)
+		var m map[string]any
+		json.Unmarshal(raw, &m)
+		p0 := m["people"].([]any)[0].(map[string]any)
+		delete(p0, "color")
+		if set {
+			p0["color"] = color
+		}
+		out, _ := json.Marshal(m)
+		return ParseCalendarFeed(out, berlin)
+	}
+	snap, err := parse("#16a34a", true)
+	if err != nil || snap.People[0].Color != "#16a34a" {
+		t.Fatalf("valid colour: %v %+v", err, snap.People)
+	}
+	snap, err = parse(nil, false)
+	if err != nil || snap.People[0].Color != "" {
+		t.Fatalf("missing colour must parse as empty: %v %+v", err, snap.People)
+	}
+	// A cosmetic field must not take the calendars down: drop the colour.
+	for _, bad := range []string{"green", "#12345", "#12345g", "16a34a"} {
+		snap, err := parse(bad, true)
+		if err != nil || len(snap.People) == 0 || snap.People[0].Color != "" {
+			t.Errorf("colour %q: err = %v, people = %+v, want person accepted with empty colour", bad, err, snap.People)
+		}
 	}
 }
