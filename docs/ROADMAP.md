@@ -13,6 +13,7 @@
   last-good cache, builder page in the family app (`/layouts`); replaces `SCENE_*` times and built-in `SCENES`
   (kept as fallback), night keeps its built-in look
 - [x] Remove the legacy to-do source (code, env vars, the CLI and its Rust build stage) once the family app has run for a while
+- [x] Wall redesign "Familienplaner": Sofia Sans, paper/board palettes, wide clock, children's name plates, day band, week matrix, shopping strip, new built-in afternoon scene, `node web/preview.mjs` demo harness
 - [ ] Calendar legend / per-person filter
 - [x] Time-of-day scenes (`SCENE_*`) with focus zone, night = dimmed clock only
 - [x] Photo slideshow (`PHOTOS_DIR`)

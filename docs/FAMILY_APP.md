@@ -190,7 +190,7 @@ on `SCENE_*` and built-in layouts.
     "start": { "schoolDay": "06:45", "weekend": "07:30" }, // "HH:MM" or null = off
     "palette": "paper", // optional "paper|board" (layout scenes only; ignored on night)
     "widgets": [{
-      "id": "w1", "type": "clock|shopping|briefing|news|photos|school|calendars",
+      "id": "w1", "type": "clock|shopping|briefing|news|photos|school|calendars|dayband|week",
       "x": 0, "y": 0, "w": 12, "h": 4,
       "props": { "wide": true, "hints": true }, // per type; omitted when empty
       "fallback": "shopping", // optional: shown when the widget is empty
@@ -199,6 +199,14 @@ on `SCENE_*` and built-in layouts.
   "preview": { "sceneId": "…", "until": 1791230400000, "widgets": [/* … */] }, // optional: wins until then
 }
 ```
+
+Widget catalog (minimum size in grid columns x rows): clock 4x3, shopping 4x2, briefing 4x4, news 4x3, photos 4x4,
+school 6x4, calendars 6x4, dayband 8x4, week 6x5. A tile at most two rows tall is `flat` (the shopping tile then
+renders as a one-row strip).
+
+The built-in default `afternoon` scene (start 14:00, palette `paper`) is: clock 12x3 at y=0 (`wide: true`,
+`hints: false`), dayband 12x4 at y=3, school 12x8 at y=7 (`mode: "full"`, `mealDay: "today"`), week 12x7 at y=15,
+shopping 12x2 at y=22; widget ids equal their types. The family app seeds the same values.
 
 `palette` is optional and additive: an older family app sends none. Without it the wall derives the palette from
 the scene's start hour ("board" from 18:00 until 05:59, "paper" otherwise) and reports it as `scene.palette`.
