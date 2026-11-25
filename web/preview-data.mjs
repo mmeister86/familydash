@@ -67,7 +67,7 @@ export function demoDashboard(now, opts = {}) {
 
   // --- calendar: Familie / Dienst / Mama in columns, Hannah as school calendar
   const calendars = [
-    { id: 0, name: "Familie", color: "#14211B", panel: "column", into: -1 },
+    { id: 0, name: "Familie", color: "#2563eb", panel: "column", into: -1 },
     { id: 1, name: "Dienst", color: "#7A4BD6", panel: "column", into: -1 },
     { id: 2, name: "Mama", color: "#D43F7A", panel: "column", into: -1 },
     { id: 3, name: "Hannah", color: "#F2B705", panel: "school", into: -1 },

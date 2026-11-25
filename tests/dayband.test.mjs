@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 
 const src = readFileSync(new URL("../web/static/dayband.js", import.meta.url), "utf8");
-const { daybandLanes, daybandWeather, daybandRain, daybandNow } = new Function(
-  `${src}; return { daybandLanes, daybandWeather, daybandRain, daybandNow };`,
+const { daybandLanes, daybandWeather, daybandRain, daybandNow, daybandRoom } = new Function(
+  `${src}; return { daybandLanes, daybandWeather, daybandRain, daybandNow, daybandRoom };`,
 )();
 
 const now = new Date(2026, 8, 30, 13, 18);
@@ -146,11 +146,33 @@ const H24 = Array.from({ length: 24 }, (_, h) => ({ time: iso(h), temp: 10 + h, 
   assert.equal(daybandNow(new Date(2026, 8, 30, 6, 0)), 0);
 }
 
-// an outside label that would run into the next bar of its row goes to the other side
+// labels claim space: colliding labels move to a second row
 {
   const l = lanes({ calendars: cals, events: [ev(0, iso(7, 30), iso(8), "Lukas zur Schule bringen"), ev(0, iso(11), iso(12), "Zahnarzt")] })[0];
-  assert.deepEqual(l.segments.map((s) => s.side), ["right", "right"]);
-  const tight = lanes({ calendars: cals, events: [ev(0, iso(10), iso(10, 30), "Zahnarzt"), ev(0, iso(11), iso(11, 30), "Sport")] })[0];
-  assert.deepEqual(tight.segments.map((s) => s.side), ["left", "right"]);
+  assert.equal(l.rows, 2);
+  assert.deepEqual(l.segments.map((s) => [s.row, s.side]), [[0, "right"], [1, "right"]]);
+}
+// short events far apart stay on one row
+{
+  const l = lanes({ calendars: cals, events: [ev(0, iso(8), iso(8, 30), "A"), ev(0, iso(15), iso(15, 30), "B")] })[0];
+  assert.equal(l.rows, 1);
+  assert.deepEqual(l.segments.map((s) => s.row), [0, 0]);
+}
+// three colliding segments: the third lands on row 1 with the label right, nothing throws
+{
+  const l = lanes({ calendars: cals, events: [ev(0, iso(10), iso(10, 30), "Zahnarzt"), ev(0, iso(10, 15), iso(10, 45), "Friseur"), ev(0, iso(10, 20), iso(10, 50), "Sport")] })[0];
+  assert.equal(l.rows, 2);
+  assert.deepEqual(l.segments.map((s) => s.row), [0, 1, 1]);
+  assert.equal(l.segments[2].side, "right");
+}
+// label space stays inside 6..22 and never overlaps a neighbour in its row
+{
+  const l = lanes({ calendars: cals, events: [ev(0, iso(5), iso(6, 30), "Frühstück bei Oma"), ev(0, iso(7, 30), iso(8), "Lukas zur Schule bringen"), ev(0, iso(11), iso(12), "Zahnarzt"), ev(0, iso(21, 30), iso(23), "Spätschicht im Krankenhaus")] })[0];
+  for (const s of l.segments) {
+    const room = daybandRoom(l.segments, s);
+    if (s.side === "in") assert.equal(room, null);
+    else if (s.side === "right") assert.ok(room >= 0 && s.end + room <= 22);
+    else assert.ok(room >= 0 && s.start - room >= 6);
+  }
 }
 console.log("dayband.test.mjs ok");

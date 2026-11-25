@@ -27,15 +27,41 @@ function daybandClip(start, end) {
   return e > s ? { start: s, end: e } : null;
 }
 
-// Label inside the bar when it fits, else right of it, else left of it.
-// prevEnd/nextStart (neighbours in the same row) keep an outside label off
-// the next bar: a right label that would run into it goes left when that is free.
-function daybandSide(label, start, end, prevEnd = -Infinity, nextStart = Infinity) {
-  const need = label.length * DAYBAND_CHAR_W;
-  if (need <= end - start) return "in";
-  if (end + need <= DAYBAND_TO && end + need <= nextStart) return "right";
-  if (start - need >= DAYBAND_FROM && start - need >= prevEnd) return "left";
-  return end + need <= DAYBAND_TO ? "right" : "left";
+// Hours an outside label of this width claims next to a bar.
+function daybandNeed(label) {
+  return label.length * DAYBAND_CHAR_W;
+}
+
+// Space a segment occupies with its label on `side`, within the window.
+function daybandExtent(seg, side) {
+  const need = daybandNeed(seg.label);
+  if (side === "right") return { start: seg.start, end: Math.min(seg.end + need, DAYBAND_TO) };
+  if (side === "left") return { start: Math.max(seg.start - need, DAYBAND_FROM), end: seg.end };
+  return { start: seg.start, end: seg.end };
+}
+
+// Label sides a segment may take, preferred first: inside the bar, right of
+// it, left of it, each only when the label fits the window on that side.
+function daybandSides(seg) {
+  const need = daybandNeed(seg.label);
+  const sides = [];
+  if (need <= seg.end - seg.start) sides.push("in");
+  if (seg.end + need <= DAYBAND_TO) sides.push("right");
+  if (seg.start - need >= DAYBAND_FROM) sides.push("left");
+  return sides;
+}
+
+// Hours available to an outside label up to the next occupied extent of the
+// same row (or the window edge); null for a label inside its bar.
+function daybandRoom(segments, seg) {
+  if (seg.side === "in") return null;
+  const others = segments.filter((o) => o !== seg && o.row === seg.row).map((o) => daybandExtent(o, o.side));
+  if (seg.side === "right") {
+    const next = Math.min(DAYBAND_TO, ...others.filter((e) => e.start >= seg.end).map((e) => e.start));
+    return Math.max(0, next - seg.end);
+  }
+  const prev = Math.max(DAYBAND_FROM, ...others.filter((e) => e.end <= seg.start).map((e) => e.end));
+  return Math.max(0, seg.start - prev);
 }
 
 // Timed events of `events` that touch today's window, as segments.
@@ -64,24 +90,26 @@ function daybandSchoolSegment(day, today) {
   return clip ? { ...clip, label: `Schule bis ${last.end}`, kind: "school" } : null;
 }
 
-// Sorts by start and puts overlapping segments on a second row.
+// Sorts by start and places every segment with its label. A segment claims
+// its bar plus the label space; it takes row 0 when that is free, else row 1,
+// else row 1 anyway with the label to the right (truncated by CSS).
 function daybandLayout(name, color, segs) {
   segs.sort((a, b) => a.start - b.start || a.end - b.end);
-  const rowEnd = [-Infinity, -Infinity];
+  const taken = [[], []];
+  const free = (row, e) => taken[row].every((t) => e.end <= t.start || t.end <= e.start);
   let rows = 1;
-  const placed = segs.map((s) => {
-    const row = rowEnd[0] <= s.start ? 0 : 1;
-    rowEnd[row] = Math.max(rowEnd[row], s.end);
+  const segments = segs.map((s) => {
+    let sides = daybandSides(s);
+    if (!sides.length) sides = [s.start - DAYBAND_FROM > DAYBAND_TO - s.end ? "left" : "right"];
+    let row = 1, side = "right";
+    search: for (const r of [0, 1]) {
+      for (const sd of sides) {
+        if (free(r, daybandExtent(s, sd))) { row = r; side = sd; break search; }
+      }
+    }
+    taken[row].push(daybandExtent(s, side));
     if (row) rows = 2;
-    return { ...s, row };
-  });
-  const segments = placed.map((s, i) => {
-    const mine = placed.filter((o) => o.row === s.row);
-    const k = mine.indexOf(s);
-    return {
-      start: s.start, end: s.end, label: s.label, kind: s.kind, row: s.row,
-      side: daybandSide(s.label, s.start, s.end, mine[k - 1]?.end, mine[k + 1]?.start),
-    };
+    return { start: s.start, end: s.end, label: s.label, kind: s.kind, row, side };
   });
   return { name, color, rows, segments };
 }

@@ -480,7 +480,12 @@ function renderDayband(d) {
     const c = l.color || "var(--text)";
     // inkOn cannot parse a CSS variable: the fallback fill takes the panel colour as text
     const on = c.startsWith("var(") ? "var(--panel)" : inkOn(c);
-    const bars = l.segments.map((s) => `<div class="bar ${s.kind} ${s.side === "in" ? "" : `out ${s.side}`}" style="--s:${s.start};--e:${s.end};--r:${s.row}"><span>${esc(s.label)}</span></div>`).join("");
+    const bars = l.segments.map((s) => {
+      const room = daybandRoom(l.segments, s);
+      // room as a share of the bar's own width (the span's containing block)
+      const rw = room === null ? "" : `;--rw:${(room / (s.end - s.start) * 100).toFixed(1)}%`;
+      return `<div class="bar ${s.kind} ${s.side === "in" ? "" : `out ${s.side}`}" style="--s:${s.start};--e:${s.end};--r:${s.row}${rw}"><span>${esc(s.label)}</span></div>`;
+    }).join("");
     return `<div class="who rows-${l.rows}">${esc(l.name)}</div><div class="track rows-${l.rows}" style="--c:${esc(c)};--on:${esc(on)}">${bars}</div>`;
   };
   const weather = slots.length

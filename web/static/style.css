@@ -590,7 +590,7 @@ body.status-alert .status .k-down { color: var(--danger); }
   padding: 0 0.5rem; white-space: nowrap; overflow: hidden;
 }
 .bar.out { overflow: visible; padding: 0; }
-.bar.out span { position: absolute; left: calc(100% + 0.45rem); color: var(--text); font-weight: 600; }
+.bar.out span { position: absolute; left: calc(100% + 0.45rem); max-width: max(0rem, calc(var(--rw) - 0.45rem)); overflow: hidden; text-overflow: ellipsis; color: var(--text); font-weight: 600; }
 .bar.out.left span { left: auto; right: calc(100% + 0.45rem); }
 .wxslot {
   position: absolute; left: calc((var(--h) - 6) / 16 * 100%); transform: translateX(-50%);
