@@ -40,6 +40,9 @@ func TestCacheRestart(t *testing.T) {
 	if snap.UpdatedAt.UnixMilli() != 1791028680000 {
 		t.Errorf("restarted UpdatedAt = %v, want original provider success time", snap.UpdatedAt)
 	}
+	if len(snap.People) == 0 || snap.People[0].Color == "" {
+		t.Errorf("restarted snapshot lost person colour: %+v", snap.People)
+	}
 	if !snap.Central || snap.ConfigurationRevision != 3 {
 		t.Errorf("restarted snapshot lost central metadata: %+v", snap)
 	}

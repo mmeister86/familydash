@@ -49,6 +49,7 @@ type Weather struct {
 	Location  string    `json:"location,omitempty"`
 	Current   Current   `json:"current"`
 	Hourly    []Hour    `json:"hourly"`
+	Today     []Hour    `json:"today"` // every hour of the local day of now
 	Daily     []Day     `json:"daily"`
 	UpdatedAt time.Time `json:"updatedAt"`
 	Error     string    `json:"error,omitempty"`
@@ -190,6 +191,18 @@ func (s *Service) transform(r *apiResponse, now time.Time) *Weather {
 		isDay := i < len(r.Hourly.IsDay) && r.Hourly.IsDay[i] == 1
 		_, ic := Describe(at(r.Hourly.Code, i), isDay)
 		w.Hourly = append(w.Hourly, Hour{Time: t, Temp: atF(r.Hourly.Temp, i), PrecipProb: at(r.Hourly.PrecipProb, i), Icon: ic})
+	}
+	// the whole local day of now, from the same hourly arrays
+	nowY, nowM, nowD := now.In(s.loc).Date()
+	w.Today = []Hour{}
+	for i, ts := range r.Hourly.Time {
+		t := s.parseLocal(ts)
+		if y, m, d := t.Date(); y != nowY || m != nowM || d != nowD {
+			continue
+		}
+		isDay := i < len(r.Hourly.IsDay) && r.Hourly.IsDay[i] == 1
+		_, ic := Describe(at(r.Hourly.Code, i), isDay)
+		w.Today = append(w.Today, Hour{Time: t, Temp: atF(r.Hourly.Temp, i), PrecipProb: at(r.Hourly.PrecipProb, i), Icon: ic})
 	}
 	for i, date := range r.Daily.Time {
 		lbl, ic := Describe(at(r.Daily.Code, i), true)

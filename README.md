@@ -370,7 +370,7 @@ At night (`SCENE_NIGHT`) the page shows only a dimmed clock. Portrait and landsc
 
 | | |
 |---|---|
-| `GET /api/dashboard` | Everything the frontend needs (JSON), incl. `uptime` and `briefing` |
+| `GET /api/dashboard` | Everything the frontend needs (JSON), incl. `uptime` and `briefing`; `weather.today` holds every hour of the current day, `calendar.people[].color` the person's colour (central calendar feed) |
 | `GET /photos/<path>` | Slideshow files (only those listed in `/api/dashboard`) |
 | `GET /healthz` | Liveness |
 

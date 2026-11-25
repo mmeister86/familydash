@@ -11,8 +11,8 @@
     "toMs": 1794610800000
   },
   "people": [
-    { "id": "user_mama", "slug": "mama", "name": "Mama", "role": "parent" },
-    { "id": "user_lena", "slug": "lena", "name": "Lena", "role": "child" }
+    { "id": "user_mama", "slug": "mama", "name": "Mama", "role": "parent", "color": "#2563eb" },
+    { "id": "user_lena", "slug": "lena", "name": "Lena", "role": "child", "color": "#2563eb" }
   ],
   "bindings": [
     { "personId": "user_lena", "kind": "timetable", "externalId": "lena-7b" }

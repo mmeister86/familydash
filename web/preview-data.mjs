@@ -110,6 +110,15 @@ export function demoDashboard(now, opts = {}) {
     const raining = t.getHours() >= 16 && t.getHours() <= 19;
     return { time: iso(t), temp, precipProb: raining ? 70 : 10, icon: raining ? "rain" : "partly" };
   });
+  // all 24 hours of today: 8 deg at 07:00 up to 16 deg at 15:00, down to 9 deg at 21:00
+  const tempAt = (h) => h <= 7 ? 8 : h <= 15 ? 8 + (h - 7) : h <= 21 ? 16 - Math.round(((h - 15) * 7) / 6) : 9;
+  const today = Array.from({ length: 24 }, (_, h) => {
+    const raining = h >= 16 && h <= 19;
+    return {
+      time: iso(day(0, `${pad(h)}:00`)), temp: tempAt(h), precipProb: raining ? 60 : 10,
+      icon: raining ? "rain" : h >= 7 && h <= 15 ? "partly" : "cloud",
+    };
+  });
   const dailyRaw = [
     [16, 8, 70, 61, "Leichter Regen", "rain"],
     [13, 7, 40, 3, "Bedeckt", "cloud"],
@@ -124,7 +133,7 @@ export function demoDashboard(now, opts = {}) {
   const weather = {
     location: "Chemnitz",
     current: { temp: 14, feels: 12, wind: 11, code: 2, label: "Teilweise bewölkt", icon: "partly", isDay: true },
-    hourly, daily, updatedAt: iso(now),
+    hourly, today, daily, updatedAt: iso(now),
   };
 
   // --- shopping

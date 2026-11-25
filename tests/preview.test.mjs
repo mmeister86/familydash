@@ -12,6 +12,10 @@ assert.ok(d.calendar.events.some((e) => !e.allDay && e.start.startsWith("2026-09
 assert.strictEqual(d.weather.daily.length, 5);
 assert.strictEqual(d.weather.daily[0].date, "2026-09-30");
 assert.ok(d.weather.hourly.length === 12);
+assert.strictEqual(d.weather.today.length, 24);
+assert.strictEqual(d.weather.today[7].temp, 8);
+assert.strictEqual(d.weather.today[15].temp, 16);
+assert.strictEqual(d.weather.today[21].temp, 9);
 assert.ok(d.shopping.items.length === 10);
 assert.strictEqual(d.school.students[0].day.date, "2026-09-30");
 assert.ok(d.school.students[0].day.lessons.length === 7);

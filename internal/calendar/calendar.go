@@ -141,6 +141,9 @@ type Person struct {
 	Slug string `json:"slug"`
 	Name string `json:"name"`
 	Role string `json:"role"` // parent | child
+	// Color is the person's #RRGGBB profile colour; empty when an older
+	// family app does not send one.
+	Color string `json:"color,omitempty"`
 }
 
 // PersonBinding links a person to an external source identity, e.g. a
