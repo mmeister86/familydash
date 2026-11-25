@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 
 const src = readFileSync(new URL("../web/static/wallfmt.js", import.meta.url), "utf8");
-const { rainOutlook, wasteSentence, inkOn, kidColor } = new Function(`${src}; return { rainOutlook, wasteSentence, inkOn, kidColor };`)();
+const { rainOutlook, wasteSentence, inkOn, kidColor, safeColor } = new Function(`${src}; return { rainOutlook, wasteSentence, inkOn, kidColor, safeColor };`)();
 
 const H = (probs) => probs.map((p, i) => ({ time: new Date(2026, 8, 30, i).toISOString(), precipProb: p }));
 const now = new Date(2026, 8, 30, 13, 18);
@@ -38,3 +38,10 @@ assert.equal(k({ calColor: "" }), "#2460D8");
 assert.equal(k({ central: false, calColor: undefined }), "#16a34a"); // meal colour
 assert.equal(k({ central: false, calColor: undefined, mealColor: "" }), "var(--text)"); // fallback
 console.log("wallfmt.test.mjs ok");
+
+// safeColor: only hex colours and the theme tokens may reach a style attribute
+for (const ok of ["#fff", "#16a34a", "#16A34A80", "var(--text)", "var(--accent)", "var(--muted)", "var(--danger)"]) assert.equal(safeColor(ok), ok);
+for (const bad of ["red", "rgb(1,2,3)", "#12", "#16a34a;background:url(x)", "", undefined, null, "var(--other)"]) {
+  assert.equal(safeColor(bad), "var(--text)");
+  assert.equal(safeColor(bad, "var(--muted)"), "var(--muted)");
+}

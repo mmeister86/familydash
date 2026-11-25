@@ -177,6 +177,8 @@ h2 {
 .bin { display: flex; align-items: center; gap: 0.55rem; font-size: 1.05rem; color: var(--muted); }
 .bin b { color: var(--text); font-weight: 700; }
 .bin i { flex: none; width: 0.9rem; height: 1.15rem; border-radius: 3px 3px 5px 5px; background: var(--c); box-shadow: inset 0 0 0 1.5px rgba(0, 0, 0, 0.25); }
+/* today: the bin mark is filled solid, tomorrow: outlined only */
+.bin--tomorrow i { background: transparent; box-shadow: inset 0 0 0 2px var(--c); }
 
 .wx-days {
   display: grid;
@@ -268,7 +270,11 @@ h2 {
 .panel.shopping[data-flat] { -webkit-mask-image: none; mask-image: none; display: flex; align-items: center; gap: 1.25rem; padding: 0 1.25rem; }
 .panel.shopping[data-flat] h2 { margin: 0; font-size: 1.7rem; white-space: nowrap; flex: none; }
 .panel.shopping[data-flat] .shop-items { max-height: 3.45rem; overflow: hidden; }
-.panel.shopping[data-flat] .more, .panel.shopping[data-flat] .hint { display: none; }
+.panel.shopping[data-flat] .more { display: none; }
+/* hint, error and empty state stay readable: one ellipsised line next to the title */
+.panel.shopping[data-flat] .hint, .panel.shopping[data-flat] .empty {
+  flex: 1; min-width: 0; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
 /* ---------- AI card (briefing / outlook) */
 .panel.briefing { display: flex; flex-direction: column; }

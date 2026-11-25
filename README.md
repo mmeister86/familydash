@@ -110,7 +110,7 @@ Values may be wrapped in quotes (`KEY="value"`) – they are stripped, since `do
 
 ### Layout
 
-Built for a **portrait** wall display. Every time-of-day scene has its own layout (see *Time-of-day scenes*); the calendars always fill the bottom row:
+Built for a **portrait** wall display. Every time-of-day scene has its own layout (see *Time-of-day scenes*); in the older layouts sketched first the calendars fill the bottom row, the afternoon scene has none:
 
 ```
 morning                         day                             evening
@@ -279,8 +279,9 @@ day uses a compact card with the picture behind clock and weather; the afternoon
 
 The wall comes in two palettes, `paper` (light, default) and `board` (dark; the built-in evening scene). Scenes from the family app pick one with `palette`. Besides the older tiles there are `dayband` (one time axis for weather and all people) and `week` (days as rows, calendars as columns). The Bring! tile flows its items as text and turns into a single strip when it is at most two grid rows tall (minimum 4x2).
 
-Try a scene on your laptop with `http://<unraid-ip>:8095/?scene=evening`. Scenes and their sections are defined in `SCENES` in
-`web/static/app.js`, the grid of each scene in `.board.scene-*` in `style.css`.
+Try a scene on your laptop with `http://<unraid-ip>:8095/?scene=evening`. Each scene is a list of widgets with grid
+positions (the built-in ones live in `internal/scenes/defaults.go`, the family app can supply its own); `web/static/layout.js`
+resolves them to grid areas and `applyScene` in `web/static/app.js` places the tiles.
 
 ### AI card (morning briefing / evening outlook)
 

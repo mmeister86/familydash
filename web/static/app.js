@@ -13,7 +13,6 @@ const fmt = {
   wdShort: new Intl.DateTimeFormat("de-DE", { weekday: "short" }),
   dayMonth: new Intl.DateTimeFormat("de-DE", { day: "numeric", month: "long" }),
   dayMonthShort: new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit" }),
-  hour: new Intl.DateTimeFormat("de-DE", { hour: "2-digit" }),
 };
 
 let state = { data: null, version: null, lastOk: 0, error: null };
@@ -192,7 +191,7 @@ function renderWaste(list) {
   const html = bins.map(({ b, day, state }) => {
     const name = esc(b.name);
     const rest = esc(wasteSentence(b.name, state, (b.shifted || []).includes(day))).slice(name.length);
-    return `<span class="bin bin--${state}" style="--c:${esc(b.color)}"><i></i><span><b>${name}</b>${rest}</span></span>`;
+    return `<span class="bin bin--${state}" style="--c:${esc(safeColor(b.color))}"><i></i><span><b>${name}</b>${rest}</span></span>`;
   }).join("");
   // render() runs every minute – only touch the DOM on change
   const el = $("waste");
@@ -252,7 +251,7 @@ function lessonRow(l, isToday, isNext) {
 
 // name plate + meta line at the top of a card; the plate fill is the child's colour
 function kidHead(name, color, meta) {
-  const c = color || "var(--text)";
+  const c = safeColor(color);
   // inkOn cannot parse a CSS variable: the fallback plate takes the panel colour as text
   const on = c.startsWith("var(") ? "var(--panel)" : inkOn(c);
   return `<div class="kid-head"><span class="nameplate" style="--c:${esc(c)};--on:${esc(on)}">${esc(name)}</span>${meta ? `<span class="meta">${esc(meta)}</span>` : ""}</div>`;
@@ -477,7 +476,7 @@ function renderDayband(d) {
   if (!lanes.length && !slots.length) { $("dayband").innerHTML = ""; return false; }
   const nowPos = daybandNow(now);
   const lane = (l) => {
-    const c = l.color || "var(--text)";
+    const c = safeColor(l.color);
     // inkOn cannot parse a CSS variable: the fallback fill takes the panel colour as text
     const on = c.startsWith("var(") ? "var(--panel)" : inkOn(c);
     const bars = l.segments.map((s) => {
@@ -489,7 +488,7 @@ function renderDayband(d) {
     return `<div class="who rows-${l.rows}">${esc(l.name)}</div><div class="track rows-${l.rows}" style="--c:${esc(c)};--on:${esc(on)}">${bars}</div>`;
   };
   const weather = slots.length
-    ? `<div class="who wx">Wetter</div><div class="track">${slots.map((s) => `<div class="wxslot${s.past ? " gone" : ""}" style="--h:${s.hour}">${icon(s.icon)}${round(s.temp)}°</div>`).join("")}${daybandRain(hours).map((r) => `<div class="rainbar" style="--s:${r.start};--e:${r.end}"></div>`).join("")}</div>`
+    ? `<div class="who wx">Wetter</div><div class="track">${slots.map((s) => `<div class="wxslot${s.past ? " gone" : ""}" style="--h:${s.hour}">${icon(s.icon)}${round(s.temp)}°</div>`).join("")}${daybandRain(hours, now).map((r) => `<div class="rainbar" style="--s:${r.start};--e:${r.end}"></div>`).join("")}</div>`
     : "";
   $("dayband").innerHTML = `<div class="band" style="--rows:${(slots.length ? 1 : 0) + lanes.reduce((n, l) => n + l.rows, 0)}">
     <div></div><div class="track axis">${DAYBAND_AXIS.map((h) => `<span style="--h:${h}">${h}${h === DAYBAND_TO ? " Uhr" : ""}</span>`).join("")}</div>
@@ -506,7 +505,7 @@ function renderDayband(d) {
 function renderWeek(d) {
   const { columns, rows } = weekRows({ calendars: d.calendar?.calendars || [], events: d.calendar?.events || [], days: d.days || 7, now: new Date() });
   if (!columns.length) { $("week").innerHTML = ""; return false; }
-  const head = `<div class="col"></div>${columns.map((c) => `<div class="col" style="--c:${esc(c.color)}"><i></i>${esc(c.name)}</div>`).join("")}`;
+  const head = `<div class="col"></div>${columns.map((c) => `<div class="col" style="--c:${esc(safeColor(c.color))}"><i></i>${esc(c.name)}</div>`).join("")}`;
   const body = rows.map((r) => {
     const t = r.isToday ? " is-today" : "";
     const cells = r.cells.map((cell) => {
@@ -581,7 +580,7 @@ function mealCard(ch, mealDay) {
 // a column shows one calendar plus any calendars merged into it via
 // CALENDAR_n_COLUMN; entries of merged calendars keep their own color
 function calendarColumn(cal, events, days, merged = []) {
-  const tint = (e) => (e.cal === cal.id ? "" : ` style="--c:${esc(e.color)}"`);
+  const tint = (e) => (e.cal === cal.id ? "" : ` style="--c:${esc(safeColor(e.color))}"`);
   const now = new Date(), today = startOfDay(now);
   let html = "";
   for (let i = 0; i < days; i++) {
@@ -604,9 +603,9 @@ function calendarColumn(cal, events, days, merged = []) {
     if (i === 0 && !allDay.length && !timed.length) html += `<div class="empty">Nichts geplant</div>`;
     html += `</div>`;
   }
-  return `<div class="calcol" style="--c:${esc(cal.color)}">
+  return `<div class="calcol" style="--c:${esc(safeColor(cal.color))}">
     <div class="head"><span class="dot"></span><span class="name">${esc(cal.name)}</span>${merged.map((m) =>
-      `<span class="also" style="--c:${esc(m.color)}"><span class="dot"></span>${esc(m.name)}</span>`).join("")}</div>
+      `<span class="also" style="--c:${esc(safeColor(m.color))}"><span class="dot"></span>${esc(m.name)}</span>`).join("")}</div>
     ${html}
   </div>`;
 }
@@ -706,7 +705,7 @@ function sceneBriefing(d, widgets) {
 
 function briefRow(it) {
   const who = it.who && it.who.toLowerCase() !== "familie"
-    ? `<span class="who" style="--c:${esc(it.color || "var(--muted)")}">${esc(it.who)}</span>` : "";
+    ? `<span class="who" style="--c:${esc(safeColor(it.color, "var(--muted)"))}">${esc(it.who)}</span>` : "";
   return `<div class="bi"><span class="bi-ic">${BRIEF_ICONS[it.icon] || "💡"}</span><span class="bi-t">${who}${esc(it.text)}</span></div>`;
 }
 
@@ -1015,33 +1014,40 @@ async function refreshScene() {
   } catch (e) { /* keep last state; the dashboard poll retries */ }
 }
 
+// Runs one tile renderer; a throw is logged and the tile counts as empty
+// (fallback), so a single broken tile cannot blank the wall.
+function safely(name, fn, fallback) {
+  try { return fn(); } catch (e) { console.error(`render ${name}:`, e); return fallback; }
+}
+
 function render() {
   const d = state.data;
   if (d) {
-    const sc = currentScene(d);
-    const widgets = sceneWidgets(d);
+    const sc = safely("scene", () => currentScene(d), { id: "day", kind: "layout" });
+    const widgets = safely("widgets", () => sceneWidgets(d), []);
     const school = widgets.find((w) => w.type === "school");
-    const brief = sceneBriefing(d, widgets);
-    renderBriefing(brief);
-    slideshow.set(d.photos);
-    const hasDayband = renderDayband(d);
-    const hasWeek = renderWeek(d);
-    const hasSchool = renderSchoolRow(d, school?.props?.mode || "full", school?.props?.mealDay);
-    const hasNews = renderNews(d.news);
-    const hasPhotos = slideshow.has();
-    const visible = applyScene(sc, widgets, {
+    const brief = safely("briefing", () => { const b = sceneBriefing(d, widgets); renderBriefing(b); return b; }, null);
+    safely("photos", () => slideshow.set(d.photos));
+    const hasDayband = safely("dayband", () => renderDayband(d), false);
+    const hasWeek = safely("week", () => renderWeek(d), false);
+    const hasSchool = safely("school", () => renderSchoolRow(d, school?.props?.mode || "full", school?.props?.mealDay), false);
+    const hasNews = safely("news", () => renderNews(d.news), false);
+    const hasPhotos = safely("photos", () => slideshow.has(), false);
+    const visible = safely("scene", () => applyScene(sc, widgets, {
       briefing: !!brief, school: hasSchool, dayband: hasDayband, week: hasWeek, news: hasNews, photos: hasPhotos,
       clock: true, shopping: true, calendars: true,
+    }), new Set());
+    safely("photos", () => (visible.has("photos") && hasPhotos ? slideshow.start() : slideshow.stop()));
+    safely("weather", () => {
+      const hints = widgetProp(widgets, "clock", "hints") === true && sc.schoolDay !== false
+        ? weatherHints(d.weather, ymd(new Date()), 7, 16).filter(([ic]) => ic !== "👍") : [];
+      renderWeather(d.weather, hints);
     });
-    visible.has("photos") && hasPhotos ? slideshow.start() : slideshow.stop();
-    const hints = widgetProp(widgets, "clock", "hints") === true && sc.schoolDay !== false
-      ? weatherHints(d.weather, ymd(new Date()), 7, 16).filter(([ic]) => ic !== "👍") : [];
-    renderWeather(d.weather, hints);
-    renderWeatherBg(d);
-    renderNight(d);
-    renderWaste(d.waste);
-    renderShopping(d.shopping);
-    renderCalendars(d);
+    safely("weather background", () => renderWeatherBg(d));
+    safely("night", () => renderNight(d));
+    safely("waste", () => renderWaste(d.waste));
+    safely("shopping", () => renderShopping(d.shopping));
+    safely("calendars", () => renderCalendars(d));
   }
   renderStatus();
 }

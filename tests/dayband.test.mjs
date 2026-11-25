@@ -132,11 +132,17 @@ const H24 = Array.from({ length: 24 }, (_, h) => ({ time: iso(h), temp: 10 + h, 
 // rain bars
 {
   const rain = (hs) => H24.map((e, h) => ({ ...e, precipProb: hs.includes(h) ? 50 : 49 }));
-  assert.deepEqual(daybandRain(rain([16, 17, 18, 19])), [{ start: 16, end: 20 }]);
-  assert.deepEqual(daybandRain(rain([4, 5, 6, 7])), [{ start: 6, end: 8 }]);
-  assert.deepEqual(daybandRain(rain([8, 9, 14])), [{ start: 8, end: 10 }, { start: 14, end: 15 }]);
-  assert.deepEqual(daybandRain(rain([2, 3])), []);
-  assert.deepEqual(daybandRain(undefined), []);
+  assert.deepEqual(daybandRain(rain([16, 17, 18, 19]), now), [{ start: 16, end: 20 }]);
+  assert.deepEqual(daybandRain(rain([4, 5, 6, 7]), now), [{ start: 6, end: 8 }]);
+  assert.deepEqual(daybandRain(rain([8, 9, 14]), now), [{ start: 8, end: 10 }, { start: 14, end: 15 }]);
+  assert.deepEqual(daybandRain(rain([2, 3]), now), []);
+  assert.deepEqual(daybandRain(undefined, now), []);
+}
+// hours dated yesterday (stale feed just after midnight) are ignored
+{
+  const yday = H24.map((e) => ({ ...e, time: new Date(new Date(e.time).getTime() - 24 * 3600 * 1000).toISOString(), precipProb: 90 }));
+  assert.deepEqual(daybandWeather(yday, now), []);
+  assert.deepEqual(daybandRain(yday, now), []);
 }
 // now line
 {

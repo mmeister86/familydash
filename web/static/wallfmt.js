@@ -48,3 +48,11 @@ function kidColor({ central, people, personId, calColor, mealColor }) {
   const person = central && personId ? (people || []).find((p) => p.id === personId) : null;
   return person?.color || calColor || mealColor || "var(--text)";
 }
+
+// Colour values end up inside style="…" attributes, where attribute escaping
+// is not enough (`red;background:url(…)`). Only hex colours and the theme
+// tokens pass; anything else becomes the fallback.
+function safeColor(value, fallback = "var(--text)") {
+  const v = String(value ?? "").trim();
+  return /^#[0-9a-f]{3,8}$/i.test(v) || /^var\(--(text|accent|muted|danger)\)$/.test(v) ? v : fallback;
+}

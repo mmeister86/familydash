@@ -136,10 +136,19 @@ function daybandLanes({ kids, calendars, events, now }) {
   return lanes;
 }
 
+// weather.today can still hold yesterday's hours for one refresh interval
+// after midnight: keep only entries of `now`'s local date.
+function daybandToday(hours, now) {
+  return (hours || []).filter((h) => {
+    const t = new Date(h.time);
+    return t.getFullYear() === now.getFullYear() && t.getMonth() === now.getMonth() && t.getDate() === now.getDate();
+  });
+}
+
 // hours: weather.today entries. Icon and temperature at 07, 09 ... 21.
 function daybandWeather(hours, now) {
   const byHour = new Map();
-  for (const h of hours || []) byHour.set(new Date(h.time).getHours(), h);
+  for (const h of daybandToday(hours, now)) byHour.set(new Date(h.time).getHours(), h);
   const nowH = now.getHours() + now.getMinutes() / 60;
   const out = [];
   for (let hour = DAYBAND_FROM + 1; hour < DAYBAND_TO; hour += 2) {
@@ -150,8 +159,8 @@ function daybandWeather(hours, now) {
 }
 
 // Runs of hours with rain probability >= 50 %, clipped to the window.
-function daybandRain(hours) {
-  const rainy = (hours || []).filter((h) => h.precipProb >= 50).map((h) => new Date(h.time).getHours()).sort((a, b) => a - b);
+function daybandRain(hours, now) {
+  const rainy = daybandToday(hours, now).filter((h) => h.precipProb >= 50).map((h) => new Date(h.time).getHours()).sort((a, b) => a - b);
   const runs = [];
   for (const h of rainy) {
     const last = runs[runs.length - 1];
