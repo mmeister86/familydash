@@ -42,10 +42,11 @@ func DefaultFeed() Feed {
 				Start:   Start{SchoolDay: sp("14:00"), Weekend: sp("14:00")},
 				Palette: "paper",
 				Widgets: []Widget{
-					{ID: "clock", Type: "clock", X: 0, Y: 0, W: 6, H: 5, Props: &WidgetProps{Wide: bp(false), Hints: bp(false)}},
-					{ID: "shopping", Type: "shopping", X: 6, Y: 0, W: 6, H: 5},
-					{ID: "school", Type: "school", X: 0, Y: 5, W: 12, H: 11, Props: &WidgetProps{Mode: "full", MealDay: "today"}},
-					{ID: "calendars", Type: "calendars", X: 0, Y: 16, W: 12, H: 8},
+					{ID: "clock", Type: "clock", X: 0, Y: 0, W: 12, H: 3, Props: &WidgetProps{Wide: bp(true), Hints: bp(false)}},
+					{ID: "dayband", Type: "dayband", X: 0, Y: 3, W: 12, H: 4},
+					{ID: "school", Type: "school", X: 0, Y: 7, W: 12, H: 8, Props: &WidgetProps{Mode: "full", MealDay: "today"}},
+					{ID: "week", Type: "week", X: 0, Y: 15, W: 12, H: 7},
+					{ID: "shopping", Type: "shopping", X: 0, Y: 22, W: 12, H: 2},
 				},
 			},
 			{

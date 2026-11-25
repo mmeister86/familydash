@@ -67,3 +67,38 @@ func TestDefaultPalettes(t *testing.T) {
 		}
 	}
 }
+
+func TestDefaultAfternoonScene(t *testing.T) {
+	var got Scene
+	for _, s := range DefaultFeed().Scenes {
+		if s.ID == "afternoon" {
+			got = s
+		}
+	}
+	type rect struct {
+		id, typ    string
+		x, y, w, h int
+	}
+	want := []rect{
+		{"clock", "clock", 0, 0, 12, 3},
+		{"dayband", "dayband", 0, 3, 12, 4},
+		{"school", "school", 0, 7, 12, 8},
+		{"week", "week", 0, 15, 12, 7},
+		{"shopping", "shopping", 0, 22, 12, 2},
+	}
+	if len(got.Widgets) != len(want) {
+		t.Fatalf("afternoon widgets = %d, want %d", len(got.Widgets), len(want))
+	}
+	for i, w := range want {
+		g := got.Widgets[i]
+		if g.ID != w.id || g.Type != w.typ || g.X != w.x || g.Y != w.y || g.W != w.w || g.H != w.h {
+			t.Errorf("widget %d = %s/%s %d,%d %dx%d, want %+v", i, g.ID, g.Type, g.X, g.Y, g.W, g.H, w)
+		}
+	}
+	if p := got.Widgets[0].Props; p == nil || p.Wide == nil || !*p.Wide || p.Hints == nil || *p.Hints {
+		t.Errorf("clock props = %+v, want wide:true hints:false", p)
+	}
+	if p := got.Widgets[2].Props; p == nil || p.Mode != "full" || p.MealDay != "today" {
+		t.Errorf("school props = %+v, want mode full, mealDay today", p)
+	}
+}

@@ -213,9 +213,9 @@ function renderShopping(list) {
   const shown = items.slice(0, MAX_SHOPPING);
   el.className = "panel shopping fade";
   el.innerHTML = `
-    <div class="head"><span class="dot" style="--c:#46C28E"></span><span class="name">${esc(list.name || "Einkauf")}</span><span class="meta">${items.length || ""}</span></div>
+    <h2>${esc(list.name || "Einkauf")}${items.length ? `<span>${items.length}</span>` : ""}</h2>
     ${list.error && !items.length ? `<p class="hint">${esc(list.error)}</p>` : shown.length
-      ? `<div class="chips">${shown.map((it) => `<span class="item">${esc(it.name)}${it.spec ? `<small>${esc(it.spec)}</small>` : ""}</span>`).join("")}</div>`
+      ? `<ul class="shop-items">${shown.map((it) => `<li>${esc(it.name)}${it.spec ? `<span>${esc(it.spec)}</span>` : ""}</li>`).join("")}</ul>`
       : `<div class="empty">Nichts zu kaufen ✓</div>`}
     ${items.length > shown.length ? `<div class="more">+ ${items.length - shown.length} weitere</div>` : ""}`;
 }
@@ -278,7 +278,7 @@ function schoolBody(day, isToday) {
 
 // beste.schule or fixed timetable: one card per child, top to bottom
 // school (lessons, exams, homework) → Termine → Essen.
-// opts.color tints the dot, opts.cal/opts.events add the child's school calendar,
+// opts.color fills the name plate, opts.cal/opts.events add the child's school calendar,
 // opts.meal the child's lunch (VielfaltMenü). The school part absorbs any
 // overflow so Termine and Essen always stay visible at the bottom.
 function studentCard(st, opts = {}, mealDay) {
@@ -513,7 +513,7 @@ function renderWeek(d) {
       const empty = !cell.allDay.length && !cell.timed.length;
       const lines = cell.allDay.map((a) => `<div class="allday${r.free ? " free" : ""}">${esc(a.title)}</div>`).join("")
         + cell.timed.map((e) => `<div class="ev${e.past ? " done" : ""}"><span class="t">${esc(e.time)}</span><span>${esc(e.title)}${e.location ? `<small>${esc(e.location)}</small>` : ""}</span></div>`).join("");
-      return `<div class="${t.trim()}">${empty && r.isToday ? `<div class="none">frei</div>` : lines}</div>`;
+      return `<div${t ? ' class="is-today"' : ""}>${empty && r.isToday ? `<div class="none">frei</div>` : lines}</div>`;
     }).join("");
     return `<div class="day${t}${r.free ? " free" : ""}"><b>${esc(r.label)}</b>${esc(r.sub)}</div>${cells}`;
   }).join("");
@@ -662,6 +662,7 @@ function applyScene(sc, widgets, has) {
     el.style.gridColumn = `${p.x + 1} / span ${p.w}`;
     el.style.gridRow = `${p.y + 1} / span ${p.h}`;
     el.toggleAttribute("data-narrow", p.narrow);
+    el.toggleAttribute("data-flat", p.flat);
   }
   for (const type of hidden) $(EL[type]).hidden = true;
   warnUnknownTypes(unknown);

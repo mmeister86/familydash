@@ -34,7 +34,7 @@ type WidgetDef struct {
 // Catalog lists every widget type with its minimum size.
 var Catalog = []WidgetDef{
 	{Type: WidgetClock, MinW: 4, MinH: 3},
-	{Type: WidgetShopping, MinW: 4, MinH: 4},
+	{Type: WidgetShopping, MinW: 4, MinH: 2},
 	{Type: WidgetBriefing, MinW: 4, MinH: 4},
 	{Type: WidgetNews, MinW: 4, MinH: 3},
 	{Type: WidgetPhotos, MinW: 4, MinH: 4},
