@@ -227,20 +227,35 @@ const MAX_EXAMS = 3;
 const MAX_SCHOOL_EVENTS = 8;
 const MAX_CARD_EVENTS = 4; // school calendar entries under a fixed timetable
 
-function lessonRow(l, isToday) {
+function lessonPast(l, isToday) {
+  if (!isToday || !l.end) return false;
+  const [h, m] = l.end.split(":").map(Number);
+  const end = new Date(); end.setHours(h, m, 0, 0);
+  return end <= new Date();
+}
+
+function lessonRow(l, isToday, isNext) {
   const now = new Date();
   const at = (hm) => { const [h, m] = hm.split(":").map(Number); const d = new Date(); d.setHours(h, m, 0, 0); return d; };
-  const past = isToday && l.end && at(l.end) <= now;
+  const past = lessonPast(l, isToday);
   const running = isToday && l.start && l.end && at(l.start) <= now && now < at(l.end);
-  const cls = ["lesson", l.status || "", past ? "past" : "", running ? "now" : ""].join(" ");
-  const badge = (l.status === "cancelled" ? `<span class="tag danger">entfällt</span>` : l.status === "substitution" ? `<span class="tag warn">Vertretung</span>` : "")
-    + (l.tag ? `<span class="tag">${esc(l.tag)}</span>` : "");
+  const cls = ["lesson", l.status || "", past ? "past" : "", running ? "now" : "", isNext ? "next" : ""].join(" ");
+  // status words instead of badges
+  const status = (l.status === "cancelled" ? `<em class="st off">${past ? "entfiel" : "entfällt"}</em>` : l.status === "substitution" ? `<em class="st sub">Vertretung</em>` : "")
+    + (l.tag ? `<em class="st">${esc(l.tag)}</em>` : "");
   return `<div class="${cls}">
-    <span class="nr">${l.nr || ""}</span>
     <span class="t">${esc(l.start || "")}</span>
-    <span class="subj"><span class="s">${esc(l.subject)}</span>${badge}${l.info ? `<span class="info">${esc(l.info)}</span>` : ""}</span>
+    <span class="subj"><span class="s">${esc(l.subject)}</span>${status}${l.info ? `<span class="info">${esc(l.info)}</span>` : ""}</span>
     <span class="room">${esc(l.room || "")}</span>
   </div>`;
+}
+
+// name plate + meta line at the top of a card; the plate fill is the child's colour
+function kidHead(name, color, meta) {
+  const c = color || "var(--text)";
+  // inkOn cannot parse a CSS variable: the fallback plate takes the panel colour as text
+  const on = c.startsWith("var(") ? "var(--panel)" : inkOn(c);
+  return `<div class="kid-head"><span class="nameplate" style="--c:${esc(c)};--on:${esc(on)}">${esc(name)}</span>${meta ? `<span class="meta">${esc(meta)}</span>` : ""}</div>`;
 }
 
 // During holidays the cards read "Du hast Ferien" instead of the timetable
@@ -253,7 +268,12 @@ function onHoliday(day) {
 function schoolBody(day, isToday) {
   return onHoliday(day)
     ? `<div class="empty">Du hast Ferien 🥳🥳🥳</div>`
-    : (day.lessons || []).map((l) => lessonRow(l, isToday)).join("");
+    : (() => {
+        const lessons = day.lessons || [];
+        // the first lesson of today that is neither over nor cancelled
+        const next = isToday ? lessons.findIndex((l) => l.status !== "cancelled" && !lessonPast(l, true)) : -1;
+        return lessons.map((l, i) => lessonRow(l, isToday, i === next)).join("");
+      })();
 }
 
 // beste.schule or fixed timetable: one card per child, top to bottom
@@ -267,21 +287,21 @@ function studentCard(st, opts = {}, mealDay) {
   const exams = (st.exams || []).slice(0, MAX_EXAMS);
   const hw = (st.homework || []).slice(0, MAX_HOMEWORK);
   return `<div class="panel kid">
-    <div class="head"><span class="dot" style="--c:${opts.color ? esc(opts.color) : "var(--accent)"}"></span><span class="name">${esc(st.name || "Schule")}</span>
-      <span class="meta">${day.noSchool ? "" : esc(relDay(day.date))}</span></div>
-    <div class="kid-main">
+    ${kidHead(st.name || "Schule", opts.color, day.noSchool ? "" : relDay(day.date))}
+    <div class="kid-body"><div class="kid-main">
     ${(day.notices || []).map((n) => `<div class="notice">${esc(n)}</div>`).join("")}
     ${schoolBody(day, isToday)}
     ${exams.length ? `<div class="sub-h">Arbeiten</div>${exams.map((e) => `
       <div class="entry exam"><span class="when">${esc(shortDay(e.date))}</span>
-        <span class="what"><b>${esc(e.subject || e.kind || "Arbeit")}</b> ${esc(e.kind && e.subject ? e.kind : "")}${e.text ? ` · <span class="muted">${esc(e.text)}</span>` : ""}</span></div>`).join("")}` : ""}
+        <span class="what"><b>${esc(e.subject || e.kind || "Arbeit")}</b> ${esc(e.kind && e.subject ? e.kind : "")}${e.text ? ` <span class="x">${esc(e.text)}</span>` : ""}</span></div>`).join("")}` : ""}
     ${hw.length ? `<div class="sub-h">Hausaufgaben</div>${hw.map((e) => `
       <div class="entry"><span class="when">${esc(shortDay(e.date))}</span>
-        <span class="what"><b>${esc(e.subject || "")}</b>${e.text ? ` <span class="muted">${esc(e.text)}</span>` : ""}</span></div>`).join("")}` : ""}
+        <span class="what"><b>${esc(e.subject || "")}</b>${e.text ? ` <span class="x">${esc(e.text)}</span>` : ""}</span></div>`).join("")}` : ""}
     </div>
-    ${opts.todos?.length ? `<div class="kid-sec"><div class="sub-h">To-dos</div>${kidTodoRows(opts.todos)}</div>` : ""}
+    ${opts.todos?.length ? `<div class="kid-sec"><div class="sub-h">Aufgaben</div>${kidTodoRows(opts.todos)}</div>` : ""}
     ${opts.cal ? `<div class="kid-sec"><div class="sub-h">Termine</div>${calendarRows(opts.events || [], MAX_CARD_EVENTS) || `<div class="empty">Nichts eingetragen</div>`}</div>` : ""}
     ${showMeal(day, opts.meal, MEAL_DAYS, mealDay) ? `<div class="kid-sec"><div class="sub-h">Essen</div>${mealRows(opts.meal, MEAL_DAYS, mealDay)}</div>` : ""}
+    </div>
   </div>`;
 }
 
@@ -307,16 +327,16 @@ function calendarRows(events, max) {
     const when = shortDay(date) + (e.allDay ? "" : " " + fmt.time.format(new Date(e.start)));
     const cls = diff === 0 ? "today" : diff === 1 ? "soon" : "";
     return `<div class="entry wide ${cls}"><span class="when">${esc(when)}</span>
-      <span class="what">${esc(e.title)}${e.location ? ` <span class="loc">· ${esc(e.location)}</span>` : ""}</span></div>`;
+      <span class="what">${esc(e.title)}${e.location ? ` <span class="x">${esc(e.location)}</span>` : ""}</span></div>`;
   }).join("");
 }
 
 // a calendar with CALENDAR_n_PANEL=school: upcoming entries as a list
 function schoolCalendarCard(cal, events) {
   const rows = calendarRows(events, MAX_SCHOOL_EVENTS);
-  return `<div class="panel fade" style="--c:${esc(cal.color)}">
-    <div class="head"><span class="dot"></span><span class="name">${esc(cal.name)}</span><span class="meta">nächste 3 Wochen</span></div>
-    ${rows || `<div class="empty">Nichts eingetragen</div>`}
+  return `<div class="panel kid fade">
+    ${kidHead(cal.name, cal.color, "nächste 3 Wochen")}
+    <div class="kid-body">${rows || `<div class="empty">Nichts eingetragen</div>`}</div>
   </div>`;
 }
 
@@ -328,13 +348,14 @@ function kidPlan(st, opts, withMeal, mealDay) {
   const day = st.day || {};
   const isToday = day.date === ymd(new Date());
   return `<div class="kid-plan">
-    <div class="head"><span class="dot" style="--c:${opts.color ? esc(opts.color) : "var(--accent)"}"></span><span class="name">${esc(st.name || "Schule")}</span>
-      <span class="meta">${day.noSchool ? "" : esc(relDay(day.date))}</span></div>
-    <div class="kid-main">
-      ${(day.notices || []).map((n) => `<div class="notice">${esc(n)}</div>`).join("")}
-      ${schoolBody(day, isToday)}
+    ${kidHead(st.name || "Schule", opts.color, day.noSchool ? "" : relDay(day.date))}
+    <div class="kid-body">
+      <div class="kid-main">
+        ${(day.notices || []).map((n) => `<div class="notice">${esc(n)}</div>`).join("")}
+        ${schoolBody(day, isToday)}
+      </div>
+      ${withMeal && showMeal(day, opts.meal, 1, mealDay) ? `<div class="kid-sec"><div class="sub-h">Essen</div>${mealRows(opts.meal, 1, mealDay)}</div>` : ""}
     </div>
-    ${withMeal && showMeal(day, opts.meal, 1, mealDay) ? `<div class="kid-sec"><div class="sub-h">Essen</div>${mealRows(opts.meal, 1, mealDay)}</div>` : ""}
   </div>`;
 }
 
@@ -388,14 +409,17 @@ function renderSchoolRow(d, mode, mealDay) {
     if (mine.length) {
       const ids = new Set(mine.map(calIdOf));
       for (const m of mine) usedCals.add(calIdOf(m));
-      Object.assign(opts, { color: mine[0].color, cal: mine[0], events: events.filter((e) => ids.has(evCalIdOf(e))) });
+      Object.assign(opts, { cal: mine[0], events: events.filter((e) => ids.has(evCalIdOf(e))) });
     }
     const mi = meals.findIndex((m, i) => !usedMeals.has(i) && sameKid(m.name, name));
     if (mi >= 0) {
       usedMeals.add(mi);
       opts.meal = meals[mi];
-      opts.color ||= meals[mi].color;
     }
+    // same person id as schoolCalsFor: given, else via the binding
+    const FM = globalThis.FamilyCalendarMapping;
+    const pid = d.calendar?.central ? personId || (FM && sourceId ? FM.personForSource(d.calendar.bindings, sourceKind, sourceId) : null) : null;
+    opts.color = kidColor({ central: d.calendar?.central, people: d.calendar?.people, personId: pid, calColor: opts.cal?.color, mealColor: opts.meal?.color });
     const ownTodos = [];
     for (const t of todos) {
       if (usedTodos.has(t.id)) continue;
@@ -476,9 +500,9 @@ function showMeal(day, meal, max, mealDay) {
 
 // lunch of a child without a school card: a card of its own
 function mealCard(ch, mealDay) {
-  return `<div class="panel" style="--c:${esc(ch.color || "var(--accent)")}">
-    <div class="head"><span class="dot"></span><span class="name">${esc(ch.name)}</span><span class="meta">Mittagessen</span></div>
-    ${mealRows(ch, MEAL_DAYS, mealDay)}
+  return `<div class="panel kid">
+    ${kidHead(ch.name, ch.color, "Mittagessen")}
+    <div class="kid-body">${mealRows(ch, MEAL_DAYS, mealDay)}</div>
   </div>`;
 }
 
@@ -704,18 +728,18 @@ function weatherHints(w, dateStr, fromH, toH) {
 // (afternoon): open (overdue first), then ticked off but not yet confirmed
 // by a parent (⏳), then done – with the task's points.
 
-const CHECK_SVG = `<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.2"/><path class="tick" d="M6.2 10.4l2.5 2.5 5.1-5.6"/></svg>`;
+const CHECK_SVG = `<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="1.4" y="1.4" width="17.2" height="17.2" rx="3.6"/><path class="tick" d="M6.2 10.4l2.5 2.5 5.1-5.6"/></svg>`;
 
 function todoRow(t) {
   const diff = t.deadline ? dayDiff(t.deadline) : null;
-  const due = diff === null ? "" : diff < 0 ? `<span class="tag danger">überfällig</span>`
-    : diff === 0 ? `<span class="tag danger">heute fällig</span>`
-    : diff === 1 ? `<span class="tag warn">morgen fällig</span>` : "";
-  const pending = t.pending && !t.done ? `<span class="tag">⏳ wartet</span>` : "";
-  const points = t.points ? `<span class="tag pts">⭐ ${esc(t.points)}</span>` : "";
+  const due = diff === null ? "" : diff < 0 ? ` <em class="st off">überfällig</em>`
+    : diff === 0 ? ` <em class="st off">heute fällig</em>`
+    : diff === 1 ? ` <em class="st sub">morgen fällig</em>` : "";
+  const waiting = t.pending && !t.done ? `<span class="soft">, wartet auf Bestätigung</span>` : "";
   return `<div class="todo${t.done ? " done" : ""}${t.pending ? " pending" : ""}">
     <span class="box">${CHECK_SVG}</span>
-    <span class="what"><span class="t">${esc(t.title)}</span>${t.done || t.pending ? "" : due}${pending}${points}</span>
+    <span class="what"><span class="t">${esc(t.title)}</span>${waiting}${t.done || t.pending ? "" : due}</span>
+    <span class="pts">${t.points ? `${esc(t.points)} ★` : ""}</span>
   </div>`;
 }
 

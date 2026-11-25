@@ -294,62 +294,77 @@ h2 {
 }
 .notice {
   font-family: "SofiaC", sans-serif;
-  font-size: 0.95rem;
+  font-size: 1.2rem;
   font-weight: 600;
+  line-height: 1.25;
   color: var(--notice-ink);
   background: var(--notice);
   border-radius: 4px;
-  padding: 0.3rem 0.55rem;
+  padding: 0.4rem 0.65rem;
   margin-bottom: 0.45rem;
 }
 .lesson {
   display: grid;
-  grid-template-columns: 1.1rem 2.9rem 1fr auto;
-  gap: 0.5rem;
+  grid-template-columns: 3.55rem 1fr auto;
+  column-gap: 0.7rem;
   align-items: baseline;
-  padding: 0.14rem 0;
+  padding: 0.1rem 0;
   font-family: "SofiaC", sans-serif;
-  font-size: 1.1rem;
+  font-size: 1.3rem;
+  font-weight: 500;
+  line-height: 1.65rem;
 }
-.lesson .nr { color: var(--faint); font-size: 0.9rem; text-align: right; font-variant-numeric: tabular-nums; }
-.lesson .t { color: var(--muted); font-size: 0.95rem; font-variant-numeric: tabular-nums; }
-.lesson .room { color: var(--muted); font-size: 0.95rem; }
-.lesson .info { display: block; color: var(--muted); font-size: 0.9rem; }
-.lesson.past, .lesson.past .t, .lesson.past .room, .lesson.past .nr { color: var(--faint); }
-.lesson.now .s { color: var(--text); font-weight: 800; }
-.lesson.cancelled .s { text-decoration: line-through; color: var(--muted); }
-.lesson.substitution .s { color: var(--warn); }
-.tag {
-  font-size: 0.9rem;
-  font-weight: 700;
-  margin-left: 0.4rem;
-  white-space: nowrap;
-  color: var(--muted);
-}
-.tag.danger { color: var(--danger); }
-.tag.warn { color: var(--warn); }
+.lesson .t { color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+.lesson .room { color: var(--muted); font-weight: 400; font-size: 1.15rem; }
+.lesson .info { display: block; color: var(--muted); font-size: 1.05rem; line-height: 1.3; }
+.lesson.past, .lesson.past .t, .lesson.past .room, .lesson.past .info { color: var(--faint); }
+.lesson.now .s, .lesson.next .s, .lesson.next .t, .lesson.next .room { color: var(--text); font-weight: 800; }
+.lesson.cancelled .s { text-decoration: line-through; text-decoration-thickness: 2px; }
+.st { font-style: normal; font-weight: 700; font-size: 1.15rem; margin-left: 0.45rem; white-space: nowrap; color: var(--muted); }
+.st.off { color: var(--danger); }
+.st.sub { color: var(--warn); }
 
 .sub-h {
   font-family: "Sofia", sans-serif;
   font-size: 1.1rem;
   font-weight: 700;
+  line-height: 1;
   color: var(--muted);
-  margin: 0.7rem 0 0.3rem;
-  padding-top: 0.55rem;
+  margin: 0.65rem 0 0.3rem;
+  padding-top: 0.6rem;
   border-top: 1px solid var(--line);
 }
-.entry { display: grid; grid-template-columns: 4.4rem 1fr; gap: 0.55rem; padding: 0.18rem 0; font-family: "SofiaC", sans-serif; font-size: 1.05rem; line-height: 1.3; }
-.entry .when { color: var(--muted); font-size: 0.95rem; white-space: nowrap; padding-top: 0.1rem; font-variant-numeric: tabular-nums; }
+.entry { display: grid; grid-template-columns: 5.5rem 1fr; column-gap: 0.7rem; padding: 0.1rem 0; font-family: "SofiaC", sans-serif; font-size: 1.25rem; line-height: 1.25; }
+.entry .when { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .entry .what { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.entry.wide { grid-template-columns: 6.2rem 1fr; }
+.entry.wide { grid-template-columns: 8.6rem 1fr; }
 .entry b { font-weight: 700; }
-.entry.exam .when, .entry.soon .when { color: var(--danger); }
+.entry.exam .when, .entry.soon .when { color: var(--danger); font-weight: 700; }
 .entry.today .when { color: var(--text); font-weight: 700; }
-.entry .loc { color: var(--muted); font-size: 0.95rem; }
+.entry .x { color: var(--muted); }
 
-/* one card per child: school part on top takes what's left and fades out,
-   Termine and Essen always stay visible below it */
-.panel.kid { display: flex; flex-direction: column; }
+/* one card per child: the name plate sits flush in the top-left corner, the
+   body below carries the padding. The school part takes what's left and
+   fades out, Termine and Essen always stay visible below it */
+.panel.kid { display: flex; flex-direction: column; padding: 0; }
+.kid-head { display: flex; align-items: stretch; flex: none; }
+.nameplate {
+  background: var(--c);
+  color: var(--on);
+  font-family: "SofiaX", sans-serif;
+  font-size: 2.3rem;
+  font-weight: 800;
+  line-height: 3.3rem;
+  letter-spacing: 0.02em;
+  padding: 0 1.25rem 0 1.15rem;
+  border-radius: 0 0 6px 0;
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kid-head .meta { margin-left: auto; padding: 0 1.15rem; font-family: "SofiaC", sans-serif; font-size: 1.25rem; font-weight: 500; line-height: 3.3rem; color: var(--muted); white-space: nowrap; }
+.kid-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 0.7rem 1.15rem 0.9rem; }
 .kid-main {
   flex: 1 1 auto;
   min-height: 0;
@@ -358,26 +373,26 @@ h2 {
           mask-image: linear-gradient(to bottom, black 85%, transparent);
 }
 .kid-sec { flex: none; }
-.kid-sec .meal .dish { font-size: 1.1rem; }
+.kid-sec .meal .dish { font-size: 1.25rem; }
 
 /* ---------- school lunch (VielfaltMenü) */
 .meal {
   display: grid;
-  grid-template-columns: 5.2rem 1fr;
+  grid-template-columns: 5.5rem 1fr;
   gap: 0.6rem;
   align-items: baseline;
   padding: 0.2rem 0;
   font-family: "SofiaC", sans-serif;
 }
-.meal .when { color: var(--muted); font-size: 0.95rem; font-weight: 700; white-space: nowrap; }
+.meal .when { color: var(--muted); font-size: 1.25rem; font-weight: 500; white-space: nowrap; }
 .meal.today .when { color: var(--text); }
 .meal .what { min-width: 0; }
 .meal .dish {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-  font-size: 1.1rem; line-height: 1.25;
+  font-size: 1.25rem; line-height: 1.25;
 }
-.meal .side { display: block; color: var(--muted); font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.meal .dish.none { color: var(--faint); font-size: 1.05rem; }
+.meal .side { display: block; color: var(--muted); font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meal .dish.none { color: var(--faint); font-size: 1.25rem; }
 /* no lunch today = more breakfast in the bag – make it stand out */
 .meal.today .dish.none { color: var(--warn); font-weight: 600; }
 .meal.today:has(.dish.none) .when { color: var(--warn); }
@@ -423,10 +438,9 @@ h2 {
 .calcol .head .also .dot { width: 0.5rem; height: 0.5rem; }
 
 /* ---------- morning/evening: all children's timetables stacked in one card */
-.panel.kid-stack { display: flex; flex-direction: column; gap: 0.9rem; }
+.panel.kid-stack { display: flex; flex-direction: column; padding: 0; }
 .kid-plan { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
-.kid-plan + .kid-plan { padding-top: 0.9rem; border-top: 2px solid var(--line); }
-.kid-plan .head { margin-bottom: 0.45rem; }
+.kid-plan + .kid-plan { border-top: 2px solid var(--line); }
 .kid-plan .kid-sec .sub-h { margin-top: 0.4rem; }
 
 /* ---------- news (Google News & co.) */
@@ -447,18 +461,21 @@ h2 {
 .headline .src { color: var(--muted); font-size: 0.9rem; margin-top: 0.12rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- to-dos (family app) */
-.todo { font-family: "SofiaC", sans-serif; display: grid; grid-template-columns: 1.5rem 1fr; gap: 0.55rem; align-items: start; padding: 0.24rem 0; }
-.todo .box svg { width: 1.3rem; height: 1.3rem; display: block; margin-top: 0.05rem; }
-.todo .box circle { fill: none; stroke: var(--muted); stroke-width: 1.6; }
-.todo .box .tick { fill: none; stroke: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.todo .what { min-width: 0; font-size: 1.15rem; line-height: 1.3; }
+.todo { font-family: "SofiaC", sans-serif; display: grid; grid-template-columns: 1.4rem 1fr auto; column-gap: 0.6rem; align-items: start; padding: 0.15rem 0; font-size: 1.25rem; font-weight: 500; line-height: 1.25; }
+.todo .box svg { width: 1.25rem; height: 1.25rem; display: block; margin-top: 0.1rem; }
+.todo .box rect { fill: none; stroke: var(--text); stroke-width: 2.2; }
+.todo .box .tick { fill: none; stroke: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.todo .what { min-width: 0; }
 .todo .t { overflow-wrap: anywhere; }
+.todo .soft { color: var(--muted); font-weight: 400; }
+.todo .pts { font-weight: 800; white-space: nowrap; }
 .todo.done, .todo.done .what { color: var(--faint); }
 .todo.done .t { text-decoration: line-through; }
-.todo.done .box circle { fill: var(--good); stroke: var(--good); }
-.todo.done .box .tick { stroke: var(--bg); }
-.todo.pending .what { color: var(--muted); }
-.todo.pending .box circle { stroke: var(--warn); stroke-dasharray: 3 2.4; }
+.todo.done .pts { color: var(--faint); }
+.todo.done .box rect { fill: var(--good); stroke: var(--good); }
+.todo.done .box .tick { stroke: var(--panel); }
+.todo.pending .what, .todo.pending .pts { color: var(--muted); }
+.todo.pending .box rect { stroke: var(--muted); stroke-dasharray: 3.4 2.6; }
 
 /* slideshow: two stacked images crossfading. Opacity only – cheap on the Pi. */
 .photo-frame {
