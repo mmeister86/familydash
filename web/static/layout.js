@@ -11,6 +11,7 @@ const EL = {
   photos: "photo-frame",
   school: "school",
   calendars: "calendars",
+  dayband: "dayband",
 };
 
 // resolveLayout places feed widgets onto the grid.

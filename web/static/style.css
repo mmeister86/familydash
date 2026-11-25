@@ -550,3 +550,61 @@ body.status-alert .status .k-down { color: var(--danger); }
 .board.wide-top .clock-card[data-narrow] { display: flex; flex-direction: column; }
 .board.wide-top .clock-card[data-narrow] .cc-clock { display: block; }
 .board.wide-top .clock-card[data-narrow] .time { font-size: min(50cqh, 46cqw); }
+
+/* ---------- day band: one time axis (06-22) for the weather and every lane */
+.panel.dayband { container-type: size; padding: 0.8rem 1.25rem 0.9rem 0; }
+.band {
+  --gap-r: 0.3rem;
+  /* lanes share the tile height, but a row never exceeds 2.6rem */
+  --u: min(2.6rem, calc((100cqh - 1.5rem - var(--rows) * var(--gap-r)) / var(--rows)));
+  --bh: max(0.5rem, calc(var(--u) - 0.3rem));
+  display: grid; grid-template-columns: 7.55rem minmax(0, 1fr);
+  grid-template-rows: 1.5rem; grid-auto-rows: var(--u);
+  row-gap: var(--gap-r); align-content: start;
+  position: relative; height: 100%; overflow: hidden;
+}
+.band .who {
+  font: 700 min(1.45rem, calc(var(--u) * 0.62))/var(--u) "SofiaC", sans-serif;
+  padding-left: 1.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.band .who.wx { color: var(--muted); font-weight: 500; }
+.band .rows-2 { grid-row: span 2; }
+.track { position: relative; min-width: 0; }
+.axis { font: 600 1.05rem/1.5rem "SofiaC", sans-serif; color: var(--muted); }
+.axis span { position: absolute; white-space: nowrap; left: calc((var(--h) - 6) / 16 * 100%); transform: translateX(-50%); }
+.axis span:first-child { transform: none; }
+.axis span:last-child { transform: translateX(-100%); }
+/* hourly grid behind all lanes */
+.grid-lines {
+  position: absolute; left: 7.55rem; right: 0; top: 1.8rem; bottom: 0; pointer-events: none;
+  background: repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px calc(100% / 8));
+}
+.bar {
+  position: absolute; height: var(--bh);
+  top: calc(var(--r, 0) * (var(--u) + var(--gap-r)) + 0.15rem);
+  left: calc((var(--s) - 6) / 16 * 100%);
+  width: calc((var(--e) - var(--s)) / 16 * 100%);
+  background: var(--c); color: var(--on);
+  border-radius: 4px; box-shadow: 0 0 0 1px var(--panel);
+  font: 700 min(1.2rem, calc(var(--u) * 0.5))/var(--bh) "SofiaC", sans-serif;
+  padding: 0 0.5rem; white-space: nowrap; overflow: hidden;
+}
+.bar.out { overflow: visible; padding: 0; }
+.bar.out span { position: absolute; left: calc(100% + 0.45rem); color: var(--text); font-weight: 600; }
+.bar.out.left span { left: auto; right: calc(100% + 0.45rem); }
+.wxslot {
+  position: absolute; left: calc((var(--h) - 6) / 16 * 100%); transform: translateX(-50%);
+  top: 0; display: flex; align-items: center; gap: 0.25rem; white-space: nowrap;
+  font: 700 min(1.25rem, calc(var(--u) * 0.55))/var(--u) "SofiaC", sans-serif;
+}
+.wxslot .icon { width: min(1.5rem, calc(var(--u) * 0.75)); height: min(1.5rem, calc(var(--u) * 0.75)); flex: none; }
+.wxslot.gone { color: var(--faint); }
+.rainbar {
+  position: absolute; bottom: 0; height: 0.3rem; border-radius: 3px; background: var(--rain);
+  left: calc((var(--s) - 6) / 16 * 100%); width: calc((var(--e) - var(--s)) / 16 * 100%);
+}
+.nowline {
+  position: absolute; left: calc(7.55rem + (100% - 7.55rem) * var(--now)); top: 1.5rem; bottom: 0.1rem;
+  width: 0.2rem; margin-left: -0.1rem; background: var(--text); border-radius: 2px; box-shadow: 0 0 0 0.2rem var(--panel);
+}
+.nowline::before { content: ""; position: absolute; top: -0.2rem; left: -0.3rem; width: 0.8rem; height: 0.8rem; border-radius: 50%; background: var(--text); }

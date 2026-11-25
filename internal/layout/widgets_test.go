@@ -14,6 +14,7 @@ func TestCatalog(t *testing.T) {
 		{Type: WidgetPhotos, MinW: 4, MinH: 4},
 		{Type: WidgetSchool, MinW: 6, MinH: 4},
 		{Type: WidgetCalendars, MinW: 6, MinH: 4},
+		{Type: WidgetDayband, MinW: 8, MinH: 4},
 	}
 	if len(Catalog) != len(want) {
 		t.Fatalf("catalog = %d entries, want %d", len(Catalog), len(want))

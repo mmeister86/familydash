@@ -23,10 +23,10 @@ export const demoScenes = {
     widget("calendars", "calendars", 0, 15, 12, 9),
   ],
   afternoon: [
-    widget("clock", "clock", 0, 0, 6, 5, { wide: false, hints: false }),
-    widget("shopping", "shopping", 6, 0, 6, 5),
-    widget("school", "school", 0, 5, 12, 11, { mode: "full", mealDay: "today" }),
-    widget("calendars", "calendars", 0, 16, 12, 8),
+    widget("clock", "clock", 0, 0, 12, 3, { wide: true, hints: false }),
+    widget("dayband", "dayband", 0, 3, 12, 4),
+    widget("school", "school", 0, 7, 12, 8, { mode: "full", mealDay: "today" }),
+    widget("calendars", "calendars", 0, 15, 12, 9),
   ],
   evening: [
     widget("clock", "clock", 0, 0, 12, 5, { wide: true, hints: false }),

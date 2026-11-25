@@ -396,8 +396,10 @@ function schoolCalsFor(d, name, calName, personId, sourceKind, sourceId, usedCal
 // every mapping, and children without a binding get no guessed calendar.
 // mode: "full" (afternoon: everything, one card per child side by side),
 // "plan" (timetables stacked in one card), "plan-meal" (the same + the next lunch).
-function renderSchoolRow(d, mode, mealDay) {
-  const cals = d.calendar?.calendars || [];
+// Resolves every child's colour, school calendar, meal and to-dos.
+// Returns the [student-or-timetable, opts] pairs plus the calendars and
+// meals they claimed, so the caller can place the leftovers itself.
+function resolveSchoolKids(d) {
   const events = d.calendar?.events || [];
   const meals = d.meals?.children || [];
   const todos = d.todos?.tasks || [];
@@ -432,6 +434,14 @@ function renderSchoolRow(d, mode, mealDay) {
 
   const kids = [...(d.school?.students || []).map((st) => [st, extras(st.name, undefined, st.personId, "besteschule", st.id)]),
                 ...(d.timetables || []).map((t) => [t, extras(t.name, t.calendar, t.personId, "timetable", t.id)])];
+  return { kids, usedCals, usedMeals };
+}
+
+function renderSchoolRow(d, mode, mealDay) {
+  const cals = d.calendar?.calendars || [];
+  const events = d.calendar?.events || [];
+  const meals = d.meals?.children || [];
+  const { kids, usedCals, usedMeals } = resolveSchoolKids(d);
   const lonelyMeals = () => meals.filter((_, i) => !usedMeals.has(i));
 
   let html = "";
@@ -450,6 +460,39 @@ function renderSchoolRow(d, mode, mealDay) {
   }
   $("school").innerHTML = html;
   return !!html;
+}
+
+// ------------------------------------------------------------------ day band
+
+const DAYBAND_AXIS = [6, 8, 10, 12, 14, 16, 18, 20, 22];
+
+// One time axis for the weather and every child's and calendar's day.
+// Returns whether there is anything to show.
+function renderDayband(d) {
+  const now = new Date();
+  const kids = resolveSchoolKids(d).kids.map(([st, opts]) => ({ name: st.name || "Schule", color: opts.color, day: st.day || {}, events: opts.events || [] }));
+  const lanes = daybandLanes({ kids, calendars: d.calendar?.calendars || [], events: d.calendar?.events || [], now });
+  const hours = d.weather?.today || [];
+  const slots = daybandWeather(hours, now);
+  if (!lanes.length && !slots.length) { $("dayband").innerHTML = ""; return false; }
+  const nowPos = daybandNow(now);
+  const lane = (l) => {
+    const c = l.color || "var(--text)";
+    // inkOn cannot parse a CSS variable: the fallback fill takes the panel colour as text
+    const on = c.startsWith("var(") ? "var(--panel)" : inkOn(c);
+    const bars = l.segments.map((s) => `<div class="bar ${s.kind} ${s.side === "in" ? "" : `out ${s.side}`}" style="--s:${s.start};--e:${s.end};--r:${s.row}"><span>${esc(s.label)}</span></div>`).join("");
+    return `<div class="who rows-${l.rows}">${esc(l.name)}</div><div class="track rows-${l.rows}" style="--c:${esc(c)};--on:${esc(on)}">${bars}</div>`;
+  };
+  const weather = slots.length
+    ? `<div class="who wx">Wetter</div><div class="track">${slots.map((s) => `<div class="wxslot${s.past ? " gone" : ""}" style="--h:${s.hour}">${icon(s.icon)}${round(s.temp)}°</div>`).join("")}${daybandRain(hours).map((r) => `<div class="rainbar" style="--s:${r.start};--e:${r.end}"></div>`).join("")}</div>`
+    : "";
+  $("dayband").innerHTML = `<div class="band" style="--rows:${(slots.length ? 1 : 0) + lanes.reduce((n, l) => n + l.rows, 0)}">
+    <div></div><div class="track axis">${DAYBAND_AXIS.map((h) => `<span style="--h:${h}">${h}${h === DAYBAND_TO ? " Uhr" : ""}</span>`).join("")}</div>
+    <div class="grid-lines"></div>
+    ${weather}${lanes.map(lane).join("")}
+    ${nowPos === null ? "" : `<div class="nowline" style="--now:${nowPos}"></div>`}
+  </div>`;
+  return true;
 }
 
 // ------------------------------------------------------------------ school lunch (VielfaltMenü)
@@ -954,11 +997,12 @@ function render() {
     const brief = sceneBriefing(d, widgets);
     renderBriefing(brief);
     slideshow.set(d.photos);
+    const hasDayband = renderDayband(d);
     const hasSchool = renderSchoolRow(d, school?.props?.mode || "full", school?.props?.mealDay);
     const hasNews = renderNews(d.news);
     const hasPhotos = slideshow.has();
     const visible = applyScene(sc, widgets, {
-      briefing: !!brief, school: hasSchool, news: hasNews, photos: hasPhotos,
+      briefing: !!brief, school: hasSchool, dayband: hasDayband, news: hasNews, photos: hasPhotos,
       clock: true, shopping: true, calendars: true,
     });
     visible.has("photos") && hasPhotos ? slideshow.start() : slideshow.stop();
