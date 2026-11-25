@@ -151,7 +151,7 @@ or when the response would exceed 4 MiB (the Go cache is kept then).
   "configurationRevision": 7,       // bumped on every source/mode change; revokes old commit permission
   "generatedAt": 1728123456789,     // feed build time — NOT source freshness
   "window": { "fromDate": "2026-10-03", "toDate": "2026-11-14", "fromMs": 0, "toMs": 0 }, // 42 Berlin days, end exclusive
-  "people": [{ "id": "…", "slug": "lukas", "name": "Lukas", "role": "child", "color": "#16a34a" }],  // color optional #RRGGBB
+  "people": [{ "id": "…", "slug": "lukas", "name": "Lukas", "role": "child", "color": "#16a34a" }],  // color optional #RRGGBB; anything else is dropped (the person stays)
   "bindings": [{ "personId": "…", "kind": "besteschule|timetable", "externalId": "…" }],
   "calendars": [{
     "id": "…", "sourceKey": "family", "name": "Familie", "color": "#4F8EF7",

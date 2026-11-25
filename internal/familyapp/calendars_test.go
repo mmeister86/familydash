@@ -336,10 +336,11 @@ func TestPersonColor(t *testing.T) {
 	if err != nil || snap.People[0].Color != "" {
 		t.Fatalf("missing colour must parse as empty: %v %+v", err, snap.People)
 	}
+	// A cosmetic field must not take the calendars down: drop the colour.
 	for _, bad := range []string{"green", "#12345", "#12345g", "16a34a"} {
-		_, err := parse(bad, true)
-		if err == nil || !strings.Contains(err.Error(), "people[0]: color") {
-			t.Errorf("colour %q: err = %v, want people[0]: color", bad, err)
+		snap, err := parse(bad, true)
+		if err != nil || len(snap.People) == 0 || snap.People[0].Color != "" {
+			t.Errorf("colour %q: err = %v, people = %+v, want person accepted with empty colour", bad, err, snap.People)
 		}
 	}
 }

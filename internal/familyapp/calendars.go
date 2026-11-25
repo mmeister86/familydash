@@ -170,8 +170,8 @@ func ParseCalendarFeed(data []byte, loc *time.Location) (calendar.Snapshot, erro
 		if p.Role != "parent" && p.Role != "child" {
 			return calendar.Snapshot{}, feedErr("people[%d]: role %q, want parent|child", i, p.Role)
 		}
-		if p.Color != "" && !personColorRe.MatchString(p.Color) {
-			return calendar.Snapshot{}, feedErr("people[%d]: color %q, want #RRGGBB", i, p.Color)
+		if !personColorRe.MatchString(p.Color) {
+			p.Color = "" // cosmetic: drop a malformed colour instead of rejecting the feed
 		}
 		if personIDs[p.ID] {
 			return calendar.Snapshot{}, feedErr("duplicate person id %q", p.ID)
