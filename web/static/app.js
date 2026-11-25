@@ -568,6 +568,7 @@ function widgetProp(widgets, type, key) {
 // visible widget types (for the slideshow).
 function applyScene(sc, widgets, has) {
   const night = sc.kind === "night";
+  document.documentElement.dataset.palette = sc.palette === "board" ? "board" : "paper";
   document.body.classList.toggle("scene-night", night);
   $("board").classList.toggle("wide-top", widgetProp(widgets, "clock", "wide") === true && !night);
   const { placements, hidden, unknown } = resolveLayout(widgets, has);
