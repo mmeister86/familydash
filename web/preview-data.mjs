@@ -211,7 +211,7 @@ export function demoDashboard(now, opts = {}) {
     id: sceneId, name, kind,
     since: at(since), until: at(until, sceneId === "night" ? 1 : 0),
     schoolDay: true,
-    ...(opts.palette ? { palette: opts.palette } : {}),
+    palette: opts.palette ?? (sceneId === "evening" ? "board" : "paper"),
   };
 
   return {

@@ -15,7 +15,8 @@ func DefaultFeed() Feed {
 		Scenes: []Scene{
 			{
 				ID: "morning", Name: "Morgen", Kind: "layout",
-				Start: Start{SchoolDay: sp("06:45"), Weekend: sp("07:30")},
+				Start:   Start{SchoolDay: sp("06:45"), Weekend: sp("07:30")},
+				Palette: "paper",
 				Widgets: []Widget{
 					{ID: "clock", Type: "clock", X: 0, Y: 0, W: 12, H: 5, Props: &WidgetProps{Wide: bp(true), Hints: bp(true)}},
 					{ID: "school", Type: "school", X: 0, Y: 5, W: 6, H: 11, Props: &WidgetProps{Mode: "plan-meal", MealDay: "today"}},
@@ -26,7 +27,8 @@ func DefaultFeed() Feed {
 			},
 			{
 				ID: "day", Name: "Tag", Kind: "layout",
-				Start: Start{SchoolDay: sp("09:00"), Weekend: sp("10:00")},
+				Start:   Start{SchoolDay: sp("09:00"), Weekend: sp("10:00")},
+				Palette: "paper",
 				Widgets: []Widget{
 					{ID: "clock", Type: "clock", X: 0, Y: 0, W: 6, H: 5, Props: &WidgetProps{Wide: bp(false), Hints: bp(false)}},
 					{ID: "shopping", Type: "shopping", X: 6, Y: 0, W: 6, H: 5},
@@ -37,7 +39,8 @@ func DefaultFeed() Feed {
 			},
 			{
 				ID: "afternoon", Name: "Nachmittag", Kind: "layout",
-				Start: Start{SchoolDay: sp("14:00"), Weekend: sp("14:00")},
+				Start:   Start{SchoolDay: sp("14:00"), Weekend: sp("14:00")},
+				Palette: "paper",
 				Widgets: []Widget{
 					{ID: "clock", Type: "clock", X: 0, Y: 0, W: 6, H: 5, Props: &WidgetProps{Wide: bp(false), Hints: bp(false)}},
 					{ID: "shopping", Type: "shopping", X: 6, Y: 0, W: 6, H: 5},
@@ -47,7 +50,8 @@ func DefaultFeed() Feed {
 			},
 			{
 				ID: "evening", Name: "Abend", Kind: "layout",
-				Start: Start{SchoolDay: sp("19:00"), Weekend: sp("19:00")},
+				Start:   Start{SchoolDay: sp("19:00"), Weekend: sp("19:00")},
+				Palette: "board",
 				Widgets: []Widget{
 					{ID: "clock", Type: "clock", X: 0, Y: 0, W: 12, H: 5, Props: &WidgetProps{Wide: bp(true), Hints: bp(false)}},
 					{ID: "briefing", Type: "briefing", X: 0, Y: 5, W: 6, H: 6, Props: &WidgetProps{Kind: "tomorrow"}},

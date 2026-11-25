@@ -122,3 +122,20 @@ func TestParseClock(t *testing.T) {
 		}
 	}
 }
+
+func TestDefaultPalette(t *testing.T) {
+	loc, _ := time.LoadLocation("Europe/Berlin")
+	cases := map[string]string{
+		"18:00": "board", "21:29": "board", "00:30": "board", "05:59": "board",
+		"06:00": "paper", "09:00": "paper", "17:59": "paper",
+	}
+	for hm, want := range cases {
+		since, err := time.ParseInLocation("15:04", hm, loc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := DefaultPalette(since); got != want {
+			t.Errorf("DefaultPalette(%s) = %q, want %q", hm, got, want)
+		}
+	}
+}

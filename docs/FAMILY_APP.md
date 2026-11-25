@@ -188,6 +188,7 @@ on `SCENE_*` and built-in layouts.
     "name": "Morgen",
     "kind": "layout|night", // night carries no widgets
     "start": { "schoolDay": "06:45", "weekend": "07:30" }, // "HH:MM" or null = off
+    "palette": "paper", // optional "paper|board" (layout scenes only; ignored on night)
     "widgets": [{
       "id": "w1", "type": "clock|shopping|briefing|news|photos|school|calendars",
       "x": 0, "y": 0, "w": 12, "h": 4,
@@ -198,6 +199,9 @@ on `SCENE_*` and built-in layouts.
   "preview": { "sceneId": "…", "until": 1791230400000, "widgets": [/* … */] }, // optional: wins until then
 }
 ```
+
+`palette` is optional and additive: an older family app sends none. Without it the wall derives the palette from
+the scene's start hour ("board" from 18:00 until 05:59, "paper" otherwise) and reports it as `scene.palette`.
 
 A scene runs from its start until the next start the same day; before the first start the last scene of the
 previous day runs on. Go validates strictly, polls every 15 s, replaces its persistent last-good snapshot

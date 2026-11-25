@@ -58,3 +58,12 @@ func TestDefaultFeedFillsGrid(t *testing.T) {
 		}
 	}
 }
+
+func TestDefaultPalettes(t *testing.T) {
+	want := map[string]string{"morning": "paper", "day": "paper", "afternoon": "paper", "evening": "board", "night": ""}
+	for _, sc := range DefaultFeed().Scenes {
+		if sc.Palette != want[sc.ID] {
+			t.Errorf("%s palette = %q, want %q", sc.ID, sc.Palette, want[sc.ID])
+		}
+	}
+}

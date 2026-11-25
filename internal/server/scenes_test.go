@@ -413,3 +413,59 @@ func TestDashboardSceneQuery(t *testing.T) {
 		t.Errorf("unknown scene status = %d, want 200", unknown.Code)
 	}
 }
+
+func paletteFeed(extra string) []byte {
+	return []byte(`{"version":1,"revision":1,"grid":{"cols":12,"rows":24},"scenes":[
+		{"id":"morning","name":"Morgen","kind":"layout","start":{"schoolDay":"09:00","weekend":"09:00"},"widgets":[]},
+		{"id":"late","name":"Spaet","kind":"layout","start":{"schoolDay":"19:00","weekend":"19:00"},"widgets":[]},
+		{"id":"pinned","name":"Fest","kind":"layout","start":{"schoolDay":"14:00","weekend":"14:00"},"palette":"board","widgets":[]},
+		{"id":"night","name":"Nacht","kind":"night","start":{"schoolDay":"21:30","weekend":"21:30"}}]` + extra + `}`)
+}
+
+func TestResolveScenePalette(t *testing.T) {
+	s := sceneTestServer(t, paletteFeed(""))
+	at := func(hm string) string {
+		now, _ := time.ParseInLocation("2006-01-02 15:04", "2026-10-12 "+hm, berlin(t))
+		return s.resolveScene(now, "").Scene.Palette
+	}
+	if got := at("09:30"); got != "paper" {
+		t.Errorf("09:00 scene without palette = %q, want paper", got)
+	}
+	if got := at("19:30"); got != "board" {
+		t.Errorf("19:00 scene without palette = %q, want board", got)
+	}
+	if got := at("14:30"); got != "board" {
+		t.Errorf("explicit palette = %q, want board", got)
+	}
+	if got := at("22:00"); got != "" {
+		t.Errorf("night palette = %q, want empty", got)
+	}
+	now, _ := time.ParseInLocation("2006-01-02 15:04", "2026-10-12 10:00", berlin(t))
+	if got := s.resolveScene(now, "late").Scene.Palette; got != "board" {
+		t.Errorf("override palette = %q, want board", got)
+	}
+}
+
+func TestResolveScenePreviewPalette(t *testing.T) {
+	now := time.Now()
+	until := now.Add(90 * time.Second).UnixMilli()
+	for id, want := range map[string]string{"late": "board", "morning": "paper", "pinned": "board"} {
+		extra := fmt.Sprintf(`,"preview":{"sceneId":%q,"until":%d,"widgets":[]}`, id, until)
+		s := sceneTestServer(t, paletteFeed(extra))
+		if got := s.resolveScene(now, "").Scene.Palette; got != want {
+			t.Errorf("preview %s palette = %q, want %q", id, got, want)
+		}
+	}
+}
+
+func TestResolveSceneFallbackPalette(t *testing.T) {
+	s := &Server{cfg: &config.Config{Location: berlin(t)}, sceneProvider: fallbackSceneProvider(t)}
+	now, _ := time.ParseInLocation("2006-01-02 15:04", "2026-10-12 19:30", berlin(t))
+	if got := s.resolveScene(now, "").Scene.Palette; got != "board" {
+		t.Errorf("evening fallback palette = %q, want board", got)
+	}
+	now, _ = time.ParseInLocation("2006-01-02 15:04", "2026-10-12 10:00", berlin(t))
+	if got := s.resolveScene(now, "").Scene.Palette; got != "paper" {
+		t.Errorf("day fallback palette = %q, want paper", got)
+	}
+}

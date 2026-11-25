@@ -67,6 +67,17 @@ type Current struct {
 	SchoolDay bool      `json:"schoolDay"` // Mon–Fri; public holidays/vacations: TODO
 	Forced    bool      `json:"forced,omitempty"`
 	Preview   bool      `json:"preview,omitempty"` // wall shows a 2-minute preview, not the schedule
+	Palette   string    `json:"palette,omitempty"` // "paper" or "board" for layout scenes, empty for night
+}
+
+// DefaultPalette is the palette a scene without an explicit one gets:
+// "board" for scenes starting in the evening or night hours (18:00-05:59 in
+// since's own location), "paper" otherwise.
+func DefaultPalette(since time.Time) string {
+	if h := since.Hour(); h >= 18 || h < 6 {
+		return "board"
+	}
+	return "paper"
 }
 
 // ParseClock parses "HH:MM" (also "H:MM", "HH.MM") into minutes of the day.
