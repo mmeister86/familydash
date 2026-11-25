@@ -398,43 +398,41 @@ var (
 	regularStatus   = map[string]bool{"initial": true, "hold": true, "regular": true, "": true}
 )
 
+// applySubstitutions merges the day's plan entries into the weekly lessons.
+// A period can have several entries (e.g. one group's lesson cancelled while
+// another lesson takes place), so cancellations are applied first and
+// everything else afterwards: an entry that says a lesson takes place always
+// wins over a cancellation of the same period, whatever order the API lists
+// them in.
 func applySubstitutions(day *Day, subDay obj, tt *timetable, ctx *studentCtx) {
+	var cancels, others []obj
 	for _, it := range asList(subDay["lessons"]) {
 		sl, ok := it.(obj)
 		if !ok || !ctx.matches(sl) {
 			continue
 		}
+		if isCancellation(sl) {
+			cancels = append(cancels, sl)
+		} else {
+			others = append(others, sl)
+		}
+	}
+	for _, sl := range append(cancels, others...) {
 		nr, ok := toInt(firstOf(sl, nrKeys...))
 		if !ok {
 			continue
 		}
-		status := strings.ToLower(strings.TrimSpace(firstScalar(sl, []string{"status"})))
-		notes := ""
-		if n := sl["notes"]; n != nil {
-			var parts []string
-			for _, x := range asList(n) {
-				if t := noteText(x); t != "" {
-					parts = append(parts, t)
-				}
-			}
-			if s, ok := n.(string); ok {
-				parts = append(parts, strings.TrimSpace(s))
-			}
-			notes = strings.Join(parts, " · ")
-		}
+		status := entryStatus(sl)
+		notes := entryNotes(sl)
 		lowNotes := strings.ToLower(notes)
 		subject := directText(sl, subjectKeys, text)
-
-		idx := -1
-		for i, l := range day.Lessons {
-			if l.Nr == nr {
-				idx = i
-				break
-			}
-		}
+		idx := findLesson(day.Lessons, nr, subject)
+		// A regular entry for a period whose lesson was just cancelled means
+		// the period takes place after all (e.g. another group's lesson).
+		revives := idx >= 0 && day.Lessons[idx].Status == "cancelled"
 
 		switch {
-		case cancelledStatus[status] || containsAny(lowNotes, "ausfall", "entfällt", "entfaellt", "cancel"):
+		case isCancellation(sl):
 			if idx >= 0 {
 				day.Lessons[idx].Status = "cancelled"
 				day.Lessons[idx].Info = notes
@@ -444,7 +442,7 @@ func applySubstitutions(day *Day, subDay obj, tt *timetable, ctx *studentCtx) {
 				day.Lessons = append(day.Lessons, l)
 			}
 
-		case substStatus[status] || containsAny(lowNotes, "vertret", "ersatz", "verlegt", "raumänderung") || !regularStatus[status]:
+		case revives || substStatus[status] || containsAny(lowNotes, "vertret", "ersatz", "verlegt", "raumänderung") || !regularStatus[status]:
 			var orig Lesson
 			if idx >= 0 {
 				orig = day.Lessons[idx]
@@ -452,6 +450,7 @@ func applySubstitutions(day *Day, subDay obj, tt *timetable, ctx *studentCtx) {
 				orig = newSlot(nr, "", tt)
 			}
 			l := orig
+			l.Info = ""
 			if subject != "" {
 				l.Subject = subject
 			}
@@ -490,6 +489,50 @@ func applySubstitutions(day *Day, subDay obj, tt *timetable, ctx *studentCtx) {
 			}
 		}
 	}
+}
+
+func entryStatus(sl obj) string {
+	return strings.ToLower(strings.TrimSpace(firstScalar(sl, []string{"status"})))
+}
+
+func entryNotes(sl obj) string {
+	n := sl["notes"]
+	if n == nil {
+		return ""
+	}
+	var parts []string
+	for _, x := range asList(n) {
+		if t := noteText(x); t != "" {
+			parts = append(parts, t)
+		}
+	}
+	if s, ok := n.(string); ok {
+		parts = append(parts, strings.TrimSpace(s))
+	}
+	return strings.Join(parts, " · ")
+}
+
+func isCancellation(sl obj) bool {
+	return cancelledStatus[entryStatus(sl)] ||
+		containsAny(strings.ToLower(entryNotes(sl)), "ausfall", "entfällt", "entfaellt", "cancel")
+}
+
+// findLesson returns the lesson in period nr, preferring one with the same
+// subject when several lessons share the period; -1 if there is none.
+func findLesson(ls []Lesson, nr int, subject string) int {
+	idx := -1
+	for i, l := range ls {
+		if l.Nr != nr {
+			continue
+		}
+		if subject != "" && strings.EqualFold(l.Subject, subject) {
+			return i
+		}
+		if idx < 0 {
+			idx = i
+		}
+	}
+	return idx
 }
 
 func newSlot(nr int, subject string, tt *timetable) Lesson {

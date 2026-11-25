@@ -192,3 +192,59 @@ func TestBuildDaysWeek(t *testing.T) {
 		t.Errorf("substitution lost: %+v", days[0].Lessons[1])
 	}
 }
+
+// Two plan entries for the same period: the regular group lesson is
+// cancelled while another TC lesson (different group/teacher/room) takes
+// place as a substitution. Whatever order the API lists them in, the
+// period must show the substitution, not "cancelled".
+func TestCancelledAndSubstitutionInSameSlot(t *testing.T) {
+	const tmpl = `{
+ "students": {"data": [{"id": 11, "forename": "Lukas"}]},
+ "timetable": {"data": {"lessons": [
+   {"weekday": 3, "nr": 4, "subject": {"name": "Sport"}, "time": {"from": "10:35", "to": "11:20"}},
+   {"weekday": 3, "nr": 5, "subject": {"name": "Technik/Computer"}, "rooms": [{"local_id": "W2.06"}], "teachers": [{"local_id": "Scha"}], "time": {"from": "11:30", "to": "12:15"}}
+ ]}},
+ "substitutions": {"data": [{"date": "2026-11-25", "lessons": [%s]}]}
+}`
+	cancelled := `{"nr": 5, "status": "canceled", "subject": {"name": "Technik/Computer"}, "rooms": [{"local_id": "W2.06"}], "teachers": [{"local_id": "Scha"}]}`
+	cases := map[string]string{
+		"planned first":    `{"nr": 5, "status": "planned", "subject": {"name": "Technik/Computer"}, "rooms": [{"local_id": "W2.15"}], "teachers": [{"local_id": "Ju"}]}, ` + cancelled,
+		"planned last":     cancelled + `, {"nr": 5, "status": "planned", "subject": {"name": "Technik/Computer"}, "rooms": [{"local_id": "W2.15"}], "teachers": [{"local_id": "Ju"}]}`,
+		"held entry last":  cancelled + `, {"nr": 5, "status": "hold", "subject": {"name": "Technik/Computer"}, "rooms": [{"local_id": "W2.15"}], "teachers": [{"local_id": "Ju"}]}`,
+		"held entry first": `{"nr": 5, "status": "hold", "subject": {"name": "Technik/Computer"}, "rooms": [{"local_id": "W2.15"}], "teachers": [{"local_id": "Ju"}]}, ` + cancelled,
+	}
+	for name, subs := range cases {
+		t.Run(name, func(t *testing.T) {
+			raw := load(t, strings.Replace(tmpl, "%s", subs, 1))
+			d := Build(raw, time.Date(2026, 11, 25, 7, 0, 0, 0, berlin), berlin, nil).Students[0].Day
+			var tc []Lesson
+			for _, l := range d.Lessons {
+				if l.Nr == 5 {
+					tc = append(tc, l)
+				}
+			}
+			if len(tc) != 1 || tc[0].Status == "cancelled" || tc[0].Room != "W2.15" {
+				t.Fatalf("period 5 should take place in W2.15:\n%s", lessons(d))
+			}
+		})
+	}
+}
+
+// A cancelled lesson replaced by a different subject still shows as a
+// substitution "statt …", independent of entry order.
+func TestCancelledReplacedByOtherSubject(t *testing.T) {
+	raw := load(t, `{
+ "students": {"data": [{"id": 11, "forename": "Lukas"}]},
+ "timetable": {"data": {"lessons": [
+   {"weekday": 3, "nr": 1, "subject": {"name": "Mathematik"}, "time": {"from": "08:00", "to": "08:45"}}
+ ]}},
+ "substitutions": {"data": [{"date": "2026-11-25", "lessons": [
+   {"nr": 1, "status": "planned", "subject": {"name": "Deutsch"}},
+   {"nr": 1, "status": "cancelled", "subject": {"name": "Mathematik"}}
+ ]}]}
+}`)
+	d := Build(raw, time.Date(2026, 11, 25, 7, 0, 0, 0, berlin), berlin, nil).Students[0].Day
+	if got := lessons(d); got != "08:00 Deutsch substitution (statt Mathematik)" {
+		t.Fatalf("got:\n%s", got)
+	}
+}
