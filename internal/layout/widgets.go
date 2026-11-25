@@ -22,6 +22,7 @@ const (
 	WidgetSchool    WidgetType = "school"
 	WidgetCalendars WidgetType = "calendars"
 	WidgetDayband   WidgetType = "dayband"
+	WidgetWeek      WidgetType = "week"
 )
 
 // WidgetDef pins one catalog entry: the type and its minimum tile size.
@@ -40,6 +41,7 @@ var Catalog = []WidgetDef{
 	{Type: WidgetSchool, MinW: 6, MinH: 4},
 	{Type: WidgetCalendars, MinW: 6, MinH: 4},
 	{Type: WidgetDayband, MinW: 8, MinH: 4},
+	{Type: WidgetWeek, MinW: 6, MinH: 5},
 }
 
 // Lookup returns the catalog entry for a type string.

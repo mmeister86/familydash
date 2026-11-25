@@ -500,6 +500,27 @@ function renderDayband(d) {
   return true;
 }
 
+// ------------------------------------------------------------------ week matrix
+
+// Days as rows, calendar columns as columns. Returns whether there is a column.
+function renderWeek(d) {
+  const { columns, rows } = weekRows({ calendars: d.calendar?.calendars || [], events: d.calendar?.events || [], days: d.days || 7, now: new Date() });
+  if (!columns.length) { $("week").innerHTML = ""; return false; }
+  const head = `<div class="col"></div>${columns.map((c) => `<div class="col" style="--c:${esc(c.color)}"><i></i>${esc(c.name)}</div>`).join("")}`;
+  const body = rows.map((r) => {
+    const t = r.isToday ? " is-today" : "";
+    const cells = r.cells.map((cell) => {
+      const empty = !cell.allDay.length && !cell.timed.length;
+      const lines = cell.allDay.map((a) => `<div class="allday${r.free ? " free" : ""}">${esc(a.title)}</div>`).join("")
+        + cell.timed.map((e) => `<div class="ev${e.past ? " done" : ""}"><span class="t">${esc(e.time)}</span><span>${esc(e.title)}${e.location ? `<small>${esc(e.location)}</small>` : ""}</span></div>`).join("");
+      return `<div class="${t.trim()}">${empty && r.isToday ? `<div class="none">frei</div>` : lines}</div>`;
+    }).join("");
+    return `<div class="day${t}${r.free ? " free" : ""}"><b>${esc(r.label)}</b>${esc(r.sub)}</div>${cells}`;
+  }).join("");
+  $("week").innerHTML = `<div class="wgrid" style="grid-template-columns:10.2rem repeat(${columns.length}, minmax(0, 1fr))">${head}${body}</div>`;
+  return true;
+}
+
 // ------------------------------------------------------------------ school lunch (VielfaltMenü)
 
 const MEAL_DAYS = 2;     // delivery days shown per child
@@ -1003,11 +1024,12 @@ function render() {
     renderBriefing(brief);
     slideshow.set(d.photos);
     const hasDayband = renderDayband(d);
+    const hasWeek = renderWeek(d);
     const hasSchool = renderSchoolRow(d, school?.props?.mode || "full", school?.props?.mealDay);
     const hasNews = renderNews(d.news);
     const hasPhotos = slideshow.has();
     const visible = applyScene(sc, widgets, {
-      briefing: !!brief, school: hasSchool, dayband: hasDayband, news: hasNews, photos: hasPhotos,
+      briefing: !!brief, school: hasSchool, dayband: hasDayband, week: hasWeek, news: hasNews, photos: hasPhotos,
       clock: true, shopping: true, calendars: true,
     });
     visible.has("photos") && hasPhotos ? slideshow.start() : slideshow.stop();

@@ -26,7 +26,8 @@ export const demoScenes = {
     widget("clock", "clock", 0, 0, 12, 3, { wide: true, hints: false }),
     widget("dayband", "dayband", 0, 3, 12, 4),
     widget("school", "school", 0, 7, 12, 8, { mode: "full", mealDay: "today" }),
-    widget("calendars", "calendars", 0, 15, 12, 9),
+    widget("week", "week", 0, 15, 12, 7),
+    widget("shopping", "shopping", 0, 22, 12, 2),
   ],
   evening: [
     widget("clock", "clock", 0, 0, 12, 5, { wide: true, hints: false }),

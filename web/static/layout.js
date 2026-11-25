@@ -12,6 +12,7 @@ const EL = {
   school: "school",
   calendars: "calendars",
   dayband: "dayband",
+  week: "week",
 };
 
 // resolveLayout places feed widgets onto the grid.

@@ -5,7 +5,7 @@ import assert from "node:assert";
 const src = readFileSync(new URL("./static/layout.js", import.meta.url), "utf8");
 const { resolveLayout, briefingKind, scenePayloadChanged, EL } = new Function(`${src}; return { resolveLayout, briefingKind, scenePayloadChanged, EL };`)();
 
-const allTypes = ["clock", "shopping", "briefing", "news", "photos", "school", "calendars", "dayband"];
+const allTypes = ["clock", "shopping", "briefing", "news", "photos", "school", "calendars", "dayband", "week"];
 const allShown = Object.fromEntries(allTypes.map((t) => [t, true]));
 
 // basic placement, rest hidden
@@ -19,7 +19,7 @@ const allShown = Object.fromEntries(allTypes.map((t) => [t, true]));
     { type: "clock", x: 0, y: 0, w: 12, h: 4, narrow: false },
     { type: "news", x: 0, y: 4, w: 6, h: 5, narrow: false },
   ]);
-  assert.deepStrictEqual(got.hidden.sort(), ["shopping", "briefing", "photos", "school", "calendars", "dayband"].sort());
+  assert.deepStrictEqual(got.hidden.sort(), ["shopping", "briefing", "photos", "school", "calendars", "dayband", "week"].sort());
   assert.deepStrictEqual(got.unknown, []);
   assert.strictEqual(EL["clock"], "clock-card");
   assert.strictEqual(EL["photos"], "photo-frame");
@@ -32,6 +32,14 @@ const allShown = Object.fromEntries(allTypes.map((t) => [t, true]));
   assert.strictEqual(EL["dayband"], "dayband");
   assert.ok(!got.hidden.includes("dayband"));
   assert.ok(resolveLayout([], allShown).hidden.includes("dayband"));
+}
+
+// the week tile is placed like any other tile
+{
+  const got = resolveLayout([{ type: "week", x: 0, y: 15, w: 12, h: 7 }], allShown);
+  assert.deepStrictEqual(got.placements, [{ type: "week", x: 0, y: 15, w: 12, h: 7, narrow: false }]);
+  assert.strictEqual(EL["week"], "week");
+  assert.ok(resolveLayout([], allShown).hidden.includes("week"));
 }
 
 // narrow tiles (below 6 columns) are flagged for compact CSS
